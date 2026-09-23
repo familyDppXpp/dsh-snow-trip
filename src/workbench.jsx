@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useId, useMemo, useRef, us
 import {date,evaluate,money,text} from './ledger.js';
 import {PackageCard,usePackages} from './package-cards.jsx';
 import {packageStats,packageCandidates} from './package-explore.js';
-import {packageSummary} from './packages.ts';
+import {fieldLabels,purchaseLabels} from './packages.ts';
 import {storage} from './storage.js';
 import {snowSessions, sessionTitle, groupSessions, packagesForSession} from './sessions.js';
 
@@ -12,10 +12,26 @@ export function PackageSidebarToggle() {
   if(!panel?.available)return null;
   return <span className="snow"><button className="icon-button" aria-label={panel.open?'收起套餐详情':'展开套餐详情'} title={panel.open?'收起套餐详情':'展开套餐详情'} aria-expanded={panel.open} aria-controls="snow-package-sidebar" onClick={panel.toggle}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button></span>;
 }
+function PackageFacts({record,fields}) {
+  return <dl className="snow-detail-facts">{fields.map(key=>{
+    const value=record[key];
+    const shown=value===null?'待确认':Array.isArray(value)?(value.length?value.join('；'):'已确认无'):['quote','paid','paidExtra'].includes(key)?yuan(value/100):typeof value==='boolean'?(value?'是':'否'):String(value);
+    return <div key={key}><dt>{fieldLabels[key]}</dt><dd className={value===null?'is-unknown':undefined}>{shown}</dd></div>;
+  })}</dl>;
+}
 function PackageSidebar({records,onClose,error,loading,onRetry}) {
   return <aside className="snow snow-package-sidebar" id="snow-package-sidebar" aria-label="套餐详情" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}}}>
-    <div className="snow-package-sidebar-head"><h2>套餐详情</h2><button className="icon-button" aria-label="收起套餐详情" onClick={onClose}><Icon name="close"/></button></div>
-    <div className="snow-package-sidebar-body">{error&&<p className="error" role="alert">详情刷新失败，以下为上次读取的内容。<button onClick={onRetry}>重试</button></p>}{loading&&<p role="status">正在刷新…</p>}{records.map((record,index)=><details key={record.id} open={index===0?true:undefined}><summary><strong>{record.name}</strong><span className="snow-session-tag">{record.completeness==='incomplete'?'待补全':'资料完整'}</span></summary><div className="snow-package-detail">{packageSummary(record).split('\n').map((line,i)=><p key={i}>{line}</p>)}</div></details>)}</div>
+    <div className="snow-package-sidebar-head"><h2>套餐详情 <small>{records.length}</small></h2><button className="icon-button" aria-label="收起套餐详情" onClick={onClose}><Icon name="close"/></button></div>
+    <div className="snow-package-sidebar-body">{error&&<p className="error" role="alert">详情刷新失败，以下为上次读取的内容。<button onClick={onRetry}>重试</button></p>}{loading&&<p role="status">正在刷新…</p>}{records.map((record,index)=><details className="snow-detail-package" key={record.id} open={index===0?true:undefined}>
+      <summary><span><strong>{record.name}</strong><small>{purchaseLabels[record.purchaseStatus]}</small></span><span className="snow-session-tag">{record.completeness==='incomplete'?'待补全':'资料完整'}</span></summary>
+      <div className="snow-package-detail">
+        <div className="snow-detail-highlights"><div><span>报价</span><strong>{record.quote===null?'待确认':yuan(record.quote/100)}</strong></div><div><span>住宿间夜</span><strong>{record.nights??'待确认'}{record.nights!==null&&<small> 间夜</small>}</strong></div></div>
+        <section><h3>住宿信息</h3><PackageFacts record={record} fields={['hotels','roomType','resort','region','description']}/></section>
+        <section><h3>购买与使用</h3><PackageFacts record={record} fields={['purchasePlatform','paid','paidExtra','validFrom','validTo','usedNights','voided']}/></section>
+        <details className="snow-detail-section"><summary>使用规则</summary><PackageFacts record={record} fields={['splitRule','surchargeRules','unavailableDates']}/></details>
+        {record.unknowns.length>0&&<details className="snow-detail-section snow-detail-pending"><summary>待补全 <span>{record.unknowns.length} 项</span></summary><ul>{record.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></details>}
+      </div>
+    </details>)}</div>
   </aside>;
 }
 
