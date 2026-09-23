@@ -125,3 +125,32 @@ node test/text-import.browser.mjs
 ```
 
 分发复验：`pnpm pack` 后通过 DSH `plugin --profile web add` 安装 tgz 到隔离 profile，重启宿主并重新运行上述浏览器全链路，结果通过。安装器提示 SDK peer 缺失：这些是由 DSH 宿主解析器提供的共享包，隔离 profile 的包管理器未单独安装；已用安装后的真实宿主验证其加载、工具调用与 Remote 正常，不将该安装提示描述为零警告。
+
+## SNOW-05 截图与文字录入（2026-09-23）
+
+基线 `e226b29974b319b7e15e7e2c90e1e177a0338128`。已接入“导入截图”：选择 PNG/JPEG/WebP/GIF 后新建雪季会话，复用宿主附件草稿与缩略图、预填可编辑提示词，不自动发送。原图使用同一宿主 URL 在工作台内的原生弹窗展示，解决宿主 body portal 灯箱被工作台外层 dialog 遮挡的问题；没有另一套附件存储。
+
+`sourceNotes` 区分图片事实、用户补充、未确认推断，确认摘要、持久化记录及两处卡片共用该字段。旧记录缺少此字段时读为 `[]`；原 `sources` 历史兼容行为不变。来源说明由助理整理并交用户确认，不代表系统独立证明识别正确。图文多轮合并、冲突追问、模糊项保留未知由 `snow-import` 指导，图片能力错误沿用宿主，并在工作台显示实际发送错误及切换模型／补充文字路径。
+
+验证结果：
+
+- `npm run build`、`npm run typecheck`、`npm test`、`git diff --check` 通过；15 项自动检查中 13 项通过，2 项私人工作簿检查未提供输入而跳过。仓库没有 lint 脚本。
+- `test/image-import.test.mjs` 覆盖不自动发送、附件添加失败释放、类型拒绝、图文来源摘要、未知和冲突问题、非法来源输入。
+- 复用 `test/text-import.integration.test.mjs` 的真实宿主 Tools 与存储检查，增加图文来源在确认、写入、重开、查询、更新保留中的断言，未复制一套持久化测试。
+- `test/image-import.browser.mjs` 在隔离 DSH `0.1.5-alpha.1-5dda764-dirty` 和 Chrome 上通过：合成截图缩略图与原图弹窗、草稿可改、发送前模型请求为零且台账不变；发送后真实宿主请求包含 PNG 的 `image_url`；追加文字后确认摘要包含图片事实、用户补充和 3 晚；用户确认后成功卡片与概览 ID 相同。
+- 配置仅文字测试模型后，宿主实际拒绝图片发送；工作台显示“当前模型不支持图片”，套餐数量不变，`/model` 可切回兼容测试模型。全部浏览器步骤无未捕获异常。
+- 浏览器使用本机可控 OpenAI 兼容响应，验证附件、会话、错误处理与保存链路；它不证明真实模型的图片理解、模糊文字判断或冲突处理质量。
+- **真实兼容模型识图：未验证。** 当前隔离环境没有已确认可用的真实图片模型凭据；已有真实模型配置未证明图片支持。没有将可控模型结果记为真实识图成功，此项验收保留待验证。
+- 规范轴和需求轴独立审查完成，无剩余已确认缺陷。附件草稿方法来自当前宿主导出的 `ConversationController`，尚不在 `IConversation` 类型接口中，兼容性仅覆盖上述验证版本。
+
+本地图片 `.local/合成套餐.png`、`.local/image-draft.png`、`.local/image-confirm.png`、`.local/image-unsupported.png` 均为合成测试材料，不随包分发。测试使用 `.local/image-import-home`，没有改用户默认 profile。分发复验使用独立命名 tgz，避免同名文件安装缓存；安装器仍有宿主 SDK peer 提示，真实加载和执行已通过。
+
+浏览器复现：先在隔离 profile 安装本包与 `test/integration-host`；配置 `snow-test` 提供商指向 `http://127.0.0.1:4342/v1`，模型 `snow-test` 的 `input` 为 `[text, image]`、`snow-text` 为 `[text]`，显示名称分别为“雪季确定性集成检查”和“仅文字测试模型”。宿主启动时设置 `SNOW_MOCK_API_KEY=test`。脚本自行启动并关闭本机可控模型。
+
+```sh
+SNOW_PLAYWRIGHT=/绝对路径/playwright/index.mjs \
+SNOW_MOCK_SERVER=/绝对路径/deepseek-harness/packages/test-support/llm-mock-server/lib/index.js \
+SNOW_HOST_LOG=/绝对路径/隔离宿主日志 \
+SNOW_CHROME=/绝对路径/Chrome \
+node test/image-import.browser.mjs
+```

@@ -45,6 +45,12 @@ function Modal({title,children,onClose,wide=false,dismissible=true}) {
   return <dialog ref={ref} className={`snow-modal snow ${wide?'wide':''}`} aria-label={title} onClose={onClose} onCancel={event=>{if(!dismissible)event.preventDefault();}} onClick={e=>{if(dismissible&&e.target===ref.current)ref.current.close();}}><div className="modal-head"><h2>{title}</h2><button aria-label="关闭" disabled={!dismissible} className="icon-button" onClick={()=>ref.current.close()}><Icon name="close"/></button></div><div className="modal-body">{children}</div></dialog>;
 }
 function Field({label,children}){const id=useId();return <div className="field"><label htmlFor={id}>{label}</label>{React.cloneElement(children,{id})}</div>;}
+function SessionFeedback({state}) {
+  const snapshot=useSyncExternalStore(listener=>state.subscribe(listener),()=>state.getSnapshot());
+  const error=snapshot.promptError?.error;
+  if(!error)return null;
+  return <p role="alert" className="error">{error.details?.reason==='MODEL_DOES_NOT_SUPPORT_IMAGES'?'当前模型不支持图片，请切换宿主已有兼容模型，或移除图片并补充文字。':`${snapshot.promptError.op==='stop'?'停止':'发送'}失败：${error.message}`}</p>;
+}
 function Mountain(){return <svg className="mountain-art" viewBox="0 0 660 260" fill="none" aria-hidden="true"><path d="M0 242 106 115 151 172 269 22 332 110 390 69 548 245" fill="#dfe9e8"/><path d="m84 260 185-238 41 104 47 27 76 107" fill="#91a9a5"/><path d="m171 146 98-124 41 104-32-17-26 28-18-14-31 37z" fill="#f8fbf9"/><path d="M267 260 390 69l126 153 53-90 91 128" fill="#becdc8"/><path d="m352 128 38-59 49 59-28-8-18 19-16-25z" fill="#f8fbf9"/><path d="M0 260 84 223l75 26 129-33 101 22 120-23 151 27v18" fill="#718e86"/><path d="m57 260 138-51 62 10 90-27 83 15 62-30" stroke="#e7f0e8" strokeWidth="2" strokeDasharray="5 6"/><circle cx="347" cy="192" r="6" fill="#e8a156" stroke="#fff" strokeWidth="3"/><circle cx="492" cy="177" r="5" fill="#e8a156" stroke="#fff" strokeWidth="3"/></svg>;}
 
 function Detail({result,onClose}) {
@@ -73,6 +79,7 @@ export function App({useSessions, renderSlot, actions}) {
   },[]);
   const sessions=useSessions(state=>state);
   const [sessionBusy,setSessionBusy]=useState(false),[sessionError,setSessionError]=useState('');
+  const [imagePreview,setImagePreview]=useState(null);
   const [pendingArchive,setPendingArchive]=useState(null),[sessionMenu,setSessionMenu]=useState(null);
   const workspaceState=useSyncExternalStore(actions.workspaceList.subscribe,actions.workspaceList.getSnapshot);
   const [pendingRename,setPendingRename]=useState(null),[renameError,setRenameError]=useState('');
@@ -80,9 +87,9 @@ export function App({useSessions, renderSlot, actions}) {
   const conversation=useRef(null),sessionList=useRef(null);
   const [sessionQuery,setSessionQuery]=useState('');
   const sessionGroups=groupSessions(rows,sessionQuery);
-  async function startSession() {
+  async function startSession(file) {
     setSessionError('');setSessionQuery('');setSessionBusy(true);setView('explore');
-    try {await actions.create();setView('conversation');}
+    try {await actions.create(undefined,file instanceof File?file:undefined);setView('conversation');}
     catch(error){setSessionError(error.message);}
     finally{setSessionBusy(false);}
   }
@@ -93,7 +100,7 @@ export function App({useSessions, renderSlot, actions}) {
   useEffect(()=>{
     if(view==='conversation')sessionList.current?.querySelector('[aria-current="page"]')?.scrollIntoView({block:'nearest'});
   },[view,current?.id]);
-  const startInput=useRef(null);
+  const startInput=useRef(null),imageInput=useRef(null);
   useEffect(()=>{
     if(view==='conversation'&&current) requestAnimationFrame(()=>conversation.current?.querySelector('[contenteditable="true"]')?.focus());
   },[view,current?.id]);
@@ -151,7 +158,7 @@ export function App({useSessions, renderSlot, actions}) {
       onKeyDown={event=>{const next={ArrowLeft:railSize.width-10,ArrowRight:railSize.width+10,Home:145,End:railMax}[event.key];if(next!==undefined){event.preventDefault();resizeRail(next);}}}
     />
   </div>
-  <div className="snow snow-content" hidden={view==='conversation'&&!!current}><main className="workspace"><header className="topbar"><div><span className="crumb">我的雪季</span><span className="separator">/</span>{tabs.find(t=>t[0]===view)?.[2]}</div><button onClick={startSession} disabled={sessionBusy}><Icon name="edit"/>{sessionBusy?'正在准备…':'开始录入'}</button></header>
+  <div className="snow snow-content" hidden={view==='conversation'&&!!current}><main className="workspace"><header className="topbar"><div><span className="crumb">我的雪季</span><span className="separator">/</span>{tabs.find(t=>t[0]===view)?.[2]}</div><input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="选择套餐截图" hidden onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)startSession(file);}}/><button onClick={()=>imageInput.current.click()} disabled={sessionBusy}><Icon name="upload"/>导入截图</button><button onClick={startSession} disabled={sessionBusy}><Icon name="edit"/>{sessionBusy?'正在准备…':'开始录入'}</button></header>
   <div className="page"><div aria-live="polite" className={`feedback ${notice?'visible':''}`}>{notice}</div>{error&&<div role="alert" className="notice error">{error}</div>}
   {view==='explore'&&<><section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="green-dot"/> 雪季计划进行中</div><h1>下一站，<br/>去山里过冬。</h1><p>从已购套餐出发，找到时间和预算都合适的那一程。</p><div className="hero-tags"><span>套餐权益</span><span>逐晚补款</span><span>方案对比</span></div></div><Mountain/><div className="mountain-caption">这个雪季，把好时光留给山野。</div></section>
   <section className="stats" aria-label="台账概况"><div><span>已录入套餐</span><strong>{host.loading||host.error?'—':stats.count.toString().padStart(2,'0')}<small> 份</small></strong></div><div><span>已知住宿间夜</span><strong>{host.loading||host.error?'—':stats.nights}<small> 晚</small></strong>{stats.nightsUnknown>0&&<small>{stats.nightsUnknown} 份晚数待确认</small>}</div><div><span>已知实付与补款合计</span><strong>{host.loading||host.error?'—':yuan(stats.paid/100)}</strong>{stats.paidUnknown>0&&<small>{stats.paidUnknown} 份金额未完整，非最终总额</small>}</div><div><span>已知目的地区域</span><strong>{host.loading||host.error?'—':stats.regions.length}<small> 处</small></strong>{stats.regionsUnknown>0&&<small>{stats.regionsUnknown} 份地区待确认</small>}</div></section>
@@ -162,7 +169,12 @@ export function App({useSessions, renderSlot, actions}) {
   {view==='saved'&&<><div className="page-title"><span className="eyebrow">留住合适的选择</span><h1>已存方案</h1><p>保存的是当时的台账与费用快照，更新台账后请重新核对。</p></div>{saved.length?saved.map(plan=><section className="saved-plan" key={plan.id}><div><h2>{plan.filter.start} 出发 · {plan.options.map(x=>x.hotel).join(' / ')}</h2><p className="muted">保存于 {new Date(plan.createdAt).toLocaleString('zh-CN')} · {plan.fileName}</p></div><div className="saved-options">{plan.options.map(o=><div key={o.id}><h3>{o.hotel}</h3><p>{o.start} → {o.end} · {o.nights} 晚</p><p>预计新增：{Object.values(o.costs).every(n=>n!==null)?yuan(Object.values(o.costs).reduce((a,n)=>a+n,0)):'费用未完整'}</p>{o.conditions.map(x=><small className="error" key={x}>{x}</small>)}</div>)}</div><button onClick={()=>{const blob=new Blob([JSON.stringify(plan,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`雪季方案-${plan.filter.start}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>导出方案 JSON</button></section>):<div className="empty"><Icon name="save" size={36}/><h3>还没有保存的方案</h3><p>目前还没有历史方案。已录入套餐可在“找出行方案”中核对。</p><button onClick={()=>setView('explore')}>去找出行方案</button></div>}</>}
   <footer className="page-footer"><span>雪季出行工作台</span><span>{ledger?'来源：'+ledger.fileName:'文字录入 · 核对后保存'}</span></footer></div>
   {selection.length>0&&view==='explore'&&<div className="compare-bar"><div><Icon name="compare"/><b>已选 {selection.length} / 3</b><span>{chosen.map(r=>r.pkg.hotel.split('（')[0]).join(' · ')}</span></div><button className="text-button" onClick={()=>setSelection([])}>清空</button><button className="primary" onClick={()=>setComparing(true)}>对比与规划 <Icon name="arrow" size={17}/></button></div>}</main></div>
-  {view==='conversation'&&current&&<main className="snow-session-main"><div className="snow-conversation" ref={conversation}>{renderSlot('conversation',{})}</div></main>}
+  {view==='conversation'&&current&&<main className="snow-session-main"><div className="snow">{actions.sessionState(current.id)&&<SessionFeedback state={actions.sessionState(current.id)}/>}<p className="muted small">截图可在输入框预览或移除，提示词可编辑，点击发送后才识别。若模型不支持图片，请使用输入框的模型选择或 /model 切换宿主已有兼容模型，或补充套餐文字；识别失败不表示已保存。</p></div><div className="snow-conversation" ref={conversation} onClickCapture={event=>{
+    // 宿主图片灯箱使用 body portal，会被工作台原生 dialog 遮挡；复用宿主图片 URL 在内层 dialog 预览。
+    const image=event.target.closest('button')?.querySelector('img');
+    if(image){event.preventDefault();event.stopPropagation();setImagePreview({src:image.currentSrc||image.src,alt:image.alt});}
+  }}>{renderSlot('conversation',{})}</div></main>}
+  {imagePreview&&<Modal title="截图预览" onClose={()=>setImagePreview(null)} wide><img src={imagePreview.src} alt={imagePreview.alt} style={{display:'block',maxWidth:'100%',maxHeight:'70vh',margin:'auto'}}/></Modal>}
   {pendingRename&&<Modal title="编辑会话标题" dismissible={!sessionBusy} onClose={()=>setPendingRename(null)}>
     <form onSubmit={async event=>{
       event.preventDefault();if(sessionBusy)return;

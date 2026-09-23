@@ -45,7 +45,7 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
   }
   let agent={id:'test-session'};
   const execute=(name,args,signal=new AbortController().signal)=>ctx.tools.execute({name,arguments:args,agent,signal,callId:`call-${Math.random()}`});
-  const input={package:{description:'长白山住宿',quote:129900,purchaseStatus:'unpurchased'}};
+  const input={package:{description:'长白山住宿',quote:129900,purchaseStatus:'unpurchased',sourceNotes:[{kind:'image',text:'套餐.png：长白山住宿，报价1299元'},{kind:'user',text:'还没购买'}]}};
   try{
     assert.deepEqual(TYPERT.invocations.map(i=>i.id).sort(),['ensureWorkspace','getPackage','listPackages'].map(name=>`dsh-snow-trip#snowTrip/${name}`).sort());
     assert.deepEqual(await boot(),[]);
@@ -61,6 +61,7 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     const success=await execute('snow_save_packages',input);
     assert.equal(success.isError,false,JSON.stringify(success));
     const record=packageMetadata(success.meta);assert.ok(record);
+    assert.deepEqual(record.sourceNotes,input.package.sourceNotes);assert.match(question,/图片事实：套餐.png/);assert.match(question,/用户补充：还没购买/);
     assert.equal(record.revision,1);assert.equal(record.quote,129900);assert.equal(record.paid,null);
     assert.equal(record.nights,null);assert.equal('sources' in record,false);assert.equal(record.purchasePlatform,null);assert.equal(record.purchaseStatus,'unpurchased');
     assert.match(question,/报价：1299.00 元/);assert.match(question,/总间夜：待确认/);
@@ -85,6 +86,7 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     respond=()=>({answers:[{id:'save-package',selected:['确认保存']}]});
     const updated=await execute('snow_save_packages',update);
     assert.equal(updated.isError,false,JSON.stringify(updated));
+    assert.deepEqual(updated.value.sourceNotes,record.sourceNotes);
     assert.equal(updated.value.id,record.id);assert.equal(updated.value.revision,2);
     assert.equal(updated.value.purchasePlatform,'微信小程序 xxx');assert.match(question,/购买平台：微信小程序 xxx/);assert.equal(updated.value.quote,record.quote);assert.equal(updated.value.createdAt,record.createdAt);
     assert.deepEqual(updated.value.unavailableDates,['2026-12-25']);

@@ -51,6 +51,16 @@ export async function createSnowSession(sessions, presets, input, workspaceId, d
   return id;
 }
 
+export async function createSnowImageSession(sessions, presets, conversation, workspaceId, file) {
+  if (!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)) throw new Error('请选择 PNG、JPEG、WebP 或 GIF 截图。');
+  const id=await createSnowSession(sessions,presets,conversation.input,workspaceId,'请结合截图和我后续补充的文字整理一份套餐，区分图片事实、用户补充和推断。看不清或有冲突的字段请追问，未知项保留待确认。先展示摘要，经我确认后再保存。');
+  const drafts=conversation.createDrafts(id,[file]);
+  try {
+    if(!conversation.input.for(sessions.scope(id)).addAttachments(drafts.map(draft=>draft.id))) throw new Error('图片附件未加入，请在会话输入框重新选择截图。');
+  } catch(error) { conversation.releaseDraftAttachments(drafts);throw error; }
+  return id;
+}
+
 // 两个会话视图共享宿主问题对象；卸载镜像不回答或取消原问题。
 export function mirrorQuestions(source, target) {
   const publish=target.registerPendingInteraction(pending=>pending.kind==='plan-review'?2:1);
