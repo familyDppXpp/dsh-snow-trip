@@ -95,3 +95,4 @@
 .snow .package-trip-notes strong{color:var(--ink);font-weight:500}
 .snow .package-trip-notes ul{margin:6px 0 0;padding-left:18px}
 @media(max-width:760px){.snow .snow-package-card .card-body{padding:20px;gap:16px}.snow .snow-package-card h3{font-size:17px}}
+.snow-conversation header nav button:disabled{max-width:none;white-space:normal;overflow-wrap:anywhere;text-overflow:clip;text-align:left}
