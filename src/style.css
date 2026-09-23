@@ -43,7 +43,6 @@
 
 .snow-session-empty{padding:24px 8px;font-size:12px;color:var(--ink)}
 .snow-session-empty small{display:block;font-size:11px;line-height:1.7;color:var(--muted);margin-top:6px}
-.snow .snow-session-disclosure{font-size:10px;line-height:1.6;color:var(--muted);padding:0 5px}
 
 @media(max-width:760px){.snow-session-controls{margin-top:18px;padding-top:12px}.snow .snow-session-open{padding-left:7px;padding-right:7px}.snow-session-meta{font-size:10px;gap:2px}.snow-session-open strong{font-size:12px}}
 
@@ -70,7 +69,7 @@
 .snow-rail nav{gap:2px;margin-top:0;flex-shrink:0}
 .snow-rail nav button{min-height:36px;padding:8px 12px;font-size:13px}
 .snow-rail .snow-session-controls{margin-top:12px;padding-top:12px;min-height:0;gap:8px}
-.snow-rail .snow-session-controls>button,.snow-rail .snow-session-search,.snow-rail .snow-session-disclosure{flex-shrink:0}
+.snow-rail .snow-session-controls>button,.snow-rail .snow-session-search{flex-shrink:0}
 .snow-rail .rail-bottom{display:flex;align-items:center;flex-wrap:wrap;column-gap:4px;margin-top:8px;padding:8px 4px 0;border-top:1px solid var(--line);flex-shrink:0;font-size:10px}
 .snow-rail .rail-bottom .local-dot{margin-right:2px}
 .snow-rail .rail-bottom .return{margin-left:auto;font-size:10px;min-height:28px}

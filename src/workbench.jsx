@@ -147,7 +147,6 @@ export function App({useSessions, renderSlot, actions}) {
           </div>;
         })}</section>)}
       </div>
-      <p className="snow-session-disclosure">对话内容会发送给配置的模型。</p>
     </section>
     <div className="rail-bottom"><div className="local-dot"/><span>数据保存在本机</span><button className="return" aria-label="返回 DSH" onClick={actions.close}>← 返回 DSH</button></div></aside>
     <div className="snow-rail-resizer" role="separator" aria-label="调整侧边栏宽度" aria-orientation="vertical" aria-controls="snow-sidebar" aria-valuemin={145} aria-valuemax={railMax} aria-valuenow={railSize.width} tabIndex={0}
@@ -168,7 +167,7 @@ export function App({useSessions, renderSlot, actions}) {
   {view==='saved'&&<><div className="page-title"><span className="eyebrow">留住合适的选择</span><h1>已存方案</h1><p>保存的是当时的台账与费用快照，更新台账后请重新核对。</p></div>{saved.length?saved.map(plan=><section className="saved-plan" key={plan.id}><div><h2>{plan.filter.start} 出发 · {plan.options.map(x=>x.hotel).join(' / ')}</h2><p className="muted">保存于 {new Date(plan.createdAt).toLocaleString('zh-CN')} · {plan.fileName}</p></div><div className="saved-options">{plan.options.map(o=><div key={o.id}><h3>{o.hotel}</h3><p>{o.start} → {o.end} · {o.nights} 晚</p><p>预计新增：{Object.values(o.costs).every(n=>n!==null)?yuan(Object.values(o.costs).reduce((a,n)=>a+n,0)):'费用未完整'}</p>{o.conditions.map(x=><small className="error" key={x}>{x}</small>)}</div>)}</div><button onClick={()=>{const blob=new Blob([JSON.stringify(plan,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`雪季方案-${plan.filter.start}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>导出方案 JSON</button></section>):<div className="empty"><Icon name="save" size={36}/><h3>还没有保存的方案</h3><p>目前还没有历史方案。已录入套餐可在“找出行方案”中核对。</p><button onClick={()=>setView('explore')}>去找出行方案</button></div>}</>}
   <footer className="page-footer"><span>雪季出行工作台</span><span>{ledger?'来源：'+ledger.fileName:'文字录入 · 核对后保存'}</span></footer></div>
   {selection.length>0&&view==='explore'&&<div className="compare-bar"><div><Icon name="compare"/><b>已选 {selection.length} / 3</b><span>{chosen.map(r=>r.pkg.hotel.split('（')[0]).join(' · ')}</span></div><button className="text-button" onClick={()=>setSelection([])}>清空</button><button className="primary" onClick={()=>setComparing(true)}>对比与规划 <Icon name="arrow" size={17}/></button></div>}</main></div>
-  {view==='conversation'&&current&&<main className="snow-session-main"><div className="snow">{actions.sessionState(current.id)&&<SessionFeedback state={actions.sessionState(current.id)}/>}<p className="muted small">截图可在输入框预览或移除，提示词可编辑，点击发送后才识别。若模型不支持图片，请使用输入框的模型选择或 /model 切换宿主已有兼容模型，或补充套餐文字；识别失败不表示已保存。</p></div><div className="snow-conversation" ref={conversation} onClickCapture={event=>{
+  {view==='conversation'&&current&&<main className="snow-session-main"><div className="snow">{actions.sessionState(current.id)&&<SessionFeedback state={actions.sessionState(current.id)}/>}</div><div className="snow-conversation" ref={conversation} onClickCapture={event=>{
     // 宿主图片灯箱使用 body portal，会被工作台原生 dialog 遮挡；复用宿主图片 URL 在内层 dialog 预览。
     const image=event.target.closest('button')?.querySelector('img');
     if(image){event.preventDefault();event.stopPropagation();setImagePreview({src:image.currentSrc||image.src,alt:image.alt});}
