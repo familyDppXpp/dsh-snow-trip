@@ -68,7 +68,7 @@ function Comparison({results,filter,onSave,onClose}) {
 }
 
 export function App({useSessions, renderSlot, actions}) {
-  const [railSize,setRailSize]=useState(()=>({width:window.innerWidth<=760?145:window.innerWidth<=1150?175:206,viewport:window.innerWidth}));
+  const [railSize,setRailSize]=useState(()=>({width:window.innerWidth<=760?145:window.innerWidth<=1150?260:320,viewport:window.innerWidth}));
   const railMax=Math.max(145,Math.min(420,Math.floor(railSize.viewport/2)));
   const drag=useRef(null);
   const resizeRail=width=>setRailSize(size=>({...size,width:Math.max(145,Math.min(railMax,width))}));
