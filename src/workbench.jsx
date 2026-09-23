@@ -87,7 +87,7 @@ export function App({useSessions, renderSlot, actions}) {
   const rows=snowSessions(sessions).filter(row=>!workspaceState.archivedSessionIds.includes(row.id)),current=rows.find(row=>row.id===sessions.current);
   const conversation=useRef(null),sessionList=useRef(null);
   const [sessionQuery,setSessionQuery]=useState('');
-  const sessionGroups=groupSessions(rows,sessionQuery);
+  const [collapsedGroups,setCollapsedGroups]=useState({});
   async function startSession() {
     setSessionError('');setSessionQuery('');setSessionBusy(true);setView('explore');
     try {await actions.create();setView('conversation');}
@@ -120,6 +120,7 @@ export function App({useSessions, renderSlot, actions}) {
     finally{setSessionBusy(false);}
   }
   const host=usePackages(actions,`${view}:${current?.updatedAt}:${current?.running}`);
+  const sessionGroups=groupSessions(rows,sessionQuery,host.rows);
   const stats=packageStats(host.rows);
   const candidates=packageCandidates(host.rows,filter,sort);
   const openPackage=record=>{try{actions.continuePackage(record);setView('conversation');}catch(e){setSessionError(e.message);}};
@@ -137,11 +138,11 @@ export function App({useSessions, renderSlot, actions}) {
       {sessionError&&<p className="error" role="alert">{sessionError}</p>}
       <div className="snow-session-search"><Icon name="search" size={14}/><input aria-label="搜索会话" placeholder="搜索会话标题" value={sessionQuery} onChange={event=>setSessionQuery(event.target.value)} onKeyDown={event=>{if(event.key==='Escape'&&sessionQuery){event.preventDefault();event.stopPropagation();setSessionQuery('');}}}/>{sessionQuery&&<button aria-label="清空会话搜索" onClick={()=>setSessionQuery('')}><Icon name="close" size={12}/></button>}</div>
       <div className="snow-session-list" aria-label="雪季会话列表" ref={sessionList}>
-        {!sessionGroups.length?<div className="snow-session-empty"><p>{sessionQuery?'没有匹配的会话':'还没有会话'}</p><small>{sessionQuery?'换个关键词，或清空搜索。':'点击“新增会话”，开始准备下一程。'}</small></div>:sessionGroups.map(group=><section className="snow-session-group" key={group.label} aria-label={group.label}><h3>{group.label}</h3>{group.items.map(row=>{
+        {host.error?<div className="snow-session-empty" role="alert">会话分类加载失败<button onClick={host.retry}>重试</button></div>:host.loading&&!host.rows.length?<div className="snow-session-empty" role="status">正在加载会话分类…</div>:!sessionGroups.length?<div className="snow-session-empty"><p>{sessionQuery?'没有匹配的会话':'还没有会话'}</p><small>{sessionQuery?'换个关键词，或清空搜索。':'点击“新增会话”，开始准备下一程。'}</small></div>:sessionGroups.map(group=><section className="snow-session-group" key={group.label} aria-label={group.label}><h3><button className="snow-group-toggle" aria-expanded={!!sessionQuery.trim()||!collapsedGroups[group.label]} onClick={()=>setCollapsedGroups({...collapsedGroups,[group.label]:!collapsedGroups[group.label]})}><span aria-hidden="true">{!sessionQuery.trim()&&collapsedGroups[group.label]?'▸':'▾'}</span>{group.label}<span className="snow-group-count">{group.items.length}</span></button></h3>{(sessionQuery.trim()||!collapsedGroups[group.label])&&group.items.map(row=>{
           const title=sessionTitle(row),selected=view==='conversation'&&row.id===current?.id;
           return <div className={`snow-session-row${selected?' is-current':''}`} key={row.id} data-session-id={row.id}>
             <button className="snow-session-open" title={title} aria-current={selected?'page':undefined} disabled={sessionBusy} onClick={()=>{try{actions.open(row.id);setView('conversation');setSessionError('');}catch(error){setSessionError(error.message);}}}>
-              <strong>{title}</strong><span className="snow-session-meta"><span className={row.running?'is-running':''}>{row.running?'正在执行':row.completed?'已完成':row.blank?'尚未开始':'可继续'}</span>{!!row.updatedAt&&<time dateTime={new Date(row.updatedAt).toISOString()} title={new Date(row.updatedAt).toLocaleString('zh-CN')}>{new Date(row.updatedAt).toLocaleString('zh-CN',group.label==='更早'?{month:'numeric',day:'numeric'}:{hour:'2-digit',minute:'2-digit'})}</time>}</span>
+              <span className="snow-session-heading"><strong>{title}</strong>{row.packageStatus&&<span className="snow-session-tag">{row.packageStatus}</span>}</span><span className="snow-session-meta"><span className={row.running?'is-running':''}>{row.running?'正在执行':row.completed?'已完成':row.blank?'尚未开始':'可继续'}</span>{!!row.updatedAt&&<time dateTime={new Date(row.updatedAt).toISOString()} title={new Date(row.updatedAt).toLocaleString('zh-CN')}>{new Date(row.updatedAt).toLocaleString('zh-CN',new Date(row.updatedAt).toDateString()!==new Date().toDateString()?{month:'numeric',day:'numeric'}:{hour:'2-digit',minute:'2-digit'})}</time>}</span>
             </button>
             <div className="snow-session-actions">
             <button aria-label={`会话操作：${title}`} title="会话操作" disabled={sessionBusy} aria-haspopup="menu" aria-expanded={sessionMenu?.row.id===row.id} onClick={event=>setSessionMenu({row,anchor:event.currentTarget})}>···</button></div>

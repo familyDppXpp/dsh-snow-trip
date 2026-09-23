@@ -29,21 +29,26 @@ test('新建先选预设，草稿不发送，历史只打开雪季会话；失�
   assert.deepEqual(calls,[['create',{workspaceId:'workspace'}]]);
 });
 
-test('会话标题、时间分组与搜索使用真实状态，不显示空白会话工作区名',()=>{
-  const now=new Date(2026,8,23,12);
+test('会话标题、套餐分类与搜索使用真实关联，不显示空白会话工作区名',()=>{
+  const packages=[{sessionId:'old',completeness:'complete'},{sessionId:'old',completeness:'incomplete'}];
   const rows=[
     {id:'old',displayTitle:'禾木计划',updatedAt:+new Date(2026,8,20)},
     {id:'blank',blank:true,displayTitle:'dsh-snow-trip',updatedAt:+new Date(2026,8,23,10)},
     {id:'yesterday',title:'长白山预算',updatedAt:+new Date(2026,8,22,23)},
     {id:'named',blank:true,title:'我的行程',updatedAt:+new Date(2026,8,23,11)},
   ];
+  assert.equal(groupSessions(rows,'',packages)[0].items[0].packageStatus,'待补全');
+  assert.equal(groupSessions(rows,'',packages.slice(0,1))[0].items[0].packageStatus,'资料完整');
+  assert.equal(groupSessions(rows,'',[])[0].label,'其他');
+  assert.deepEqual(groupSessions(rows,'',[])[0].items.map(r=>r.id),['yesterday','old']);
+  assert.equal(groupSessions(rows,'',packages)[1].items[0].packageStatus,undefined);
   assert.equal(sessionTitle(rows[1]),'新会话');
   assert.equal(sessionTitle(rows[3]),'我的行程');
-  assert.deepEqual(groupSessions(rows,'',now).map(g=>[g.label,g.items.map(r=>r.id)]),[['昨天',['yesterday']],['更早',['old']]]);
-  assert.deepEqual(groupSessions(rows,'  禾木  ',now)[0].items.map(r=>r.id),['old']);
-  assert.deepEqual(groupSessions(rows,'不存在',now),[]);
-  assert.deepEqual(groupSessions(rows,'我的行程',now),[]);
-  assert.equal(groupSessions([{...rows[1],blank:false}], '',now)[0].items[0].id,'blank');
+  assert.deepEqual(groupSessions(rows,'',packages).map(g=>[g.label,g.items.map(r=>r.id)]),[['套餐',['old']],['其他',['yesterday']]]);
+  assert.deepEqual(groupSessions(rows,'  禾木  ',packages)[0].items.map(r=>r.id),['old']);
+  assert.deepEqual(groupSessions(rows,'不存在',packages),[]);
+  assert.deepEqual(groupSessions(rows,'我的行程',packages),[]);
+  assert.equal(groupSessions([{...rows[1],blank:false}], '',packages)[0].items[0].id,'blank');
 });
 
 test('编辑标题写入指定宿主会话，空标题和非雪季会话被拒绝，失败不伪装成功',async()=>{

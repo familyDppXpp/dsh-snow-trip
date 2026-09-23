@@ -101,3 +101,11 @@
 .snow .snow-package-card .package-delete{min-height:44px;padding:8px 4px;border-color:transparent;background:transparent;color:var(--muted);font-size:12px;box-shadow:none}
 .snow .snow-package-card .package-delete:hover{color:var(--danger);background:#faf0ed;border-color:transparent}
 .snow .snow-package-card .package-delete:focus-visible{outline:2px solid var(--danger);outline-offset:3px}
+
+.snow .snow-session-group h3{padding:4px 0;margin:0}
+.snow .snow-group-toggle{width:100%;justify-content:flex-start;gap:6px;padding:6px 8px;min-height:34px;border:0;background:transparent;color:var(--muted);font-size:12px}
+.snow .snow-group-count{margin-left:auto;font-size:11px;font-variant-numeric:tabular-nums}
+.snow-session-heading{display:flex;align-items:center;gap:6px;min-width:0}
+.snow-session-heading strong{flex:1;min-width:0}
+.snow-session-tag{flex-shrink:0;padding:1px 5px;border-radius:4px;background:var(--soft);color:var(--primary);font-size:10px;line-height:18px}
+@media(max-width:760px){.snow-session-heading{flex-wrap:wrap;gap:2px}.snow-session-heading strong{flex-basis:100%}}

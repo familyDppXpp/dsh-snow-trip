@@ -4,16 +4,15 @@ export function sessionTitle(row) {
   return row.title || (row.blank ? '新会话' : row.displayTitle) || '未命名会话';
 }
 
-export function groupSessions(rows, query='', now=new Date()) {
-  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  const yesterday=new Date(today);yesterday.setDate(today.getDate()-1);
-  const groups=new Map();
+export function groupSessions(rows, query='', packages=[]) {
+  const status=new Map();
+  for(const p of packages)status.set(p.sessionId,status.get(p.sessionId)==='待补全'||p.completeness==='incomplete'?'待补全':'资料完整');
+  const groups=new Map([['套餐',[]],['出行方案',[]],['其他',[]]]);
   for(const row of [...rows].filter(row=>!row.blank&&sessionTitle(row).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))) {
-    const label=row.updatedAt>=+today?'今天':row.updatedAt>=+yesterday?'昨天':'更早';
-    if(!groups.has(label))groups.set(label,[]);
-    groups.get(label).push(row);
+    const packageStatus=status.get(row.id);
+    groups.get(packageStatus?'套餐':'其他').push({...row,packageStatus});
   }
-  return [...groups].map(([label,items])=>({label,items}));
+  return [...groups].filter(([,items])=>items.length).map(([label,items])=>({label,items}));
 }
 
 export function snowSessions(state) {
