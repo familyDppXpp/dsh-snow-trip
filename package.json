@@ -20,6 +20,9 @@
     "./remote": {
       "types": "./lib/typert.remote-client.d.ts",
       "default": "./lib/typert.remote-client.js"
+    },
+    "./types": {
+      "types": "./lib/types/packages.d.ts"
     }
   },
   "files": [
@@ -34,7 +37,9 @@
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "skills",
+    "lib/types/packages.d.ts"
   ],
   "engines": {
     "node": ">=22.19.0"
@@ -55,7 +60,8 @@
         "@deepseek-ai/dsh-client-ui-attachment",
         "@deepseek-ai/dsh-client-ui-tool",
         "@deepseek-ai/dsh-client-modules",
-        "@deepseek-ai/dsh-api-remotes"
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-user-questions"
       ],
       "platform": "web"
     }
@@ -68,8 +74,15 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-skill": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-storage": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-storage-domain": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-storage-json": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.1.5-alpha.1",
     "@deepseek-ai/dsh-typert-generator": "0.1.5-alpha.1",
     "@deepseek-ai/dsh-typert-protocol": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-user-questions": "0.1.5-alpha.1",
     "@types/node": "^22.20.4",
     "esbuild": "0.25.12",
     "react": "18.3.1",
@@ -81,6 +94,10 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.5-alpha.1"
+    "@deepseek-ai/dsh-skill": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-storage-domain": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.5-alpha.1",
+    "@deepseek-ai/dsh-user-questions": "0.1.5-alpha.1"
   }
 }

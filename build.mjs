@@ -13,7 +13,7 @@ try {
   const pkg = join(stage, 'packages/snow-trip');
   await mkdir(pkg, { recursive: true });
   await symlink(resolve('node_modules'), join(stage, 'node_modules'), 'dir');
-  for (const path of ['package.json', 'tsconfig.json', 'src/service.ts', 'lib/types']) {
+  for (const path of ['package.json', 'tsconfig.json', 'src', 'lib/types']) {
     await cp(path, join(pkg, path), { recursive: true });
   }
   const manifest = JSON.parse(await readFile('package.json', 'utf8'));

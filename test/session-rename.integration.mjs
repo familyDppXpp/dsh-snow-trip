@@ -14,7 +14,7 @@ try {
   const id=await page.evaluate(()=>window.snowSessionCheck.state().current);
   const row=()=>panel.locator(`.snow-session-row[data-session-id="${id}"]`);
   const modal=page.getByRole('dialog',{name:'编辑会话标题',exact:true});
-  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();
+  await panel.getByRole('button',{name:'套餐概览',exact:true}).click();
   assert.equal(await panel.locator('.snow-session-heading').count(),0);
   await row().getByRole('button',{name:/会话操作/}).click();
   await page.getByRole('menu',{name:'会话操作',exact:true}).getByRole('menuitem',{name:'重命名',exact:true}).click();
@@ -32,7 +32,7 @@ try {
   await modal.waitFor({state:'detached'});
   await row().getByText(title,{exact:true}).waitFor();
   assert.equal(await page.evaluate(id=>window.snowSessionCheck.state().byId[id].title,id),title);
-  await panel.locator('.hero').waitFor();
+  await panel.getByRole('button',{name:'录入套餐',exact:true}).waitFor();
   await page.reload({waitUntil:'networkidle'});
   await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
   await row().getByText(title,{exact:true}).waitFor();

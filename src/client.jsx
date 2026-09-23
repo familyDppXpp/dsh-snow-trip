@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
+import {SavedPackageCard} from './package-cards.jsx';
 import { App } from './workbench.jsx';
-import { createSnowSession, openSnowSession, renameSnowSession } from './sessions.js';
+import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
 
-export const inject=['slots','modules','sessions','remote'];
-const uiPlugins=['ui-renderer','locale','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool'];
+export const inject=['slots','modules','sessions','remote','uiSession'];
+const uiPlugins=['ui-renderer','locale','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions'];
 
 function Entry({wide, prepare}) {
   const dialog=useRef(null),container=useRef(null);
@@ -48,9 +49,12 @@ export async function apply(ctx) {
         await local.plugin({name:`snow-trip-${key}`,inject:plugin.inject,Config:plugin.Config,apply:plugin.apply});
       }
       await local.plugin({
-        name:'snow-trip-session-entry',inject:['slots','uiRenderer','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
+        name:'snow-trip-session-entry',inject:['slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
+          view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
+          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
           const actions={
+            listPackages:async()=>{const result=await view.remote.snowTrip.listPackages();if(!result.ok)throw new Error(result.error.message);return result.value;},
             lastSession:()=>lastSession,
             workspaceList:{subscribe:listener=>view.workspaces.list.subscribe(listener),getSnapshot:()=>view.workspaces.list.getSnapshot()},
             archive:async id=>{await view.workspaces.archiveSession(id);if(lastSession===id)lastSession=undefined;},

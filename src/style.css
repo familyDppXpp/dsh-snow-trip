@@ -74,3 +74,5 @@
 .snow-rail .rail-bottom{display:flex;align-items:center;flex-wrap:wrap;column-gap:4px;margin-top:8px;padding:8px 4px 0;border-top:1px solid var(--line);flex-shrink:0;font-size:10px}
 .snow-rail .rail-bottom .local-dot{margin-right:2px}
 .snow-rail .rail-bottom .return{margin-left:auto;font-size:10px;min-height:28px}
+
+.snow-package-card{min-width:0;overflow-wrap:anywhere}.snow-package-card .card-body{display:grid;gap:12px}.snow-package-card p{margin:0;white-space:pre-wrap}.snow-package-card dl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0}.snow-package-card dd{margin:0;text-align:right}.snow-package-card summary{cursor:pointer}.snow-package-card details p{margin-top:10px}.snow-package-card small{color:var(--muted)}

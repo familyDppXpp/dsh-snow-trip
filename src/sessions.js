@@ -50,3 +50,16 @@ export async function createSnowSession(sessions, presets, input, workspaceId, d
   if (draft) input.for(scope).setDraft(draft);
   return id;
 }
+
+// 两个会话视图共享宿主问题对象；卸载镜像不回答或取消原问题。
+export function mirrorQuestions(source, target) {
+  const publish=target.registerPendingInteraction(pending=>pending.kind==='plan-review'?2:1);
+  const mirrored=new Map();
+  const sync=()=>{
+    const next=source.getSnapshot();
+    for(const [id,item] of mirrored)if(next.get(id)!==item.pending){item.remove();mirrored.delete(id);}
+    for(const [id,pending] of next)if(['question','plan-review'].includes(pending.kind)&&!mirrored.has(id))mirrored.set(id,{pending,remove:publish(pending,async()=>{})});
+  };
+  const unsubscribe=source.subscribe(sync);sync();
+  return()=>{unsubscribe();for(const item of mirrored.values())item.remove();};
+}

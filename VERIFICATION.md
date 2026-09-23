@@ -75,3 +75,39 @@
 ## 2026-09-23 会话操作浮层
 
 更多按钮使用原生 Popover 在按钮旁展开带图标的菜单，空间不足时向上展开并限制视口边界。`test/session-menu.integration.mjs` 验证位置、方向键/End、Esc 恢复焦点且不关闭工作台、外部点击收起、重命名及归档入口、390px 边界；截图已检查。构建、类型检查与自动检查通过。
+
+## SNOW-02 文字录入（2026-09-23）
+
+本次以 `55a211d` 为基线，交付文字单条新增、宿主查询、确认与只读卡片；不涉及 Excel、图片、批量、编辑或规划。
+
+- `pnpm build`、`pnpm typecheck`、`pnpm test` 通过。10 项检查中 9 项通过，1 项私人 Excel 回归因未提供文件而跳过；仓库没有 lint 脚本，另执行 `git diff --check`。
+- `test/text-import.integration.test.mjs` 通过真实 DSH Tools 调度、DomainFacility 与 JSON 临时存储验证确认→写入→关闭→重开→查询。覆盖未确认、伪造 confirmed、内容改变重新确认、金额/日期/空白/使用冲突、取消、查询分页截断。故意把目标 JSON 文件位置替换为目录使落盘失败，确认无 metadata、内存记录数不变。
+- 来源只接受当前会话 `source.kind=user` 的文字，排除宿主运行上下文注入；自报来源序号及摘录必须匹配真实消息。最近 30 条、每条 4000 字的边界通过 `messagesTruncated` 告知查询调用方。
+- `test/text-import.browser.mjs` 在隔离 DSH `0.1.5-alpha.1-5dda764-dirty` 与 Chrome 上通过：预先存在旧 IndexedDB 记录时不混入概览；在真实会话发送合成材料；确认前无新增记录；工作台内完成宿主确认；工具结果卡片与概览 ID/revision 相同；刷新后历史 metadata 卡片可回放；无浏览器异常。DSH 将完成后的工具步骤折叠，展开“1 次工具调用”查看卡片。
+- 浏览器使用本机确定性 OpenAI 兼容模型响应，验证宿主真实会话、工具调度、交互与持久化链路，不代表已验证真实模型对任意文字的理解质量，也未测试本票范围外的 Excel/图片能力。
+- 截图保留在本机 `.local/text-import-confirm.png`、`.local/text-import-saved.png`、`.local/text-import-overview.png`，不随包发布。
+- 非法、旧版、错误工具 metadata 的客户端检查通过，回退为可展开的通用工具结果，不生成成功卡片。
+- 两轴代码审查完成：规范轴无遗留问题；需求轴发现“仅实付等信息被当成空白”，已修复并加入回归。
+
+规格差异：DSH 的 `UNIT_NAME_RE = /^[a-z][a-z0-9_]*$/` 不接受 `snow-trip`，因此实际唯一存储域使用 `snow_trip`，表名 `packages`；预设仍为 `snow-trip`。使用配置好的宿主本机后端，没有自建数据库或云服务。
+
+新增分发资源：`skills/snow-import.md`、宿主编译产物中的输入校验/工具/存储模块、`lib/types/packages.d.ts` 及 `./types` 导出、新版客户端卡片和生成的 `getPackage/listPackages` Remote；宿主 SDK 使用 peerDependencies。包内不包含测试、私有素材、临时凭据或本机路径。
+
+复现核心检查：
+
+```sh
+pnpm build
+pnpm typecheck
+pnpm test
+```
+
+浏览器检查先准备隔离 Web profile，安装本包与 `test/integration-host`，配置测试模型指向本机 mock server。DSH 仓库提供 `pnpm run mock:llm`：`--port 4342 --sequence tool_call_success,success --repeat-last --tool-name snow_save_packages --tool-arguments '{"package":{"description":"长白山住宿","quote":129900,"purchaseStatus":"unpurchased"}}'`。每次检查重启 mock，避免上一轮耗尽首条工具响应。测试模型仅用合成材料，供应商 API key 环境变量填测试值。
+
+```sh
+SNOW_HOST_LOG=/绝对路径/隔离宿主日志 \
+SNOW_PLAYWRIGHT=/绝对路径/playwright/index.mjs \
+SNOW_CHROME=/绝对路径/Chrome \
+node test/text-import.browser.mjs
+```
+
+分发复验：`pnpm pack` 后通过 DSH `plugin --profile web add` 安装 tgz 到隔离 profile，重启宿主并重新运行上述浏览器全链路，结果通过。安装器提示 SDK peer 缺失：这些是由 DSH 宿主解析器提供的共享包，隔离 profile 的包管理器未单独安装；已用安装后的真实宿主验证其加载、工具调用与 Remote 正常，不将该安装提示描述为零警告。

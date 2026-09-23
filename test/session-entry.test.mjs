@@ -58,3 +58,14 @@ test('编辑标题写入指定宿主会话，空标题和非雪季会话被拒�
   await assert.rejects(renameSnowSession(sessions,'snow','改名'),/宿主拒绝/);
   assert.deepEqual(calls,[]);
 });
+
+test('宿主确认同步到嵌入视图，移除与卸载镜像不回答原问题',async()=>{
+  const {mirrorQuestions}=await import('../src/sessions.js');
+  let snapshot=new Map(),listener,removed=0;const published=[];
+  const source={getSnapshot:()=>snapshot,subscribe:fn=>{listener=fn;return()=>{listener=null;};}};
+  const target={registerPendingInteraction:()=>pending=>{published.push(pending);return()=>removed++;}};
+  const stop=mirrorQuestions(source,target);
+  const pending={kind:'question',key:'a'};snapshot=new Map([['session',pending]]);listener();listener();
+  assert.deepEqual(published,[pending]);snapshot=new Map();listener();assert.equal(removed,1);
+  snapshot=new Map([['session',pending]]);listener();stop();assert.equal(removed,2);assert.equal(listener,null);
+});
