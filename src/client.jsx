@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {SavedPackageCard} from './package-cards.jsx';
+import {SavedPackageCard,TurnPackageCards} from './package-cards.jsx';
 import { App, PackageSidebarToggle } from './workbench.jsx';
 import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
+import {packageTurnDefinition,selectTurnPackages} from './package-turns.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
 
@@ -49,8 +50,10 @@ export async function apply(ctx) {
         await local.plugin({name:`snow-trip-${key}`,inject:plugin.inject,Config:plugin.Config,apply:plugin.apply});
       }
       await local.plugin({
-        name:'snow-trip-session-entry',inject:['slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
+        name:'snow-trip-session-entry',inject:['uiConversation','slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
+          view.uiConversation.events.register(packageTurnDefinition);
+          view.slots.inject('conversation.chat.turnTail',()=>view.slots.register({name:'conversation.chat.turnTail',select:selectTurnPackages},TurnPackageCards));
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
           for(const key of ['snow_save_packages','snow_commit'])view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key},SavedPackageCard));
           view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));

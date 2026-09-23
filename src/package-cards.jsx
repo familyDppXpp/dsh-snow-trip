@@ -21,7 +21,7 @@ export function PackageCard({record:p,onOpen,onDelete,saved=false}) {
 }
 export function SavedPackageCard({block}) {
   const record=savedPackage(block);
-  if(record)return <div className="snow"><PackageCard record={record} saved/></div>;
+  if(record)return <p>已保存套餐：{record.name} · 第 {record.revision} 版</p>;
   const content=Array.isArray(block?.content)?block.content.filter(c=>c?.type==='text'&&typeof c.text==='string').map(c=>c.text).join('\n'):'';
   return <details><summary>套餐保存 · {block?.isError?'保存失败':block&&'kind' in block?'工具结果':'等待确认或保存'}</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{content||'暂无结果'}</pre></details>;
 }
@@ -34,4 +34,8 @@ export function usePackages(actions,refreshKey) {
     return()=>{active=false;};
   },[actions,refreshKey,attempt]);
   return {rows,error,loading,retry:()=>setAttempt(value=>value+1)};
+}
+
+export function TurnPackageCards({matched}) {
+  return <div className="snow snow-turn-packages">{matched.map(record=><PackageCard key={record.id} record={record} saved/>)}</div>;
 }

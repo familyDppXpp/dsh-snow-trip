@@ -155,3 +155,5 @@
 .snow .snow-header-button:hover{background:var(--soft);color:var(--primary)}
 .snow .snow-header-button:active{background:var(--line)}
 .snow .snow-header-button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+.snow-turn-packages{display:grid;gap:16px;margin:16px 0;width:100%;min-width:0}
