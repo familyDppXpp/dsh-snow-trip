@@ -19,16 +19,20 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
   const root=await mkdtemp(join(tmpdir(),'snow-import-'));
   let ctx,owner,presetScope,secondAgent,calls=0,respond=()=>({answers:[{id:'save-package',selected:['确认保存']}]});
   let question;
+  const archived=[];
+  let onArchive=async()=>{};
   async function boot(){
     const rootContext=new Context();
     owner=rootContext.plugin({async apply(scope){ctx=scope;
     await ctx.plugin(SystemPrompt);await ctx.plugin(Tools);
     await ctx.plugin(Storage);await ctx.plugin(StorageJson,{root});await ctx.plugin(StorageDomain,{backend:'json'});
     ctx.provide('userQuestions',{ask:async request=>{calls++;question=request.questions[0].detail;return respond();}});
+    ctx.provide('workspaceRegistry',{archiveSession:async id=>{await onArchive();archived.push(id);}});
     await ctx.plugin(SnowTrip);
     }});await owner;ctx=rootContext;
     assert.equal(ctx.tools.schemas().some(tool=>tool.name.startsWith('snow_')),false,'宿主层不应注册雪季工具');
     agent={...agent};secondAgent={...agent,id:'second-session'};
+    await ctx.snowTrip.listPackages();
     const presetKey={};
     await ctx.plugin({inject:['snowTrip','tools','userQuestions'],async apply(inner){
       presetScope=createScope(inner,presetKey);
@@ -47,7 +51,7 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
   const execute=(name,args,signal=new AbortController().signal)=>ctx.tools.execute({name,arguments:args,agent,signal,callId:`call-${Math.random()}`});
   const input={package:{description:'长白山住宿',quote:129900,purchaseStatus:'unpurchased'}};
   try{
-    assert.deepEqual(TYPERT.invocations.map(i=>i.id).sort(),['ensureWorkspace','getPackage','listPackages'].map(name=>`dsh-snow-trip#snowTrip/${name}`).sort());
+    assert.deepEqual(TYPERT.invocations.map(i=>i.id).sort(),['deletePackage','ensureWorkspace','getPackage','listPackages'].map(name=>`dsh-snow-trip#snowTrip/${name}`).sort());
     assert.deepEqual(await boot(),[]);
     for(const args of [{package:{}},{package:{...input.package,sourceNotes:[]}},{package:{...input.package,sources:[]}},{...input,confirmed:true},{package:{...input.package,confirmed:true}},{package:{...input.package,quote:-1}},{package:{...input.package,validFrom:'2026-02-30'}}]){
       const r=await execute('snow_save_packages',args);assert.equal(r.isError,true);assert.equal(r.meta,undefined);
@@ -106,9 +110,37 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     await rename(join(root,'snow_trip.json'),join(root,'saved.json'));await mkdir(join(root,'snow_trip.json'));
     const failure=await execute('snow_save_packages',input);assert.equal(failure.isError,true);assert.equal(failure.meta,undefined);
     assert.equal((await ctx.snowTrip.listPackages()).length,count);
+    await assert.rejects(ctx.snowTrip.deletePackage(record.id,3,false));
+    assert.equal((await ctx.snowTrip.listPackages()).length,count,'删除写盘失败保留记录');
+    await rm(join(root,'snow_trip.json'),{recursive:true});await rename(join(root,'saved.json'),join(root,'snow_trip.json'));
+    await assert.rejects(ctx.snowTrip.deletePackage(record.id,2,false),/已变更/);
+    await assert.rejects(ctx.snowTrip.deletePackage(record.id,3,true),/关联套餐已变更/);
+    assert.deepEqual(await ctx.snowTrip.deletePackage(record.id,3,false),{sessionId:null,archiveError:null},'同会话还有套餐时不归档');
+    const remaining=(await ctx.snowTrip.listPackages())[0];
+    await assert.rejects(ctx.snowTrip.deletePackage(remaining.id,remaining.revision,false),/关联套餐已变更/);
+    let finishArchive,archiveStarted;
+    const started=new Promise(resolve=>{archiveStarted=resolve;});
+    onArchive=()=>{archiveStarted();return new Promise(resolve=>{finishArchive=resolve;});};
+    const deleting=ctx.snowTrip.deletePackage(remaining.id,remaining.revision,true);
+    await started;
+    const later={...remaining,id:crypto.randomUUID()};
+    const saving=ctx.snowTrip.savePackage(later);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(await ctx.snowTrip.getPackage(later.id),null,'归档完成前其他写入必须等待');
+    finishArchive();
+    assert.deepEqual(await deleting,{sessionId:remaining.sessionId,archiveError:null});
+    await saving;
+    onArchive=async()=>{throw new Error('归档写盘失败');};
+    assert.deepEqual(await ctx.snowTrip.deletePackage(later.id,later.revision,true),{sessionId:null,archiveError:'归档写盘失败'});
+    assert.equal(await ctx.snowTrip.getPackage(later.id),null,'归档失败时明确返回删除已完成');
+    onArchive=async()=>{};
+    await assert.rejects(ctx.snowTrip.deletePackage(remaining.id,remaining.revision,true),/已变更/);
+    assert.deepEqual(archived,[remaining.sessionId]);
+    await owner.dispose();await boot();
+    assert.deepEqual(await ctx.snowTrip.listPackages(),[],'重启后仍然删除');
     assert.equal(packageMetadata({...success.meta,version:99}),null);
     await presetScope.dispose();
     assert.deepEqual(ctx.tools.schemas(agent),[]);
-    assert.equal((await ctx.snowTrip.listPackages()).length,count);
+    assert.equal((await ctx.snowTrip.listPackages()).length,0);
   }finally{await owner?.dispose();await rm(root,{recursive:true,force:true});}
 });

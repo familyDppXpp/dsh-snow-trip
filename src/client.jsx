@@ -55,6 +55,13 @@ export async function apply(ctx) {
           view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
           const actions={
             listPackages:async()=>{const result=await view.remote.snowTrip.listPackages();if(!result.ok)throw new Error(result.error.message);return result.value;},
+            deletePackage:async(record,archive)=>{
+              const result=await view.remote.snowTrip.deletePackage(record.id,record.revision,archive);
+              if(!result.ok)throw new Error(result.error.message);
+              if(result.value.sessionId===lastSession)lastSession=undefined;
+              if(result.value.archiveError)return `套餐已删除，但会话归档失败：${result.value.archiveError}。请从会话菜单重试归档。`;
+              return result.value.sessionId?'套餐已删除，会话已归档。':'套餐已删除。';
+            },
             lastSession:()=>lastSession,
             sessionState:id=>view.sessions.binding(id)?.session,
             workspaceList:{subscribe:listener=>view.workspaces.list.subscribe(listener),getSnapshot:()=>view.workspaces.list.getSnapshot()},

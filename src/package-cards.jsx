@@ -4,7 +4,7 @@ const money=n=>n===null?'待确认':`${(n/100).toFixed(2)} 元`;
 export function savedPackage(block) {
   return block&&'kind' in block&&!block.isError&&!block.parentCallId?packageMetadata(block.meta):null;
 }
-export function PackageCard({record:p,onOpen,saved=false}) {
+export function PackageCard({record:p,onOpen,onDelete,saved=false}) {
   return <article className="snow trip-card snow-package-card" data-package-id={p.id} data-revision={p.revision}><div className="card-body">
     <div className="card-meta"><span className="package-status">{saved?'已保存 · ':''}{purchaseLabels[p.purchaseStatus]}</span><span>{p.completeness==='incomplete'?'待补全':'资料完整'}</span></div>
     <h3>{p.name}</h3>
@@ -14,6 +14,7 @@ export function PackageCard({record:p,onOpen,saved=false}) {
     {p.unknowns.length>0&&<p className="package-missing"><span>待补全</span>{p.unknowns.join('、')}</p>}
     {saved&&<small>保存时快照</small>}
     {onOpen&&<button className="primary package-open" onClick={()=>onOpen(p)}>{p.completeness==='incomplete'?'继续补全':'补充信息'} <span aria-hidden="true">→</span></button>}
+    {onDelete&&<button className="package-delete" onClick={()=>onDelete(p)}>删除套餐</button>}
   </div></article>;
 }
 export function SavedPackageCard({block}) {
