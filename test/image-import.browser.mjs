@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile,mkdir} from 'node:fs/promises';
 const {chromium}=await import(process.env.SNOW_PLAYWRIGHT||'playwright');
 const {startMockLlmServer}=await import(process.env.SNOW_MOCK_SERVER);
-const server=await startMockLlmServer({port:4342,sequence:['success','success','tool_call_success','success'],repeatLast:true,successText:'截图报价1299元，晚数模糊，请补充购买状态和晚数。',toolName:'snow_save_packages',toolArguments:JSON.stringify({package:{name:'合成雪季套餐',quote:129900,nights:3,purchaseStatus:'unpurchased',sourceNotes:[{kind:'image',text:'合成套餐.png：报价1299元，晚数模糊'},{kind:'user',text:'未购买，3晚'}],pendingQuestions:['有效期未提供']}})});
+const server=await startMockLlmServer({port:4342,sequence:['success','success','tool_call_success','success'],repeatLast:true,successText:'截图报价1299元，晚数模糊，请补充购买状态和晚数。',toolName:'snow_save_packages',toolArguments:JSON.stringify({package:{name:'合成雪季套餐',quote:129900,nights:3,purchaseStatus:'unpurchased',pendingQuestions:['有效期未提供']}})});
 const url=(await readFile(process.env.SNOW_HOST_LOG,'utf8')).match(/http:\/\/127\.0\.0\.1:\d+[^\s\x1b]*/)?.[0];
 const browser=await chromium.launch({headless:true,executablePath:process.env.SNOW_CHROME});
 const page=await browser.newPage({viewport:{width:1280,height:960}});page.setDefaultTimeout(20000);
@@ -39,7 +39,7 @@ try{
   assert.equal((await page.evaluate(()=>window.snowSessionCheck.listPackages())).value.length,before);
   await editor.fill('未购买，3晚。请保存。');await editor.press('Enter');
   await panel.getByText('确认新增套餐',{exact:true}).waitFor();
-  const content=await panel.innerText();assert.match(content,/图片事实/);assert.match(content,/用户补充/);assert.match(content,/总间夜：3/);
+  const content=await panel.innerText();assert.match(content,/总间夜：3/);
   assert.equal((await page.evaluate(()=>window.snowSessionCheck.listPackages())).value.length,before);
   await page.screenshot({path:'.local/image-confirm.png'});
   await panel.getByText('确认保存',{exact:true}).click();await panel.getByRole('button',{name:/提交|发送/}).last().click();

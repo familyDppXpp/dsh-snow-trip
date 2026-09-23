@@ -19,12 +19,9 @@ test('图片入口使用宿主草稿附件，不自动发送；附件失败释�
   assert.deepEqual(calls,[]);
 });
 
-test('图文来源随确认摘要展示，未知与冲突问题保留，拒绝非法来源',()=>{
-  const sourceNotes=[{kind:'image',text:'套餐.png：报价 1299 元，晚数模糊'},{kind:'user',text:'用户补充：尚未购买'}];
-  const p=normalizePackage({name:'长白山',quote:129900,purchaseStatus:'unpurchased',sourceNotes,pendingQuestions:['截图与文字报价冲突，请确认']});
-  assert.equal(p.nights,null);assert.deepEqual(p.sourceNotes,sourceNotes);
-  assert.match(packageSummary(p),/图片事实：套餐.png/);assert.match(packageSummary(p),/用户补充：用户补充/);
+test('图文缺项与冲突问题保留，来源字段不可作为工具输入，旧记录正常读取',()=>{
+  const p=normalizePackage({name:'长白山',pendingQuestions:['截图与文字报价冲突，请确认']});
+  assert.equal(p.nights,null);assert.equal(p.quote,null);
   assert.match(packageSummary(p),/报价冲突/);
-  assert.throws(()=>normalizePackage({name:'测试',sourceNotes:[{kind:'verified',text:'伪造来源'}]}));
-  assert.throws(()=>normalizePackage({sourceNotes}));
+  for(const field of ['source','sources','sourceNotes'])assert.throws(()=>normalizePackage({name:'测试',[field]:[]}));
 });

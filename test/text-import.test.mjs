@@ -20,7 +20,8 @@ test('非法与错误工具 metadata 回退通用结果，合法历史快照可�
   const bundle=await build({entryPoints:['src/package-cards.jsx'],bundle:true,write:false,platform:'node',format:'esm'});
   const {savedPackage,SavedPackageCard}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
   const record={...normalizePackage({name:'历史套餐'}),id:'c3fa6a21-1ff7-4e32-a9c2-4e318591f766',schemaVersion:1,revision:1,createdAt:'2026-09-23T00:00:00.000Z',updatedAt:'2026-09-23T00:00:00.000Z',sessionId:'test',sources:[{sessionId:'test',messageSeq:1,text:'历史套餐',nature:'fact'}]};
-  const {sources,...expected}=record;assert.deepEqual(savedPackage({kind:'result',meta:{version:1,record}}),expected);
+  record.sourceNotes=[{kind:'image',text:'旧截图'}];
+  const {sources,sourceNotes,...expected}=record;assert.deepEqual(savedPackage({kind:'result',meta:{version:1,record}}),expected);
   const {purchasePlatform,...legacy}=record;assert.equal(savedPackage({kind:'result',meta:{version:1,record:legacy}}).purchasePlatform,null);
   assert.throws(()=>normalizePackage({name:'测试',sources}));
   assert.equal(normalizePackage({name:'测试',purchasePlatform:'微信小程序 xxx'}).purchasePlatform,'微信小程序 xxx');

@@ -13,7 +13,6 @@ const properties: ParameterSchemaSpec=Object.fromEntries(Object.entries(fieldLab
 Object.assign(properties,{
   purchaseStatus:{type:'string',enum:['unknown','unpurchased','purchased']},
   pendingQuestions:{type:'array',items:{type:'string'},description:'需要用户澄清的问题'},
-  sourceNotes:{type:'array',items:{type:'object',additionalProperties:false,properties:{kind:{type:'string',enum:['image','user','inference'],required:true},text:{type:'string',required:true}}},description:'来源说明：image 为实际可见图片事实（注明截图名称或顺序），user 为用户文字补充，inference 为未确认推断。不得编造来源；更新时提供合并后的完整来源列表。'},
 });
 const saveInput=z.strictObject({id:z.uuid().optional(),expectedRevision:z.number().int().min(1).optional(),package:z.record(z.string(),z.unknown())}).refine(v=>(v.id===undefined)===(v.expectedRevision===undefined),'更新时必须同时提供 id 和 expectedRevision');
 const queryInput=z.strictObject({id:z.uuid().optional(),query:z.string().trim().max(200).optional(),offset:z.number().int().min(0).default(0),limit:z.number().int().min(1).max(50).default(20)});

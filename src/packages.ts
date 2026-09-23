@@ -16,7 +16,6 @@ export const packageInput = z.strictObject({
   usedNights: z.number().int().min(0).max(100000).nullable().default(null),
   voided: z.boolean().nullable().default(null),
   pendingQuestions: z.array(text).max(100).default([]),
-  sourceNotes: z.array(z.strictObject({kind:z.enum(['image','user','inference']),text})).max(100).default([]),
 }).superRefine((p,ctx)=>{
   if(![p.name,p.description,p.roomType,p.resort,p.region,p.nights,p.quote,p.paid,p.paidExtra,p.usedNights,p.validFrom,p.validTo,p.splitRule].some(v=>v!==null)&&!p.hotels?.length&&!p.surchargeRules?.length&&!p.unavailableDates?.length)
     ctx.addIssue({code:'custom',message:'至少需要一项真实套餐信息'});
@@ -40,7 +39,8 @@ export const packageRecord = normalized.safeExtend({
   createdAt:z.iso.datetime(),updatedAt:z.iso.datetime(),sessionId:text,
   // 兼容读取旧记录；旧消息引用不再返回或写入。
   sources:z.unknown().optional(),
-}).transform(({sources,...record})=>{
+  sourceNotes:z.unknown().optional(),
+}).transform(({sources,sourceNotes,...record})=>{
   if(record.purchasePlatform===null&&!record.unknowns.includes('购买平台')) {
     record.unknowns.push('购买平台');record.completeness='incomplete';
   }
@@ -52,11 +52,10 @@ export function packageMetadata(meta: unknown): PackageRecord|null {
   return result.success?result.data.record:null;
 }
 export const purchaseLabels={unknown:'待确认',unpurchased:'未购买',purchased:'已购买'};
-export const sourceLabels={image:'图片事实',user:'用户补充',inference:'推断（未确认）'};
 export function packageSummary(p: ReturnType<typeof normalizePackage>) {
   return Object.entries(fieldLabels).map(([key,label])=>{
     const value=p[key as keyof typeof fieldLabels];
     const shown=key==='purchaseStatus'?purchaseLabels[p.purchaseStatus]:value===null?'待确认':Array.isArray(value)?(value.length?value.join('；'):'已确认无'):['quote','paid','paidExtra'].includes(key)?`${(Number(value)/100).toFixed(2)} 元`:typeof value==='boolean'?(value?'是':'否'):String(value);
     return `${label}：${shown}`;
-  }).concat(p.sourceNotes.map(note=>`${sourceLabels[note.kind]}：${note.text}`),`待补全：${p.unknowns.join('、')||'无'}`).join('\n');
+  }).concat(`待补全：${p.unknowns.join('、')||'无'}`).join('\n');
 }
