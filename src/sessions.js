@@ -7,7 +7,7 @@ export function sessionTitle(row) {
 export function groupSessions(rows, query='', packages=[]) {
   const status=new Map();
   for(const p of packages)status.set(p.sessionId,status.get(p.sessionId)==='待补全'||p.completeness==='incomplete'?'待补全':'资料完整');
-  const groups=new Map([['套餐',[]],['出行方案',[]],['其他',[]]]);
+  const groups=new Map([['其他',[]],['套餐',[]],['出行方案',[]]]);
   for(const row of [...rows].filter(row=>!row.blank&&sessionTitle(row).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))) {
     const packageStatus=status.get(row.id);
     groups.get(packageStatus?'套餐':'其他').push({...row,packageStatus});
