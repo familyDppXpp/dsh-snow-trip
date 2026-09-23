@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createSnowSession, openSnowSession, snowSessions, sessionTitle, groupSessions, renameSnowSession} from '../src/sessions.js';
+import {createSnowSession, openSnowSession, snowSessions, sessionTitle, groupSessions, packagesForSession, renameSnowSession} from '../src/sessions.js';
 
 test('新建先选预设，草稿不发送，历史只打开雪季会话；失败停止输入', async () => {
   const calls=[];
@@ -80,4 +80,11 @@ test('打开补全会话只导航，不访问输入框；执行中的会话也�
  const sessions={list:{getSnapshot:()=>({byId:{s:{running:true,projectionValues:{agentPreset:'snow-trip'}}}})},open:id=>calls.push(id),scope:()=>assert.fail('导航不应访问输入框')};
  openSnowSession(sessions,'s');
  assert.deepEqual(calls,['s']);
+});
+
+test('详情侧栏只展示当前会话套餐，最近更新优先且不修改原列表',()=>{
+  const rows=[{id:'old',sessionId:'s',updatedAt:'2026-01-01'},{id:'other',sessionId:'t',updatedAt:'2026-03-01'},{id:'new',sessionId:'s',updatedAt:'2026-02-01'}];
+  assert.deepEqual(packagesForSession(rows,'s').map(p=>p.id),['new','old']);
+  assert.deepEqual(packagesForSession(rows,'none'),[]);
+  assert.deepEqual(rows.map(p=>p.id),['old','other','new']);
 });

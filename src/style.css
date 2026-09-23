@@ -109,3 +109,15 @@
 .snow-session-heading strong{flex:1;min-width:0}
 .snow-session-tag{flex-shrink:0;padding:1px 5px;border-radius:4px;background:var(--soft);color:var(--primary);font-size:10px;line-height:18px}
 @media(max-width:760px){.snow-session-heading{flex-wrap:wrap;gap:2px}.snow-session-heading strong{flex-basis:100%}}
+
+.snow-session-layout{display:flex;flex:1;min-height:0;position:relative;overflow:hidden}
+.snow-package-sidebar{width:340px;max-width:100%;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--surface);border-left:1px solid var(--line)}
+.snow-package-sidebar-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+.snow .snow-package-sidebar-head h2{font-size:14px;margin:0}
+.snow-package-sidebar-body{overflow:auto;padding:16px;flex:1;min-height:0}
+.snow-package-sidebar details{border-bottom:1px solid var(--line);padding:12px 0}
+.snow-package-sidebar summary{cursor:pointer;line-height:1.6;overflow-wrap:anywhere}
+.snow-package-sidebar summary strong{font-size:14px;margin-right:8px}
+.snow-package-detail{padding-top:14px;overflow-wrap:anywhere}
+.snow .snow-package-detail p{font-size:13px;line-height:1.8;margin:0 0 10px;white-space:pre-wrap}
+@media(max-width:1150px){.snow-package-sidebar{position:absolute;right:0;top:0;bottom:0;z-index:5;box-shadow:-8px 0 24px #233a3410;width:min(340px,100%)}}

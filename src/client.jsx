@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {SavedPackageCard} from './package-cards.jsx';
-import { App } from './workbench.jsx';
+import { App, PackageSidebarToggle } from './workbench.jsx';
 import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
@@ -53,6 +53,7 @@ export async function apply(ctx) {
         apply(view){
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
           view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
+          view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));
           const actions={
             listPackages:async()=>{const result=await view.remote.snowTrip.listPackages();if(!result.ok)throw new Error(result.error.message);return result.value;},
             deletePackage:async(record,archive)=>{

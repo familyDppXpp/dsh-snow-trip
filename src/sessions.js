@@ -62,3 +62,7 @@ export function mirrorQuestions(source, target) {
   const unsubscribe=source.subscribe(sync);sync();
   return()=>{unsubscribe();for(const item of mirrored.values())item.remove();};
 }
+
+export function packagesForSession(packages,sessionId) {
+  return packages.filter(p=>p.sessionId===sessionId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+}
