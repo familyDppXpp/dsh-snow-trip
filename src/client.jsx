@@ -52,7 +52,7 @@ export async function apply(ctx) {
         name:'snow-trip-session-entry',inject:['slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
-          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
+          for(const key of ['snow_save_packages','snow_commit'])view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key},SavedPackageCard));
           view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));
           const actions={
             listPackages:async()=>{const result=await view.remote.snowTrip.listPackages();if(!result.ok)throw new Error(result.error.message);return result.value;},

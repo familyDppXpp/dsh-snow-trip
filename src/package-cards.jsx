@@ -23,7 +23,7 @@ export function SavedPackageCard({block}) {
   const record=savedPackage(block);
   if(record)return <div className="snow"><PackageCard record={record} saved/></div>;
   const content=Array.isArray(block?.content)?block.content.filter(c=>c?.type==='text'&&typeof c.text==='string').map(c=>c.text).join('\n'):'';
-  return <details><summary>snow_save_packages · {block?.isError?'保存失败':block&&'kind' in block?'工具结果':'等待确认或保存'}</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{content||'暂无结果'}</pre></details>;
+  return <details><summary>套餐保存 · {block?.isError?'保存失败':block&&'kind' in block?'工具结果':'等待确认或保存'}</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{content||'暂无结果'}</pre></details>;
 }
 export function usePackages(actions,refreshKey) {
   const [attempt,setAttempt]=useState(0);
