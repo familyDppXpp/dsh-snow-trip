@@ -46,7 +46,7 @@ try{
   await page.waitForFunction(()=>{const s=window.snowSessionCheck.state();return !s.byId[s.current]?.running;});
   const process=panel.getByRole('button',{name:'1 次工具调用',exact:true});if(await process.getAttribute('aria-expanded')==='false')await process.click();
   const card=panel.locator('.snow-conversation .snow-package-card');await card.waitFor();
-  const id=await card.getAttribute('data-package-id');await card.getByText('资料来源',{exact:true}).click();assert.match(await card.innerText(),/图片事实/);assert.match(await card.innerText(),/用户补充/);
+  const id=await card.getAttribute('data-package-id');assert.equal(await card.getByText('资料来源',{exact:true}).count(),0);
   await panel.getByRole('button',{name:'套餐与来源',exact:true}).click();await panel.locator(`.snow-content [data-package-id="${id}"]`).waitFor();
   // 独立文字模型拒绝图片；宿主 /model 提供恢复入口，错误不新增记录。
   await panel.getByLabel('选择套餐截图',{exact:true}).setInputFiles({name:'合成套餐.png',mimeType:'image/png',buffer:png});
@@ -63,6 +63,6 @@ try{
   await editor.fill('/model');await editor.press('Enter');
   await panel.getByRole('option',{name:/雪季确定性集成检查/}).click();
   assert.deepEqual(errors,[]);
-  console.log('通过：预览草稿不发送，宿主传入图片，多轮补充、确认摘要、来源卡片与概览同 ID、仅文字模型拒绝图片且可切换模型。');
+  console.log('通过：预览草稿不发送，宿主传入图片，多轮补充、确认摘要、卡片不显示来源折叠区且与概览同 ID、仅文字模型拒绝图片且可切换模型。');
   assert.deepEqual(errors,[]);
 }catch(error){await page.screenshot({path:'.local/image-failure.png'});console.log((await page.locator('body').innerText()).slice(-3000));throw error;}finally{await browser.close();await server.close();}
