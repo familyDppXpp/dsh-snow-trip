@@ -1,0 +1,5 @@
+{
+  "name":"snow-session-check", "version":"0.0.0", "private":true, "type":"module",
+  "exports":{".":"./index.js","./client":"./client.js"},
+  "dsh":{"bundle":{"patch":"./cordis.patch.yml"},"client":{"inject":["dsh-snow-trip"],"platform":"web"}}
+}

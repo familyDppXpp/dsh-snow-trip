@@ -1,0 +1,8 @@
+- insert:
+    - id: dsh-snow-trip
+      name: dsh-snow-trip
+    - id: snow-trip-presets
+      name: dsh-snow-trip/preset-roots
+- id: agent-presets
+  name: '@deepseek-ai/dsh-agent-presets'
+  disabled: true

@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const {chromium}=await import(process.env.SNOW_PLAYWRIGHT||'playwright');
+const url=(await readFile(process.env.SNOW_HOST_LOG,'utf8')).match(/http:\/\/127\.0\.0\.1:\d+[^\s\x1b]*/)?.[0];
+const browser=await chromium.launch({headless:true,executablePath:process.env.SNOW_CHROME});
+try{
+  const page=await browser.newPage({viewport:{width:1100,height:900}});page.setDefaultTimeout(10000);
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(url,{waitUntil:'networkidle'});
+  await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
+  const panel=page.getByRole('dialog',{name:'雪季出行工作台',exact:true});
+  const trigger=panel.getByRole('button',{name:/会话操作：/}).first();
+  const menu=page.getByRole('menu',{name:'会话操作',exact:true});
+  await trigger.click();await menu.waitFor();
+  const bounds=await menu.boundingBox(),anchor=await trigger.boundingBox();
+  assert.ok(Math.abs(bounds.y-anchor.y-anchor.height-6)<2);
+  assert.equal(await menu.getByRole('menuitem').count(),3);
+  await page.keyboard.press('ArrowDown');assert.equal(await page.evaluate(()=>document.activeElement.textContent),'分叉会话');
+  await page.keyboard.press('End');assert.equal(await page.evaluate(()=>document.activeElement.textContent),'归档会话');
+  await page.keyboard.press('Escape');await menu.waitFor({state:'detached'});
+  assert.equal(await trigger.evaluate(e=>e===document.activeElement),true);
+  assert.equal(await panel.isVisible(),true);
+  await trigger.click();await menu.waitFor();
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();await menu.waitFor({state:'detached'});
+  await trigger.click();await menu.getByRole('menuitem',{name:'重命名',exact:true}).click();
+  await page.getByRole('dialog',{name:'编辑会话标题',exact:true}).getByRole('button',{name:'取消',exact:true}).click();
+  await trigger.click();await menu.getByRole('menuitem',{name:'归档会话',exact:true}).click();
+  await page.getByRole('dialog',{name:'归档会话',exact:true}).getByRole('button',{name:'取消',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});await trigger.click();await menu.waitFor();
+  const narrow=await menu.boundingBox();assert.ok(narrow.x>=0&&narrow.x+narrow.width<=390&&narrow.y+narrow.height<=844);
+  await page.screenshot({path:'.local/session-menu.png'});
+  assert.deepEqual(errors,[]);
+  console.log('通过：按钮旁浮层、菜单图标与操作、键盘导航、Esc恢复焦点、外部点击收起、重命名/归档入口、窄屏边界。');
+}finally{await browser.close();}

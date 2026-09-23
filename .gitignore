@@ -1,0 +1,12 @@
+node_modules/
+lib/
+.local/
+*.tgz
+*.xlsx
+premium-audit.json
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+.credentials.yaml
