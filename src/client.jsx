@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {SavedPackageCard} from './package-cards.jsx';
 import { App } from './workbench.jsx';
-import { createSnowSession, createSnowImageSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
+import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
 
@@ -62,11 +62,11 @@ export async function apply(ctx) {
             fork:async id=>{const child=await view.sessions.fork({sessionId:id,increaseTitle:true});await view.sessions.refresh();openSnowSession(view.sessions,child);lastSession=child;return child;},
             rename:(id,title)=>renameSnowSession(view.sessions,id,title),
             close:()=>close(),
-            create:async(draft,file)=>{
+            create:async(draft)=>{
               const result=await view.remote.snowTrip.ensureWorkspace();
               if(!result.ok)throw new Error(`准备工作区失败：${result.error.message}`);
               const workspace=await view.workspaces.create({path:result.value});
-              const id=file?await createSnowImageSession(view.sessions,view.remote.agentPresets,view.conversation,workspace.workspaceId,file):await createSnowSession(view.sessions,view.remote.agentPresets,view.conversation.input,workspace.workspaceId,draft);
+              const id=await createSnowSession(view.sessions,view.remote.agentPresets,view.conversation.input,workspace.workspaceId,draft);
               lastSession=id;return id;
             },
             continuePackage:record=>{openSnowSession(view.sessions,record.sessionId);lastSession=record.sessionId;},

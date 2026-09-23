@@ -87,9 +87,9 @@ export function App({useSessions, renderSlot, actions}) {
   const conversation=useRef(null),sessionList=useRef(null);
   const [sessionQuery,setSessionQuery]=useState('');
   const sessionGroups=groupSessions(rows,sessionQuery);
-  async function startSession(file) {
+  async function startSession() {
     setSessionError('');setSessionQuery('');setSessionBusy(true);setView('explore');
-    try {await actions.create(undefined,file instanceof File?file:undefined);setView('conversation');}
+    try {await actions.create();setView('conversation');}
     catch(error){setSessionError(error.message);}
     finally{setSessionBusy(false);}
   }
@@ -100,7 +100,7 @@ export function App({useSessions, renderSlot, actions}) {
   useEffect(()=>{
     if(view==='conversation')sessionList.current?.querySelector('[aria-current="page"]')?.scrollIntoView({block:'nearest'});
   },[view,current?.id]);
-  const startInput=useRef(null),imageInput=useRef(null);
+  const startInput=useRef(null);
   useEffect(()=>{
     if(view==='conversation'&&current) requestAnimationFrame(()=>conversation.current?.querySelector('[contenteditable="true"]')?.focus());
   },[view,current?.id]);
@@ -158,7 +158,7 @@ export function App({useSessions, renderSlot, actions}) {
       onKeyDown={event=>{const next={ArrowLeft:railSize.width-10,ArrowRight:railSize.width+10,Home:145,End:railMax}[event.key];if(next!==undefined){event.preventDefault();resizeRail(next);}}}
     />
   </div>
-  <div className="snow snow-content" hidden={view==='conversation'&&!!current}><main className="workspace"><header className="topbar"><div><span className="crumb">我的雪季</span><span className="separator">/</span>{tabs.find(t=>t[0]===view)?.[2]}</div><input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="选择套餐截图" hidden onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)startSession(file);}}/><button onClick={()=>imageInput.current.click()} disabled={sessionBusy}><Icon name="upload"/>导入截图</button><button onClick={startSession} disabled={sessionBusy}><Icon name="edit"/>{sessionBusy?'正在准备…':'开始录入'}</button></header>
+  <div className="snow snow-content" hidden={view==='conversation'&&!!current}><main className="workspace"><header className="topbar"><div><span className="crumb">我的雪季</span><span className="separator">/</span>{tabs.find(t=>t[0]===view)?.[2]}</div><button onClick={startSession} disabled={sessionBusy}><Icon name="edit"/>{sessionBusy?'正在准备…':'开始录入'}</button></header>
   <div className="page"><div aria-live="polite" className={`feedback ${notice?'visible':''}`}>{notice}</div>{error&&<div role="alert" className="notice error">{error}</div>}
   {view==='explore'&&<><section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="green-dot"/> 雪季计划进行中</div><h1>下一站，<br/>去山里过冬。</h1><p>从已购套餐出发，找到时间和预算都合适的那一程。</p><div className="hero-tags"><span>套餐权益</span><span>逐晚补款</span><span>方案对比</span></div></div><Mountain/><div className="mountain-caption">这个雪季，把好时光留给山野。</div></section>
   <section className="stats" aria-label="台账概况"><div><span>已录入套餐</span><strong>{host.loading||host.error?'—':stats.count.toString().padStart(2,'0')}<small> 份</small></strong></div><div><span>已知住宿间夜</span><strong>{host.loading||host.error?'—':stats.nights}<small> 晚</small></strong>{stats.nightsUnknown>0&&<small>{stats.nightsUnknown} 份晚数待确认</small>}</div><div><span>已知实付与补款合计</span><strong>{host.loading||host.error?'—':yuan(stats.paid/100)}</strong>{stats.paidUnknown>0&&<small>{stats.paidUnknown} 份金额未完整，非最终总额</small>}</div><div><span>已知目的地区域</span><strong>{host.loading||host.error?'—':stats.regions.length}<small> 处</small></strong>{stats.regionsUnknown>0&&<small>{stats.regionsUnknown} 份地区待确认</small>}</div></section>
