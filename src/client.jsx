@@ -53,7 +53,18 @@ export async function apply(ctx) {
         name:'snow-trip-session-entry',inject:['uiConversation','slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
           view.uiConversation.events.register(packageTurnDefinition);
-          view.slots.inject('conversation.chat.turnTail',()=>view.slots.register({name:'conversation.chat.turnTail',select:selectTurnPackages},TurnPackageCards));
+          view.slots.inject('conversation.chat.node',()=>{
+            const original=view.slots.entries('conversation.chat.node').find(entry=>entry.options.key==='assistant-step');
+            const Assistant=original.component;
+            function PackageAnswer(props) {
+              const tail=props.useTurnData('turn-tail');
+              const records=props.useTurnData('snowPackages');
+              const seq=props.node.data.finalNode?.seq;
+              const matched=seq!==undefined&&tail?.closing?.finalNode.seq===seq?selectTurnPackages({turn:{data:{get:()=>records}},seq}):null;
+              return <>{matched&&<TurnPackageCards matched={matched}/>}<Assistant {...props}/></>;
+            }
+            return view.slots.register({name:'conversation.chat.node',key:'assistant-step',priority:-1,locale:original.locale},PackageAnswer);
+          });
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
           for(const key of ['snow_save_packages','snow_commit'])view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key},SavedPackageCard));
           view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));
