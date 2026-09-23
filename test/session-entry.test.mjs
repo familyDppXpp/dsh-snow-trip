@@ -69,3 +69,10 @@ test('宿主确认同步到嵌入视图，移除与卸载镜像不回答原问�
   assert.deepEqual(published,[pending]);snapshot=new Map();listener();assert.equal(removed,1);
   snapshot=new Map([['session',pending]]);listener();stop();assert.equal(removed,2);assert.equal(listener,null);
 });
+
+test('打开补全会话只导航，不访问输入框；执行中的会话也可查看',()=>{
+ const calls=[];
+ const sessions={list:{getSnapshot:()=>({byId:{s:{running:true,projectionValues:{agentPreset:'snow-trip'}}}})},open:id=>calls.push(id),scope:()=>assert.fail('导航不应访问输入框')};
+ openSnowSession(sessions,'s');
+ assert.deepEqual(calls,['s']);
+});

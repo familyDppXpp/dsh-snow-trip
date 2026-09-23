@@ -6,7 +6,7 @@ import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
 
 export const inject=['slots','modules','sessions','remote','uiSession'];
-const uiPlugins=['ui-renderer','locale','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions'];
+const uiPlugins=['ui-renderer','locale','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions','ui-input-trigger','ui-commands','ui-skill','ui-model-selection','ui-permission-presets'];
 
 function Entry({wide, prepare}) {
   const dialog=useRef(null),container=useRef(null);
@@ -42,7 +42,7 @@ export async function apply(ctx) {
     let mount;
     const fiber=ctx.plugin({name:'snow-trip-workbench',async apply(scope){
       let local=scope;
-      // 未装配的输入扩展也隔离，避免继承主界面的命令和草稿状态。
+      // 输入扩展在本工作台重新装配，避免继承主界面的命令和草稿状态。
       for(const key of ['slots','uiRenderer','uiSession','uiConversation','conversation','locale','uiWorkspace','inputTriggers','commandUi','modelDirectories'])local=local.isolate(key);
       for(const key of uiPlugins){
         const plugin=await ctx.modules.import(`@deepseek-ai/dsh-client-${key}/client`);
@@ -68,6 +68,7 @@ export async function apply(ctx) {
               const id=await createSnowSession(view.sessions,view.remote.agentPresets,view.conversation.input,workspace.workspaceId,draft);
               lastSession=id;return id;
             },
+            continuePackage:record=>{openSnowSession(view.sessions,record.sessionId);lastSession=record.sessionId;},
             open:id=>{openSnowSession(view.sessions,id);lastSession=id;},
           };
           view.slots.register({name:'root',children:{conversation:{kind:'single',scope:'session-maybe'}},inject:()=>({actions})},App);

@@ -48,3 +48,24 @@ test('用户当前工作簿回归（通过 SNOW_TEST_WORKBOOK 显式指定）',{
   assert.equal(evaluate(by('009'),'2026-10-09',1).eligible,false);
   for(const id of ['001','002','003','006','008','009'])assert.equal(evaluate(by(id),'2026-12-04').amount,null);
 });
+test('三个套餐的小样本回归（通过 SNOW_TEST_SMALL_WORKBOOK 指定）',{skip:!process.env.SNOW_TEST_SMALL_WORKBOOK},async()=>{
+  const raw=await readWorkbook(await readFile(process.env.SNOW_TEST_SMALL_WORKBOOK),'小样本.xlsx');
+  const data=normalize(raw,detect(raw.sheets));
+  assert.deepEqual(data.packages.map(p=>p.id),['003','007','008']);
+  assert.equal(data.packages.reduce((s,p)=>s+p.nights,0),9);
+  assert.equal(data.packages.reduce((s,p)=>s+p.paid+p.paidExtra,0),7344);
+  const [booked,surcharge,split]=data.packages;
+  assert.equal(booked.paidExtra,1000);
+  assert.equal(evaluate(booked,'2026-12-04').amount,null);
+  assert.equal(evaluate(booked,'2026-12-04').eligible,false);
+  assert.equal(evaluate(surcharge,'2026-12-04').amount,500);
+  assert.equal(evaluate(surcharge,'2026-12-12').amount,550);
+  assert.equal(evaluate(surcharge,'2026-12-30').amount,1300);
+  assert.equal(evaluate(surcharge,'2026-11-22').amount,null);
+  assert.equal(evaluate(surcharge,'2026-11-22').known,150);
+  assert.equal(split.split,true);
+  assert.equal(split.rules.length,0);
+  assert.equal(evaluate(split,'2026-12-04',1).amount,null);
+  assert.equal(evaluate(split,'2026-12-31',1).eligible,false);
+  assert.equal(evaluate(split,'2027-02-03',1).eligible,false);
+});

@@ -1,5 +1,19 @@
 # SNOW-01 验证记录
 
+## 本地 Excel 回归素材（2026-09-23）
+
+完整原件位于 `.local/2627雪季套餐台账.xlsx`，与用户提供的原件逐字节一致。小样本位于 `outputs/excel-regression-20260923/2627雪季套餐台账-小样本.xlsx`，只保留 003、007、008 三个套餐及选定规则，移除截图并压紧行号；共 9 晚，含额外补款实付 7344 元。小样本用于回归，不代表完整可用日期规则；两份 Excel 均由 Git 忽略。
+
+覆盖已付补款、已预约状态、周末加价、跨日期档位、未知加价不归零、拆分使用、套餐总价不误作加价及节假日不可用。以下命令在项目根目录执行：
+
+```sh
+SNOW_TEST_WORKBOOK=.local/2627雪季套餐台账.xlsx \
+SNOW_TEST_SMALL_WORKBOOK=outputs/excel-regression-20260923/2627雪季套餐台账-小样本.xlsx \
+pnpm test
+```
+
+结果：11 项全部通过，无跳过。不提供对应环境变量时，私有 Excel 测试自动跳过。
+
 2026-09-22 完成会话接入；2026-09-23 按用户验收纠正界面范围：恢复原工作台，只在原左栏增加会话入口，去掉另起的概览与“旧版台账与方案”。此前 `HOST-CONVERSATION-EMBED` 判断已撤销：在独立 UI 上下文装配公开 client plugin 可行，无需修改宿主。
 
 ## 环境与公开接入
@@ -91,7 +105,7 @@
 
 规格差异：DSH 的 `UNIT_NAME_RE = /^[a-z][a-z0-9_]*$/` 不接受 `snow-trip`，因此实际唯一存储域使用 `snow_trip`，表名 `packages`；预设仍为 `snow-trip`。使用配置好的宿主本机后端，没有自建数据库或云服务。
 
-新增分发资源：`skills/snow-import.md`、宿主编译产物中的输入校验/工具/存储模块、`lib/types/packages.d.ts` 及 `./types` 导出、新版客户端卡片和生成的 `getPackage/listPackages` Remote；宿主 SDK 使用 peerDependencies。包内不包含测试、私有素材、临时凭据或本机路径。
+新增分发资源：`presets/snow-trip/skills/snow-import/SKILL.md`、宿主编译产物中的输入校验/工具/存储模块、`lib/types/packages.d.ts` 及 `./types` 导出、新版客户端卡片和生成的 `getPackage/listPackages` Remote；宿主 SDK 使用 peerDependencies。包内不包含测试、私有素材、临时凭据或本机路径。
 
 复现核心检查：
 

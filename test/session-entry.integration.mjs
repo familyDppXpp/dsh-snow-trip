@@ -35,10 +35,13 @@ try {
   });
   await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'雪季出行工作台',exact:true});
-  await check('宿主套餐概览与会话入口',async()=>{
-    await dialog.getByRole('button',{name:'录入套餐',exact:true}).waitFor();
+  await check('原工作台首页保留，套餐概览和会话入口并存',async()=>{
+    await dialog.getByRole('heading',{name:/下一站，.*去山里过冬/}).waitFor();
+    assert.equal(await dialog.getByRole('button',{name:'套餐概览',exact:true}).count(),0);
+    assert.equal(await dialog.getByRole('button',{name:'开始录入',exact:true}).count(),2);
+    await dialog.getByRole('button',{name:'开始录入',exact:true}).first().waitFor();
     assert.equal(await dialog.getByRole('button',{name:'旧版台账与方案',exact:true}).count(),0);
-    for(const name of ['套餐概览']) assert.equal(await dialog.getByRole('button',{name,exact:true}).count(),1);
+    for(const name of ['找出行方案','已存方案','套餐与来源']) assert.equal(await dialog.getByRole('button',{name,exact:true}).count(),1);
 
     await page.screenshot({path:'.local/session-entry-homepage.png'});
   });
@@ -47,6 +50,18 @@ try {
   const editor=dialog.locator('[contenteditable=true]');
   await editor.waitFor();
   const first=await page.evaluate(()=>window.snowSessionCheck.state().current);
+  await check('独立输入框的斜杠菜单与技能选择不自动发送',async()=>{
+    await editor.fill('/');
+    const menu=dialog.getByRole('listbox',{name:'触发候选建议'});
+    await menu.waitFor();
+    for(const name of ['export','feedback','permission','model','snow-import']) {
+      await menu.getByRole('option',{name:new RegExp('^'+name+' ')}).waitFor();
+    }
+    await menu.getByRole('option',{name:/^snow-import /}).click();
+    assert.match(await editor.innerText(),/snow-import/);
+    assert.equal(await page.evaluate(id=>window.snowSessionCheck.state().byId[id].blank,first),true);
+    await editor.fill('');
+  });
   await check('新建空白雪季会话，排除普通会话',async()=>{
     const state=await page.evaluate(()=>window.snowSessionCheck.state());
     assert.notEqual(first,ordinary);assert.equal(state.byId[first].projectionValues.agentPreset,'snow-trip');
@@ -54,8 +69,8 @@ try {
     const list=dialog.getByLabel('雪季会话列表');
     assert.equal(await list.locator('.snow-session-open').count(),Object.values(state.byId).filter(row=>row.projectionValues?.agentPreset==='snow-trip').length);
   });
-  await dialog.getByRole('button',{name:'套餐概览',exact:true}).click();
-  await dialog.getByRole('button',{name:'录入套餐',exact:true}).waitFor();
+  await dialog.getByRole('button',{name:'套餐与来源',exact:true}).click();
+  await dialog.getByRole('button',{name:'开始录入',exact:true}).first().waitFor();
   await dialog.getByLabel('雪季会话列表').locator('.snow-session-open').first().click();
   if(process.env.SNOW_REAL_MODEL==='1') {
     await check('真实模型响应，运行中关闭工作台后可继续历史',async()=>{
@@ -73,7 +88,7 @@ try {
       report.modelConversation=body;
     });
   } else {report['真实模型响应']='未验证（需 SNOW_REAL_MODEL=1）';}
-  await dialog.getByRole('button',{name:'套餐概览',exact:true}).click();
+  await dialog.getByRole('button',{name:'套餐与来源',exact:true}).click();
   await dialog.getByRole('button',{name:'新增会话',exact:true}).click();
   await editor.waitFor();
   const second=await page.evaluate(()=>window.snowSessionCheck.state().current);
@@ -111,7 +126,7 @@ try {
   }
   await check('手机视口可见导航与会话入口',async()=>{
     await page.setViewportSize({width:390,height:844});
-    await dialog.getByRole('button',{name:'套餐概览',exact:true}).click();
+    await dialog.getByRole('button',{name:'套餐与来源',exact:true}).click();
     assert.equal(await dialog.getByRole('button',{name:'新增会话',exact:true}).isVisible(),true);
     const box=await dialog.boundingBox();assert.ok(box.width<=390);
     await page.screenshot({path:'.local/session-entry-mobile.png'});

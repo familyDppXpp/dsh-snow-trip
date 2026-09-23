@@ -22,10 +22,18 @@ export class SnowTrip extends TypertRemoteService {
   }
   [Service.init](): Promise<void> { return this.ready; }
   // 仅供服务端工具调用，不暴露为 Remote 写入接口。
-  async savePackage(record: PackageRecord): Promise<void> {
+  async savePackage(record: PackageRecord, expectedRevision?: number): Promise<void> {
     await this.ready;
     const value=packageRecord.parse(record);
-    await this.domain.table('packages').put(value.id,value);
+    const table=this.domain.table('packages');
+    if(expectedRevision!==undefined) {
+      await table.update(value.id,current=>{
+        if(current.revision!==expectedRevision||value.revision!==expectedRevision+1)throw new Error('套餐已被更新，请重新查询并确认');
+        return value;
+      });
+    } else {
+      await table.put(value.id,value);
+    }
   }
   @Remote('listPackages')
   async listPackages(): Promise<PackageRecord[]> {

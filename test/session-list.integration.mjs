@@ -38,7 +38,7 @@ try {
   await confirm.waitFor();
   await confirm.getByRole('button',{name:'取消',exact:true}).click();
   assert.equal(await active.count(),1);
-  await panel.getByRole('button',{name:'套餐概览',exact:true}).click();
+  await panel.getByRole('button',{name:'套餐与来源',exact:true}).click();
   const resize=page.getByRole('separator',{name:'调整侧边栏宽度'});
   await resize.press('End');for(let i=0;i<13;i++)await resize.press('ArrowLeft');
   await mkdir('.local',{recursive:true});

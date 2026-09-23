@@ -43,7 +43,7 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     assert.equal(denied.isError,true);
     return ctx.snowTrip.listPackages();
   }
-  let agent={id:'test-session',session:{snapshotEvents:()=>[{seq:0,type:'user/message',data:{source:{kind:'plugin',plugin:'runtime-context'},content:[{type:'text',text:'宿主注入内容不得成为套餐来源'}]}},{seq:1,type:'user/message',data:{source:{kind:'user'},content:[{type:'text',text:'长白山住宿，还没买，报价 1299 元。'}]}},{seq:2,type:'user/message',data:{source:{kind:'user'},content:[{type:'text',text:'晚数暂时不知道，先保存资料。'}]}}]}};
+  let agent={id:'test-session'};
   const execute=(name,args,signal=new AbortController().signal)=>ctx.tools.execute({name,arguments:args,agent,signal,callId:`call-${Math.random()}`});
   const input={package:{description:'长白山住宿',quote:129900,purchaseStatus:'unpurchased'}};
   try{
@@ -62,7 +62,7 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     assert.equal(success.isError,false,JSON.stringify(success));
     const record=packageMetadata(success.meta);assert.ok(record);
     assert.equal(record.revision,1);assert.equal(record.quote,129900);assert.equal(record.paid,null);
-    assert.equal(record.nights,null);assert.equal(record.sources.length,2);assert.equal(record.purchaseStatus,'unpurchased');
+    assert.equal(record.nights,null);assert.equal('sources' in record,false);assert.equal(record.purchasePlatform,null);assert.equal(record.purchaseStatus,'unpurchased');
     assert.match(question,/报价：1299.00 元/);assert.match(question,/总间夜：待确认/);
     assert.deepEqual(await ctx.snowTrip.getPackage(record.id),record);
     const shared=await ctx.tools.execute({name:'snow_query',arguments:{},agent:secondAgent,signal:new AbortController().signal,callId:'shared'});
@@ -73,11 +73,31 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     await owner.dispose();await boot();
     assert.deepEqual(await ctx.snowTrip.getPackage(record.id),record);
     const query=await execute('snow_query',{limit:1});assert.equal(query.isError,false,JSON.stringify(query));
-    assert.equal(query.value.packages[0].id,record.id);assert.equal(query.value.truncated,false);
+    assert.equal('messages' in query.value,false);assert.equal(query.value.packages[0].id,record.id);assert.equal(query.value.truncated,false);
     respond=()=>({answers:[{id:'save-package',selected:['确认保存']}]});
     await execute('snow_save_packages',{package:{name:'另一个套餐'}});
     assert.equal((await execute('snow_query',{limit:1})).value.truncated,true);
     assert.equal((await execute('snow_query',{offset:1,limit:1})).value.packages.length,1);
+    const update={id:record.id,expectedRevision:1,package:{purchasePlatform:'微信小程序 xxx',unavailableDates:['2026-12-25'],pendingQuestions:[]}};
+    respond=()=>({answers:[{id:'save-package',selected:['暂不保存']}]});
+    assert.equal((await execute('snow_save_packages',update)).isError,true);
+    assert.equal((await ctx.snowTrip.getPackage(record.id)).revision,1);
+    respond=()=>({answers:[{id:'save-package',selected:['确认保存']}]});
+    const updated=await execute('snow_save_packages',update);
+    assert.equal(updated.isError,false,JSON.stringify(updated));
+    assert.equal(updated.value.id,record.id);assert.equal(updated.value.revision,2);
+    assert.equal(updated.value.purchasePlatform,'微信小程序 xxx');assert.match(question,/购买平台：微信小程序 xxx/);assert.equal(updated.value.quote,record.quote);assert.equal(updated.value.createdAt,record.createdAt);
+    assert.deepEqual(updated.value.unavailableDates,['2026-12-25']);
+    assert.ok(!updated.value.unknowns.includes('不可用日期'));
+    assert.equal((await ctx.snowTrip.listPackages()).length,2);
+    const callsBeforeStale=calls;
+    assert.equal((await execute('snow_save_packages',update)).isError,true);assert.equal(calls,callsBeforeStale);
+    // 两个确认同时通过时，存储的原子版本检查只允许一个写入。
+    let release;const gate=new Promise(resolve=>{release=resolve;});let arrivals=0;
+    respond=async()=>{if(++arrivals===2)release();await gate;return {answers:[{id:'save-package',selected:['确认保存']}]};};
+    const competing=await Promise.all([execute('snow_save_packages',{...update,expectedRevision:2,package:{roomType:'双床房'}}),execute('snow_save_packages',{...update,expectedRevision:2,package:{roomType:'大床房'}})]);
+    assert.equal(competing.filter(r=>!r.isError).length,1);
+    assert.equal((await ctx.snowTrip.getPackage(record.id)).revision,3);
     const count=(await ctx.snowTrip.listPackages()).length;
     const controller=new AbortController();respond=()=>{controller.abort();return {answers:[{id:'save-package',selected:['确认保存']}]};};
     assert.equal((await execute('snow_save_packages',input,controller.signal)).isError,true);

@@ -26,7 +26,7 @@ try {
     if(workspaceId) assert.equal(rows[0].workspaceId,workspaceId);
     workspaceId=rows[0].workspaceId;
     assert.ok(rows[0].sessionIds.includes(state.current));
-    await panel.getByRole('button',{name:'套餐概览',exact:true}).click();
+    await panel.getByRole('button',{name:'套餐与来源',exact:true}).click();
   }
   console.log('通过：隐藏工作区选择、创建用户目录、会话使用固定目录、重复新建复用工作区。');
 } finally {await browser.close();}

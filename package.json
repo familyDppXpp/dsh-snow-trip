@@ -13,6 +13,7 @@
     "./client": "./lib/client.js",
     "./package.json": "./package.json",
     "./preset-roots": "./src/preset-roots.js",
+    "./tools": "./lib/tools.js",
     "./typert": {
       "types": "./lib/typert.host.d.ts",
       "default": "./lib/typert.host.js"
@@ -23,8 +24,7 @@
     },
     "./types": {
       "types": "./lib/types/packages.d.ts"
-    },
-    "./tools": "./lib/tools.js"
+    }
   },
   "files": [
     "src/index.js",
@@ -62,7 +62,12 @@
         "@deepseek-ai/dsh-client-ui-tool",
         "@deepseek-ai/dsh-client-modules",
         "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-ui-user-questions"
+        "@deepseek-ai/dsh-client-ui-user-questions",
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-ui-commands",
+        "@deepseek-ai/dsh-client-ui-skill",
+        "@deepseek-ai/dsh-client-ui-model-selection",
+        "@deepseek-ai/dsh-client-ui-permission-presets"
       ],
       "platform": "web"
     }
@@ -75,6 +80,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-scope": "0.1.5-rc.3",
     "@deepseek-ai/dsh-skill": "0.1.5-alpha.1",
     "@deepseek-ai/dsh-storage": "0.1.5-alpha.1",
     "@deepseek-ai/dsh-storage-domain": "0.1.5-alpha.1",
@@ -88,8 +94,7 @@
     "esbuild": "0.25.12",
     "react": "18.3.1",
     "typescript": "6.0.3",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "@deepseek-ai/dsh-scope": "0.1.5-rc.3"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "dependencies": {
     "zod": "4.4.3"
