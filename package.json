@@ -23,7 +23,8 @@
     },
     "./types": {
       "types": "./lib/types/packages.d.ts"
-    }
+    },
+    "./tools": "./lib/tools.js"
   },
   "files": [
     "src/index.js",
@@ -32,13 +33,13 @@
     "VERIFICATION.md",
     "src/preset-roots.js",
     "lib/service.js",
+    "lib/tools.js",
     "lib/types/service.d.ts",
     "presets",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
     "lib/typert.remote-client.d.ts",
-    "skills",
     "lib/types/packages.d.ts"
   ],
   "engines": {
@@ -87,7 +88,8 @@
     "esbuild": "0.25.12",
     "react": "18.3.1",
     "typescript": "6.0.3",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "@deepseek-ai/dsh-scope": "0.1.5-rc.3"
   },
   "dependencies": {
     "zod": "4.4.3"

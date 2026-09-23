@@ -13,6 +13,7 @@
     ]
   },
   "include": [
-    "src/service.ts"
+    "src/service.ts",
+    "src/tools.ts"
   ]
 }

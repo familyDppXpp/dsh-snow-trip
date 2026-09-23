@@ -7,6 +7,7 @@ import { WorkspaceTypertGenerator } from '@deepseek-ai/dsh-typert-generator';
 
 execFileSync(process.execPath, ['node_modules/typescript/bin/tsc'], { stdio: 'inherit' });
 await build({entryPoints:['lib/types/service.js'],outfile:'lib/service.js',bundle:true,format:'esm',platform:'node',packages:'external'});
+await build({entryPoints:['lib/types/tools.js'],outfile:'lib/tools.js',bundle:true,format:'esm',platform:'node',packages:'external'});
 // 当前 SDK 仅分析 packages/ 下的项目；临时装配本包，不依赖宿主源码树。
 const stage = await mkdtemp(join(tmpdir(), 'snow-typert-'));
 try {
@@ -19,6 +20,7 @@ try {
   const manifest = JSON.parse(await readFile('package.json', 'utf8'));
   // preset-roots 是纯装配入口，不贡献 Remote 类型。
   delete manifest.exports['./preset-roots'];
+  delete manifest.exports['./tools'];
   await writeFile(join(pkg, 'package.json'), JSON.stringify(manifest));
   // SDK 按项目身份识别装饰器；把已安装的公开声明也纳入临时项目图。
   await cp('node_modules/@deepseek-ai/dsh-typert-protocol', join(stage, 'packages/protocol'), {recursive:true,dereference:true});
