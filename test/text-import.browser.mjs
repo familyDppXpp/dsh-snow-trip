@@ -16,10 +16,10 @@ try {
   await page.evaluate(ledger=>new Promise((resolve,reject)=>{const r=indexedDB.open('dsh-snow-trip',1);r.onupgradeneeded=()=>r.result.createObjectStore('data');r.onerror=()=>reject(r.error);r.onsuccess=()=>{const db=r.result,t=db.transaction('data','readwrite');t.objectStore('data').put(ledger,'ledger');t.oncomplete=()=>{db.close();resolve();};};}),ledger);
   await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
   const panel=page.getByRole('dialog',{name:'雪季出行工作台',exact:true});
-  await panel.getByRole('button',{name:'套餐与来源',exact:true}).click();
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();
   await panel.getByRole('button',{name:'开始录入',exact:true}).first().waitFor();
   const before=(await page.evaluate(()=>window.snowSessionCheck.listPackages())).value.length;
-  assert.equal(await panel.getByText('旧台账记录').count(),0);
+  assert.equal(await panel.locator('.snow-package-card').getByText('旧台账记录').count(),0);
   await panel.getByRole('button',{name:'开始录入',exact:true}).first().click();
   const editor=panel.locator('[contenteditable=true]');await editor.waitFor();
   await editor.fill('长白山住宿，还没买，报价1299元，晚数不知道。请先保存资料。');await editor.press('Enter');
@@ -36,12 +36,12 @@ try {
   const id=await card.getAttribute('data-package-id');assert.equal(await card.getAttribute('data-revision'),'1');
   assert.match(await card.innerText(),/未购买/);assert.match(await card.innerText(),/待补全/);
   await page.screenshot({path:'.local/text-import-saved.png'});
-  await panel.getByRole('button',{name:'套餐与来源',exact:true}).click();
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();
   await panel.locator(`.snow-content [data-package-id="${id}"]`).waitFor();
   await page.screenshot({path:'.local/text-import-overview.png'});
   await page.reload({waitUntil:'networkidle'});
   await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
-  await panel.getByRole('button',{name:'套餐与来源',exact:true}).click();
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();
   await panel.locator(`[data-package-id="${id}"]`).waitFor();
   await panel.locator(`[data-package-id="${id}"]`).getByRole('button',{name:'打开相关会话',exact:true}).click();
   await panel.getByText('1 次工具调用',{exact:true}).click();

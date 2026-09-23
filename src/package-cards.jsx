@@ -23,16 +23,12 @@ export function SavedPackageCard({block}) {
   return <details><summary>snow_save_packages · {block?.isError?'保存失败':block&&'kind' in block?'工具结果':'等待确认或保存'}</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{content||'暂无结果'}</pre></details>;
 }
 export function usePackages(actions,refreshKey) {
+  const [attempt,setAttempt]=useState(0);
   const [rows,setRows]=useState([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
   useEffect(()=>{
     let active=true;setLoading(true);setError('');
     actions.listPackages().then(rows=>{if(active)setRows(rows);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});
     return()=>{active=false;};
-  },[actions,refreshKey]);
-  return {rows,error,loading};
-}
-export function PackageOverview({rows,error,loading,onCreate,onOpen}) {
-  return <section aria-label="已录入套餐">
-    {error?<p className="error" role="alert">读取失败：{error}</p>:loading?<p role="status">正在读取套餐…</p>:rows.length?<div className="cards">{rows.map(p=><PackageCard key={p.id} record={p} onOpen={onOpen}/>)}</div>:<div className="empty"><h3>还没有套餐资料</h3><p>把套餐说明粘贴给助理，未购买或信息不完整也可以保存。</p><button className="primary" onClick={onCreate}>开始录入</button></div>}
-  </section>;
+  },[actions,refreshKey,attempt]);
+  return {rows,error,loading,retry:()=>setAttempt(value=>value+1)};
 }

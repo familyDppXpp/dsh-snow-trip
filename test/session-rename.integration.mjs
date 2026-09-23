@@ -14,7 +14,7 @@ try {
   const id=await page.evaluate(()=>window.snowSessionCheck.state().current);
   const row=()=>panel.locator(`.snow-session-row[data-session-id="${id}"]`);
   const modal=page.getByRole('dialog',{name:'编辑会话标题',exact:true});
-  await panel.getByRole('button',{name:'套餐与来源',exact:true}).click();
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();
   assert.equal(await panel.locator('.snow-session-heading').count(),0);
   await row().getByRole('button',{name:/会话操作/}).click();
   await page.getByRole('menu',{name:'会话操作',exact:true}).getByRole('menuitem',{name:'重命名',exact:true}).click();

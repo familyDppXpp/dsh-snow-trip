@@ -21,7 +21,7 @@ try{
   assert.equal(await trigger.evaluate(e=>e===document.activeElement),true);
   assert.equal(await panel.isVisible(),true);
   await trigger.click();await menu.waitFor();
-  await panel.getByRole('button',{name:'套餐与来源',exact:true}).click();await menu.waitFor({state:'detached'});
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();await menu.waitFor({state:'detached'});
   await trigger.click();await menu.getByRole('menuitem',{name:'重命名',exact:true}).click();
   await page.getByRole('dialog',{name:'编辑会话标题',exact:true}).getByRole('button',{name:'取消',exact:true}).click();
   await trigger.click();await menu.getByRole('menuitem',{name:'归档会话',exact:true}).click();
