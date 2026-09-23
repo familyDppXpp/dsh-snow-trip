@@ -1,13 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { defineTool, type ParameterSchemaSpec, type ToolRunContext } from '@deepseek-ai/dsh-tools';
-import '@deepseek-ai/dsh-user-questions';
 import type {} from './service.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { normalizePackage, packageInput, packageRecord, packageSummary, fieldLabels, type PackageRecord } from './packages.js';
+import { normalizePackage, packageInput, packageRecord, fieldLabels, type PackageRecord } from './packages.js';
 
 export const name='snow-trip-tools';
-export const inject=['snowTrip','tools','userQuestions'];
+export const inject=['snowTrip','tools'];
 const fields=Object.keys(packageInput.shape) as (keyof typeof packageInput.shape)[];
 const draftParameter: ParameterSchemaSpec={draftId:{type:'string',required:true,description:'snow_draft 返回的草稿 ID'}};
 const draftInput=z.strictObject({draftId:z.uuid()});
@@ -41,7 +40,7 @@ export function apply(ctx: Context) {
   const get=(id:string,exec:ToolRunContext,edit=false)=>{
     const draft=drafts.get(id);
     if(!draft||draft.owner!==owner(exec))throw new Error('当前会话无此草稿，服务重启后请重新创建');
-    if(edit&&(draft.busy||draft.saved))throw new Error(draft.saved?'草稿已保存，请重新打开套餐草稿':'正在确认保存，请等待结果');
+    if(edit&&(draft.busy||draft.saved))throw new Error(draft.saved?'草稿已保存，请重新打开套餐草稿':'正在保存，请等待结果');
     return draft;
   };
   const view=(id:string,draft:Draft)=>({draftId:id,status:draft.saved?'saved':'draft',id:draft.saved?.id??draft.previous?.id??null,expectedRevision:draft.saved?.revision??draft.previous?.revision??null,amountUnit:'元',package:amountsInYuan(draft.data)});
@@ -105,17 +104,15 @@ export function apply(ctx: Context) {
     const {draftId,field}=parse(z.strictObject({draftId:z.uuid(),field:z.enum(fields)}),args),draft=get(draftId,exec,true);
     draft.data={...draft.data,[field]:field==='pendingQuestions'?[]:field==='purchaseStatus'?'unknown':null};return view(draftId,draft);
   });
-  register('snow_commit','校验草稿并展示完整摘要，等待用户统一确认后保存。重复提交已成功的草稿返回原结果，不重复新增。',draftParameter,async(args,exec)=>{
+  register('snow_commit','校验草稿后直接保存，不弹确认问题。重复提交已成功的草稿返回原结果，不重复新增。',draftParameter,async(args,exec)=>{
     const {draftId}=parse(draftInput,args),draft=get(draftId,exec);
     if(draft.saved)return draft.saved;
-    if(draft.busy)throw new Error('正在确认保存，请等待结果');
+    if(draft.busy)throw new Error('正在保存，请等待结果');
     draft.busy=true;
     try{
       const normalized=parse(packageInput,draft.data),data=normalizePackage(normalized),previous=draft.previous;
-      if(previous&&(await ctx.snowTrip.getPackage(previous.id))?.revision!==previous.revision)throw new Error('套餐版本已变更，请查询并重建草稿后确认');
-      const answer=await ctx.userQuestions.ask({agent:exec.agent!,signal:exec.signal,questions:[{id:'save-package',header:previous?'确认补全套餐':'确认新增套餐',question:'确认保存以下套餐？',detail:((previous?`更新套餐 ${previous.id} · 版本 ${previous.revision} → ${previous.revision+1}\n`:'')+packageSummary(data)).split('\n').map(line=>'    '+line).join('\n'),options:[{label:'确认保存'},{label:'暂不保存'}]}]});
+      if(previous&&(await ctx.snowTrip.getPackage(previous.id))?.revision!==previous.revision)throw new Error('套餐版本已变更，请查询并重建草稿后重试');
       exec.signal.throwIfAborted();
-      if(answer.answers.length!==1||answer.answers[0]?.id!=='save-package'||answer.answers[0].selected.length!==1||answer.answers[0].selected[0]!=='确认保存'||answer.answers[0].custom?.trim())throw new Error('未确认，草稿保留，套餐未保存');
       const now=new Date().toISOString();
       const record=packageRecord.parse({...data,id:previous?.id??randomUUID(),revision:previous?previous.revision+1:1,schemaVersion:1,createdAt:previous?.createdAt??now,updatedAt:now,sessionId:previous?.sessionId??owner(exec)});
       await ctx.snowTrip.savePackage(record,previous?.revision);draft.saved=record;return record;

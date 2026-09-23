@@ -15,10 +15,9 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
 import {SnowTrip} from '../lib/service.js';
 import {packageMetadata} from '../src/packages.ts';
 
-test('公开工具：确认→写入→重开→查询；拒绝、伪造、变更、取消和写盘失败无成功 metadata',async()=>{
+test('公开工具：直接保存→重开→查询；变更、取消和写盘失败无成功 metadata',async()=>{
   const root=await mkdtemp(join(tmpdir(),'snow-import-'));
-  let ctx,owner,presetScope,secondAgent,calls=0,respond=()=>({answers:[{id:'save-package',selected:['确认保存']}]});
-  let question;
+  let ctx,owner,presetScope,secondAgent,calls=0;
   const archived=[];
   let onArchive=async()=>{};
   async function boot(){
@@ -26,7 +25,7 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     owner=rootContext.plugin({async apply(scope){ctx=scope;
     await ctx.plugin(SystemPrompt);await ctx.plugin(Tools);
     await ctx.plugin(Storage);await ctx.plugin(StorageJson,{root});await ctx.plugin(StorageDomain,{backend:'json'});
-    ctx.provide('userQuestions',{ask:async request=>{calls++;question=request.questions[0].detail;return respond();}});
+    ctx.provide('userQuestions',{ask:async()=>{calls++;throw new Error('不应弹保存确认');}});
     ctx.provide('workspaceRegistry',{archiveSession:async id=>{await onArchive();archived.push(id);}});
     await ctx.plugin(SnowTrip);
     }});await owner;ctx=rootContext;
@@ -77,18 +76,12 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     assert.deepEqual((await ok('snow_draft_get',{draftId})).value,draft,'失败步骤不改写已有草稿');
     const denied=await ctx.tools.execute({name:'snow_draft_get',arguments:{draftId},agent:secondAgent,signal:new AbortController().signal,callId:'isolation'});
     assert.equal(denied.isError,true);assert.equal(calls,0);assert.deepEqual(await ctx.snowTrip.listPackages(),[]);
-    respond=()=>({answers:[{id:'save-package',selected:['暂不保存']}]});
-    assert.equal((await execute('snow_commit',{draftId})).isError,true);
-    assert.equal((await ok('snow_draft_get',{draftId})).value.status,'draft');
-    respond=()=>({answers:[{id:'save-package',selected:['确认保存'],custom:'改两晚'}]});
-    assert.equal((await execute('snow_commit',{draftId})).isError,true);
-    respond=()=>({answers:[{id:'save-package',selected:['确认保存']}]});
     const success=await ok('snow_commit',{draftId}),record=packageMetadata(success.meta);
     const modelSaved=JSON.parse(success.content.find(c=>c.type==='text').text);
     assert.equal(modelSaved.quote,1299.5);assert.equal(modelSaved.amountUnit,'元');
     const savedDraft=(await ok('snow_draft_get',{draftId})).value;assert.equal(savedDraft.id,record.id);assert.equal(savedDraft.expectedRevision,1);
     assert.ok(record);assert.equal(record.quote,129950);assert.equal(record.nights,3);assert.equal(record.paid,null);
-    assert.match(question,/1299.50 元/);assert.equal('sources' in record,false);
+    assert.equal(calls,0,'直接保存不调用问题弹窗');assert.equal('sources' in record,false);
     assert.equal((await ok('snow_commit',{draftId})).value.id,record.id);
     assert.equal((await ctx.snowTrip.listPackages()).length,1,'提交重试不重复新增');
     assert.equal((await execute('snow_set_basic',{draftId,name:'不可修改'})).isError,true);
@@ -100,13 +93,14 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     await ok('snow_pending_question',{draftId:update,action:'add',value:'房型待确认'});
     await ok('snow_pending_question',{draftId:update,action:'remove',value:'房型待确认'});
     await ok('snow_clear_field',{draftId:update,field:'description'});
-    // 确认期间拒绝编辑和再次提交，确保用户确认的就是写入的快照。
+    // 写入期间拒绝编辑和再次提交，保证保存快照不变。
     let release,started;const gate=new Promise(resolve=>{started=resolve;});
-    respond=()=>{started();return new Promise(resolve=>{release=()=>resolve({answers:[{id:'save-package',selected:['确认保存']}]});});};
+    const save=ctx.snowTrip.savePackage.bind(ctx.snowTrip);
+    ctx.snowTrip.savePackage=async(...args)=>{started();await new Promise(resolve=>{release=resolve;});return save(...args);};
     const committing=execute('snow_commit',{draftId:update});await gate;
     assert.equal((await execute('snow_set_usage',{draftId:update,nights:5})).isError,true);
     assert.equal((await execute('snow_commit',{draftId:update})).isError,true);
-    release();const updated=await committing;assert.equal(updated.isError,false);
+    release();const updated=await committing;ctx.snowTrip.savePackage=save;assert.equal(updated.isError,false);
     assert.equal(updated.value.revision,2);assert.equal(updated.value.description,null);assert.equal(updated.value.quote,129950);
     assert.deepEqual(updated.value.unavailableDates,['2026-12-25']);
     const stale=(await ok('snow_draft',{id:record.id,expectedRevision:2})).value.draftId;
@@ -119,9 +113,8 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     await ok('snow_set_purchase',{draftId:fresh,purchaseStatus:'unpurchased',paid:1});
     assert.equal((await execute('snow_commit',{draftId:fresh})).isError,true,'跨字段冲突在统一提交前拦截');
     await ok('snow_clear_field',{draftId:fresh,field:'paid'});
-    const controller=new AbortController();respond=()=>{controller.abort();return {answers:[{id:'save-package',selected:['确认保存']}]};};
+    const controller=new AbortController();controller.abort();
     assert.equal((await execute('snow_commit',{draftId:fresh},controller.signal)).isError,true);
-    respond=()=>({answers:[{id:'save-package',selected:['确认保存']}]});
     await rename(join(root,'snow_trip.json'),join(root,'saved.json'));await mkdir(join(root,'snow_trip.json'));
     const failure=await execute('snow_commit',{draftId:fresh});assert.equal(failure.isError,true);assert.equal(failure.meta,undefined);
     assert.equal((await ctx.snowTrip.listPackages()).length,1);
