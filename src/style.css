@@ -112,10 +112,10 @@
 
 .snow-session-layout{display:flex;flex:1;min-height:0;position:relative;overflow:hidden}
 .snow-package-sidebar{width:340px;max-width:100%;flex:none;display:flex;flex-direction:column;min-height:0;background:var(--surface);border-left:1px solid var(--line)}
-.snow-package-sidebar-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
-.snow .snow-package-sidebar-head h2{font-size:14px;margin:0}
+.snow-package-sidebar-head{display:flex;align-items:center;justify-content:space-between;flex:none;min-height:56px;padding:8px 16px 8px 20px;border-bottom:1px solid var(--line)}
+.snow .snow-package-sidebar-head h2{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;line-height:20px;margin:0}
 .snow-package-sidebar-body{overflow:auto;padding:16px;flex:1;min-height:0}
-.snow .snow-package-sidebar-head h2 small{font-size:11px;color:var(--muted);font-weight:400;margin-left:6px}
+.snow .snow-package-sidebar-head h2 small{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;border-radius:6px;background:var(--soft);font-size:11px;color:var(--primary);font-weight:500;font-variant-numeric:tabular-nums}
 .snow .snow-package-sidebar-body{padding:0 20px 24px}
 .snow .snow-detail-package{margin:0;padding:0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent}
 .snow .snow-detail-package>summary{display:flex;align-items:center;gap:12px;padding:20px 0;cursor:pointer;background:transparent;list-style:none}
@@ -144,3 +144,14 @@
 .snow-detail-pending ul{margin:0;padding:0 0 0 18px;color:var(--muted);font-size:12px;line-height:1.8}
 .snow-detail-package>summary:focus-visible,.snow-detail-section>summary:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 @media(max-width:1150px){.snow-package-sidebar{position:absolute;right:0;top:0;bottom:0;z-index:5;box-shadow:-8px 0 24px #233a3410;width:min(340px,100%)}}
+
+/* 会话与详情使用同一组顶部栏尺寸，长标题按内容增高。 */
+.snow-conversation header:not([aria-hidden="true"]){box-sizing:border-box;min-height:56px;padding:8px 16px 8px 20px;border-bottom:1px solid var(--line);background:var(--surface)}
+.snow-conversation header::after{display:none}
+.snow-conversation header>div:first-child{min-height:39px}
+.snow-conversation header nav button:disabled{padding:4px 0;color:var(--ink);font-size:13px;font-weight:600;line-height:22px}
+.snow .snow-header-button{display:inline-flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px;min-height:40px;padding:10px;border:0;border-radius:8px;background:transparent;color:var(--muted);box-shadow:none}
+.snow .snow-header-button[aria-expanded="true"]{background:var(--soft);color:var(--primary)}
+.snow .snow-header-button:hover{background:var(--soft);color:var(--primary)}
+.snow .snow-header-button:active{background:var(--line)}
+.snow .snow-header-button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}

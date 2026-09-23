@@ -10,7 +10,7 @@ const PackageSidebarContext=createContext(null);
 export function PackageSidebarToggle() {
   const panel=useContext(PackageSidebarContext);
   if(!panel?.available)return null;
-  return <span className="snow"><button className="icon-button" aria-label={panel.open?'收起套餐详情':'展开套餐详情'} title={panel.open?'收起套餐详情':'展开套餐详情'} aria-expanded={panel.open} aria-controls="snow-package-sidebar" onClick={panel.toggle}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button></span>;
+  return <span className="snow"><button className="icon-button snow-header-button" aria-label={panel.open?'收起套餐详情':'展开套餐详情'} title={panel.open?'收起套餐详情':'展开套餐详情'} aria-expanded={panel.open} aria-controls="snow-package-sidebar" onClick={panel.toggle}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button></span>;
 }
 function PackageFacts({record,fields}) {
   return <dl className="snow-detail-facts">{fields.map(key=>{
@@ -21,7 +21,7 @@ function PackageFacts({record,fields}) {
 }
 function PackageSidebar({records,onClose,error,loading,onRetry}) {
   return <aside className="snow snow-package-sidebar" id="snow-package-sidebar" aria-label="套餐详情" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}}}>
-    <div className="snow-package-sidebar-head"><h2>套餐详情 <small>{records.length}</small></h2><button className="icon-button" aria-label="收起套餐详情" onClick={onClose}><Icon name="close"/></button></div>
+    <div className="snow-package-sidebar-head"><h2>套餐详情 <small aria-label={`${records.length} 个套餐`}>{records.length}</small></h2><button className="icon-button snow-header-button" title="收起套餐详情" aria-label="收起套餐详情" onClick={onClose}><Icon name="close"/></button></div>
     <div className="snow-package-sidebar-body">{error&&<p className="error" role="alert">详情刷新失败，以下为上次读取的内容。<button onClick={onRetry}>重试</button></p>}{loading&&<p role="status">正在刷新…</p>}{records.map((record,index)=><details className="snow-detail-package" key={record.id} open={index===0?true:undefined}>
       <summary><span><strong>{record.name}</strong><small>{purchaseLabels[record.purchaseStatus]}</small></span><span className="snow-session-tag">{record.completeness==='incomplete'?'待补全':'资料完整'}</span></summary>
       <div className="snow-package-detail">
