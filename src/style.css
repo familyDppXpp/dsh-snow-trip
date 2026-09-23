@@ -86,7 +86,7 @@
 .snow .snow-package-card .package-prices{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 16px;margin:0;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:14px}
 .snow .snow-package-card dt{color:var(--muted)}
 .snow .snow-package-card dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
-.snow .snow-package-card .package-missing{font-size:12px;color:var(--muted)}
+.snow .snow-package-card .package-missing{font-size:12px;color:var(--muted);padding:12px 14px;background:var(--paper);border-radius:6px}
 .snow .package-missing>span{display:block;margin-bottom:4px;font-weight:600;color:var(--ink)}
 .snow .snow-package-card .package-open{align-self:flex-start;min-height:44px;gap:12px;padding:10px 18px;margin:0;font-size:13px;font-weight:500}
 .snow .snow-package-card small{color:var(--muted)}
@@ -96,3 +96,8 @@
 .snow .package-trip-notes ul{margin:6px 0 0;padding-left:18px}
 @media(max-width:760px){.snow .snow-package-card .card-body{padding:20px;gap:16px}.snow .snow-package-card h3{font-size:17px}}
 .snow-conversation header nav button:disabled{max-width:none;white-space:normal;overflow-wrap:anywhere;text-overflow:clip;text-align:left}
+
+.snow .snow-package-card .package-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin-top:auto;padding-top:2px}
+.snow .snow-package-card .package-delete{min-height:44px;padding:8px 4px;border-color:transparent;background:transparent;color:var(--muted);font-size:12px;box-shadow:none}
+.snow .snow-package-card .package-delete:hover{color:var(--danger);background:#faf0ed;border-color:transparent}
+.snow .snow-package-card .package-delete:focus-visible{outline:2px solid var(--danger);outline-offset:3px}

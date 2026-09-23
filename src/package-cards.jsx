@@ -13,8 +13,10 @@ export function PackageCard({record:p,onOpen,onDelete,saved=false}) {
     <dl className="package-prices"><dt>报价</dt><dd>{money(p.quote)}</dd><dt>实付</dt><dd>{money(p.paid)}</dd><dt>已付额外补款</dt><dd>{money(p.paidExtra)}</dd></dl>
     {p.unknowns.length>0&&<p className="package-missing"><span>待补全</span>{p.unknowns.join('、')}</p>}
     {saved&&<small>保存时快照</small>}
+    {(onOpen||onDelete)&&<div className="package-actions">
     {onOpen&&<button className="primary package-open" onClick={()=>onOpen(p)}>{p.completeness==='incomplete'?'继续补全':'补充信息'} <span aria-hidden="true">→</span></button>}
     {onDelete&&<button className="package-delete" onClick={()=>onDelete(p)}>删除套餐</button>}
+    </div>}
   </div></article>;
 }
 export function SavedPackageCard({block}) {
