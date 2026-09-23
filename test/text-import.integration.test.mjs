@@ -51,7 +51,7 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
   const execute=(name,args,signal=new AbortController().signal)=>ctx.tools.execute({name,arguments:args,agent,signal,callId:`call-${Math.random()}`});
   const input={package:{description:'长白山住宿',quote:129900,purchaseStatus:'unpurchased'}};
   try{
-    assert.deepEqual(TYPERT.invocations.map(i=>i.id).sort(),['deletePackage','ensureWorkspace','getPackage','listPackages'].map(name=>`dsh-snow-trip#snowTrip/${name}`).sort());
+    assert.deepEqual(TYPERT.invocations.map(i=>i.id).sort(),['archiveSession','deletePackage','ensureWorkspace','getPackage','listPackages'].map(name=>`dsh-snow-trip#snowTrip/${name}`).sort());
     assert.deepEqual(await boot(),[]);
     for(const args of [{package:{}},{package:{...input.package,sourceNotes:[]}},{package:{...input.package,sources:[]}},{...input,confirmed:true},{package:{...input.package,confirmed:true}},{package:{...input.package,quote:-1}},{package:{...input.package,validFrom:'2026-02-30'}}]){
       const r=await execute('snow_save_packages',args);assert.equal(r.isError,true);assert.equal(r.meta,undefined);
@@ -103,6 +103,8 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     const competing=await Promise.all([execute('snow_save_packages',{...update,expectedRevision:2,package:{roomType:'双床房'}}),execute('snow_save_packages',{...update,expectedRevision:2,package:{roomType:'大床房'}})]);
     assert.equal(competing.filter(r=>!r.isError).length,1);
     assert.equal((await ctx.snowTrip.getPackage(record.id)).revision,3);
+    await assert.rejects(ctx.snowTrip.archiveSession(record.sessionId),/有关联套餐/);
+    assert.deepEqual(archived,[],'关联套餐会话不得从会话列表归档');
     const count=(await ctx.snowTrip.listPackages()).length;
     const controller=new AbortController();respond=()=>{controller.abort();return {answers:[{id:'save-package',selected:['确认保存']}]};};
     assert.equal((await execute('snow_save_packages',input,controller.signal)).isError,true);
@@ -136,6 +138,9 @@ test('公开工具：确认→写入→重开→查询；拒绝、伪造、变�
     onArchive=async()=>{};
     await assert.rejects(ctx.snowTrip.deletePackage(remaining.id,remaining.revision,true),/已变更/);
     assert.deepEqual(archived,[remaining.sessionId]);
+    await ctx.snowTrip.archiveSession(later.sessionId);
+    assert.deepEqual(archived,[remaining.sessionId,later.sessionId],'套餐删除后允许重试归档');
+    await assert.rejects(ctx.snowTrip.archiveSession(''),/Too small/);
     await owner.dispose();await boot();
     assert.deepEqual(await ctx.snowTrip.listPackages(),[],'重启后仍然删除');
     assert.equal(packageMetadata({...success.meta,version:99}),null);

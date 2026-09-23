@@ -66,7 +66,7 @@ export async function apply(ctx) {
             lastSession:()=>lastSession,
             sessionState:id=>view.sessions.binding(id)?.session,
             workspaceList:{subscribe:listener=>view.workspaces.list.subscribe(listener),getSnapshot:()=>view.workspaces.list.getSnapshot()},
-            archive:async id=>{await view.workspaces.archiveSession(id);if(lastSession===id)lastSession=undefined;},
+            archive:async id=>{const result=await view.remote.snowTrip.archiveSession(id);if(!result.ok)throw new Error(result.error.message);if(lastSession===id)lastSession=undefined;},
             fork:async id=>{const child=await view.sessions.fork({sessionId:id,increaseTitle:true});await view.sessions.refresh();openSnowSession(view.sessions,child);lastSession=child;return child;},
             rename:(id,title)=>renameSnowSession(view.sessions,id,title),
             close:()=>close(),

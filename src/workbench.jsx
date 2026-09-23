@@ -235,7 +235,7 @@ export function App({useSessions, renderSlot, actions}) {
   {sessionMenu&&<SessionMenu anchor={sessionMenu.anchor} onClose={()=>setSessionMenu(null)}>
       <button role="menuitem" onClick={()=>{setRenameError('');setPendingRename({id:sessionMenu.row.id,title:sessionTitle(sessionMenu.row)});setSessionMenu(null);}}><Icon name="edit"/>重命名</button>
       <button role="menuitem" onClick={async()=>{const id=sessionMenu.row.id;setSessionMenu(null);setSessionBusy(true);setSessionError('');try{await actions.fork(id);setSessionQuery('');setView('conversation');}catch(error){setSessionError('分叉失败：'+error.message);}finally{setSessionBusy(false);}}}><Icon name="fork"/>分叉会话</button>
-      <button role="menuitem" onClick={()=>{setSessionError('');setPendingArchive(sessionMenu.row);setSessionMenu(null);}}><Icon name="archive"/>归档会话</button>
+      {!host.loading&&!host.error&&!host.rows.some(record=>record.sessionId===sessionMenu.row.id)&&<button role="menuitem" onClick={()=>{setSessionError('');setPendingArchive(sessionMenu.row);setSessionMenu(null);}}><Icon name="archive"/>归档会话</button>}
   </SessionMenu>}
   {pendingArchive&&<Modal title="归档会话" dismissible={!sessionBusy} onClose={()=>setPendingArchive(null)}>
     <p>确定归档“{sessionTitle(pendingArchive)}”吗？</p>

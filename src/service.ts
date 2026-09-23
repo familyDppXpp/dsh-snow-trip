@@ -64,6 +64,15 @@ export class SnowTrip extends TypertRemoteService {
       return {sessionId:last?record.sessionId:null,archiveError:null};
     });
   }
+  @Remote('archiveSession')
+  async archiveSession(id: string): Promise<void> {
+    await this.ready;
+    return this.write(async()=>{
+      const sessionId=z.string().trim().min(1).parse(id);
+      if([...this.domain.table('packages').entries()].some(([,record])=>record.sessionId===sessionId))throw new Error('该会话有关联套餐，请在出行方案的套餐卡片中删除。');
+      await this.ctx.workspaceRegistry.archiveSession(sessionId as Parameters<WorkspaceRegistry['archiveSession']>[0]);
+    });
+  }
   @Remote('listPackages')
   async listPackages(): Promise<PackageRecord[]> {
     await this.ready;
