@@ -1,12 +1,13 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { defineTool, type ParameterSchemaSpec, type ToolRunContext } from '@deepseek-ai/dsh-tools';
 import type {} from './service.js';
+import '@deepseek-ai/dsh-user-questions';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { normalizePackage, packageInput, packageRecord, fieldLabels, type PackageRecord } from './packages.js';
 
 export const name='snow-trip-tools';
-export const inject=['snowTrip','tools'];
+export const inject=['snowTrip','tools','userQuestions'];
 const fields=Object.keys(packageInput.shape) as (keyof typeof packageInput.shape)[];
 const draftParameter: ParameterSchemaSpec={draftId:{type:'string',required:true,description:'snow_draft 返回的草稿 ID'}};
 const draftInput=z.strictObject({draftId:z.uuid()});
@@ -46,7 +47,7 @@ export function apply(ctx: Context) {
   const view=(id:string,draft:Draft)=>({draftId:id,status:draft.saved?'saved':'draft',id:draft.saved?.id??draft.previous?.id??null,expectedRevision:draft.saved?.revision??draft.previous?.revision??null,amountUnit:'元',package:amountsInYuan(draft.data)});
   const register=(name:string,description:string,parameters:ParameterSchemaSpec,execute:(args:Record<string,unknown>,exec:ToolRunContext)=>Promise<any>,commit=false)=>ctx.tools.register(defineTool({
     name,description,parameters,
-    output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(commit?{...amountsInYuan(value as Record<string,unknown>),amountUnit:'元'}:value)}],...(commit?{presentationMeta:(_args:unknown,value:any)=>({version:1,record:value})}:{})},
+    output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(commit?{...amountsInYuan(value as Record<string,unknown>),amountUnit:'元'}:value)}],...(commit?{presentationMeta:(args:any,value:any)=>{const draft=drafts.get(args.draftId)!;return {version:2,status:value.status==='adjusting'?'adjusting':'saved',previous:draft.previous,preview:normalizePackage(draft.data),record:value.status==='adjusting'?null:value};}}:{})},
     execute,
     finalizeContent:(exec,result)=>{
       if(!result.isError)return;
@@ -74,13 +75,15 @@ export function apply(ctx: Context) {
   register('snow_draft_discard','丢弃未保存草稿，不修改已存套餐。',draftParameter,async(args,exec)=>{const {draftId}=parse(draftInput,args);get(draftId,exec,true);drafts.delete(draftId);return {discarded:true};});
   for(const [name,keys,label] of [
     ['snow_set_basic',['name','description','roomType','resort','region','splitRule'],'基本信息'],
+    ['snow_set_benefits',['skiIncluded','skiTickets','skiBasis','skiRule','breakfastIncluded','breakfastPeople','breakfastBasis','breakfastRule','spaIncluded','spaPeople','spaVisits','spaBasis','spaRule','splitAllowed'],'套餐权益；是否包含与数量、口径分别填写，数量不推算；口径 order=整单、night=每晚、day=每日、other=其他（具体写入说明）'],
     ['snow_set_purchase',['purchasePlatform','purchaseStatus','quote','paid','paidExtra'],'购买信息及金额（元，最多两位小数）'],
     ['snow_set_usage',['nights','usedNights','validFrom','validTo','voided'],'有效期（YYYY-MM-DD）和使用量'],
   ] as const){
     const parameters:ParameterSchemaSpec={...draftParameter};
     const shape:Record<string,z.ZodType>={draftId:z.uuid()};
     for(const key of keys){
-      parameters[key]={type:moneyFields.includes(key)?'number':['nights','usedNights'].includes(key)?'integer':key==='voided'?'boolean':'string',description:fieldLabels[key]+(moneyFields.includes(key)?'；单位元，例如 1299.50':'；未知请省略，清空用 snow_clear_field')};
+      parameters[key]={type:moneyFields.includes(key)?'number':['nights','usedNights','skiTickets','breakfastPeople','spaPeople','spaVisits'].includes(key)?'integer':['voided','skiIncluded','breakfastIncluded','spaIncluded','splitAllowed'].includes(key)?'boolean':'string',description:fieldLabels[key]+(moneyFields.includes(key)?'；单位元，例如 1299.50':'；未知请省略，清空用 snow_clear_field')};
+      if(['skiBasis','breakfastBasis','spaBasis'].includes(key))parameters[key]={type:'string',enum:['order','night','day','other'],description:'整单 / 每晚 / 每日 / 其他；未知省略，其他口径填写对应 Rule 说明'};
       if(key==='purchaseStatus')parameters[key]={type:'string',enum:['unknown','unpurchased','purchased']};
       shape[key]=moneyFields.includes(key)?z.number().transform((value,context)=>{try{return cents(value);}catch(error){context.addIssue({code:'custom',message:error instanceof Error?error.message:String(error)});return z.NEVER;}}).optional():packageInput.shape[key].unwrap().optional();
     }
@@ -104,7 +107,7 @@ export function apply(ctx: Context) {
     const {draftId,field}=parse(z.strictObject({draftId:z.uuid(),field:z.enum(fields)}),args),draft=get(draftId,exec,true);
     draft.data={...draft.data,[field]:field==='pendingQuestions'?[]:field==='purchaseStatus'?'unknown':null};return view(draftId,draft);
   });
-  register('snow_commit','校验草稿后直接保存，不弹确认问题。重复提交已成功的草稿返回原结果，不重复新增。',draftParameter,async(args,exec)=>{
+  register('snow_commit','校验草稿后展示确认卡片，等待用户确认才保存。用户选择继续调整时返回 adjusting，不写入；停止提交并等待用户补充。重复提交已成功的草稿返回原结果，不重复新增。',draftParameter,async(args,exec)=>{
     const {draftId}=parse(draftInput,args),draft=get(draftId,exec);
     if(draft.saved)return draft.saved;
     if(draft.busy)throw new Error('正在保存，请等待结果');
@@ -112,7 +115,15 @@ export function apply(ctx: Context) {
     try{
       const normalized=parse(packageInput,draft.data),data=normalizePackage(normalized),previous=draft.previous;
       if(previous&&(await ctx.snowTrip.getPackage(previous.id))?.revision!==previous.revision)throw new Error('套餐版本已变更，请查询并重建草稿后重试');
+      const answer=await ctx.userQuestions.ask({agent:exec.agent!,signal:exec.signal,questions:[{
+        id:'snow-commit-'+exec.callId,header:previous?'确认修改套餐':'确认新增套餐',
+        question:previous?'确认这些修改？':'确认保存这份套餐？',
+        detail:JSON.stringify({callId:exec.callId,previous,preview:data}),
+        options:[{label:'确认保存'},{label:'继续调整'}],
+      }]});
       exec.signal.throwIfAborted();
+      const selected=answer.answers[0];
+      if(answer.answers.length!==1||selected?.id!=='snow-commit-'+exec.callId||selected.selected.length!==1||selected.selected[0]!=='确认保存'||selected.custom?.trim())return {status:'adjusting',message:'未保存，继续调整。请等待用户补充，不要自行再次提交。'};
       const now=new Date().toISOString();
       const record=packageRecord.parse({...data,id:previous?.id??randomUUID(),revision:previous?previous.revision+1:1,schemaVersion:1,createdAt:previous?.createdAt??now,updatedAt:now,sessionId:previous?.sessionId??owner(exec)});
       await ctx.snowTrip.savePackage(record,previous?.revision);draft.saved=record;return record;

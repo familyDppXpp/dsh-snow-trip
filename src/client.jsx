@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {SavedPackageCard,TurnPackageCards} from './package-cards.jsx';
+import {SavedPackageCard} from './package-cards.jsx';
 import { App, PackageSidebarToggle } from './workbench.jsx';
 import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
-import {packageTurnDefinition,selectTurnPackages} from './package-turns.js';
+import {saveTurnDefinition} from './package-turns.js';
+import {SaveCard,SaveCards,saveQuestion} from './save-card.jsx';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
 
@@ -52,21 +53,16 @@ export async function apply(ctx) {
       await local.plugin({
         name:'snow-trip-session-entry',inject:['uiConversation','slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
-          view.uiConversation.events.register(packageTurnDefinition);
-          view.slots.inject('conversation.chat.node',()=>{
-            const original=view.slots.entries('conversation.chat.node').find(entry=>entry.options.key==='assistant-step');
-            const Assistant=original.component;
-            function PackageAnswer(props) {
-              const tail=props.useTurnData('turn-tail');
-              const records=props.useTurnData('snowPackages');
-              const seq=props.node.data.finalNode?.seq;
-              const matched=seq!==undefined&&tail?.closing?.finalNode.seq===seq?selectTurnPackages({turn:{data:{get:()=>records}},seq}):null;
-              return <>{matched&&<TurnPackageCards matched={matched}/>}<Assistant {...props}/></>;
-            }
-            return view.slots.register({name:'conversation.chat.node',key:'assistant-step',priority:-1,locale:original.locale},PackageAnswer);
-          });
+          view.uiConversation.events.register(saveTurnDefinition);
+          // 使用宿主的轮次末尾扩展点，结果不插入旧消息，也不受工具折叠影响。
+          view.slots.inject('conversation.chat.turnTail',()=>view.slots.register({
+            name:'conversation.chat.turnTail',priority:-1,
+            select:({turn})=>{const items=turn.data.get('snowSaves');return items?.length?items:null;},
+          },({matched,sessionId})=><SaveCards items={matched} store={view.uiSession.pendingInteractions} sessionId={sessionId}/>));
+          view.slots.inject('conversation.composer',()=>view.slots.register({name:'conversation.composer',priority:-1,select:({pendingInteraction})=>saveQuestion(pendingInteraction)?pendingInteraction:null},({matched})=> <div className="snow snow-save-composer"><SaveCard key={matched.key} item={{callId:saveQuestion(matched).callId}} pending={matched}/></div>));
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
-          for(const key of ['snow_save_packages','snow_commit'])view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key},SavedPackageCard));
+          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
+          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_commit'},()=>null));
           view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));
           const actions={
             listPackages:async()=>{const result=await view.remote.snowTrip.listPackages();if(!result.ok)throw new Error(result.error.message);return result.value;},

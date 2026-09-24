@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {date,evaluate,money,text} from './ledger.js';
-import {PackageCard,usePackages} from './package-cards.jsx';
+import {PackageCard,PackageBenefits,usePackages} from './package-cards.jsx';
 import {packageStats,packageCandidates} from './package-explore.js';
 import {fieldLabels,purchaseLabels} from './packages.ts';
 import {storage} from './storage.js';
@@ -45,8 +45,9 @@ function PackageSidebar({records,onClose,error,loading,onRetry,width,onWidth}) {
       <div className="snow-package-detail">
         <div className="snow-detail-highlights"><div><span>报价</span><strong>{record.quote===null?'待确认':yuan(record.quote/100)}</strong></div><div><span>住宿间夜</span><strong>{record.nights??'待确认'}{record.nights!==null&&<small> 间夜</small>}</strong></div></div>
         <section><h3>住宿信息</h3><PackageFacts record={record} fields={['hotels','roomType','resort','region','description']}/></section>
+        <PackageBenefits record={record}/>
         <section><h3>购买与使用</h3><PackageFacts record={record} fields={['purchasePlatform','paid','paidExtra','validFrom','validTo','usedNights','voided']}/></section>
-        <details className="snow-detail-section"><summary>使用规则</summary><PackageFacts record={record} fields={['splitRule','surchargeRules','unavailableDates']}/></details>
+        <details className="snow-detail-section"><summary>使用规则</summary><PackageFacts record={record} fields={['surchargeRules','unavailableDates']}/></details>
         {record.unknowns.length>0&&<details className="snow-detail-section snow-detail-pending"><summary>待补全 <span>{record.unknowns.length} 项</span></summary><ul>{record.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></details>}
       </div>
     </details>)}</div>

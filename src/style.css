@@ -164,3 +164,21 @@
 .snow-package-resizer:hover::after,.snow-package-resizer:focus-visible::after{background:var(--primary)}
 .snow-package-resizer:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
 @media(max-width:1150px){.snow-package-sidebar{position:absolute}}
+
+.snow .snow-save-card{border:1px solid var(--line,#dce4e0);border-radius:16px;background:var(--paper,#fff);padding:24px;margin:16px 0;max-width:680px;color:var(--ink,#203b34)}
+.snow-save-card header>span{font-size:12px;color:#426b59;font-weight:600}
+.snow-save-card h3{margin:8px 0 20px;font-size:19px}.snow-save-card h4{font-size:13px;margin:20px 0 8px;color:#52655d}
+.snow-save-card dl{margin:0}.snow-save-card dl>div{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;padding:9px 0;border-bottom:1px solid #edf0ed}
+.snow-save-card dt{color:#65766d}.snow-save-card dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.snow-save-old{color:#78867e}.snow-save-card aside{background:#f5f6f2;border-radius:8px;padding:12px;margin-top:18px;font-size:13px}.snow-save-card aside p{margin:6px 0 0}
+.snow-save-card footer{display:flex;gap:12px;margin-top:20px}.snow-save-card button{padding:10px 18px;border-radius:8px}.snow-save-card button:disabled{opacity:.55;cursor:wait}
+.snow-save-card small,.snow-save-hint{color:#718078;font-size:12px}.snow-save-card small{display:block;margin-top:16px}.snow-save-card summary{cursor:pointer;padding:12px 0}.snow-save-card [role=alert]{color:#a23e32}
+@media(max-width:520px){.snow .snow-save-card{padding:16px}.snow-save-card dl>div{grid-template-columns:86px minmax(0,1fr)}}
+
+.snow .snow-save-card>header{display:block;background:transparent;border:0;padding:0;min-height:0}
+
+.snow-save-card[data-save-state=confirm] .snow-save-body,.snow-save-card[data-save-state=saving] .snow-save-body{max-height: min(42vh,420px);overflow-y:auto;overscroll-behavior:contain;padding-right:8px}
+.snow-save-card[data-save-state=confirm],.snow-save-card[data-save-state=saving]{scroll-margin-block:16px}
+
+.snow-save-composer{width:100%;max-width:760px;margin:auto}.snow .snow-save-composer .snow-save-card{max-width:none;margin:8px 0;padding:16px 20px}.snow-save-composer .snow-save-card h3{margin-bottom:12px}.snow-save-composer .snow-save-body{max-height:32vh!important}.snow-save-composer .snow-save-card footer{margin-top:12px}
+.snow .package-benefits{margin:16px 0}.snow .package-benefits h4{margin:0 0 8px;font-size:13px}.snow .package-benefits dl{margin:0}.snow .package-benefits dl>div{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;padding:7px 0;border-bottom:1px solid #edf0ed}.snow .package-benefits dt{color:#65766d}.snow .package-benefits dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;font-size:13px}

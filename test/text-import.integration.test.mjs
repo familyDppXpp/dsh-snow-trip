@@ -15,17 +15,18 @@ import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
 import {SnowTrip} from '../lib/service.js';
 import {packageMetadata} from '../src/packages.ts';
 
-test('公开工具：直接保存→重开→查询；变更、取消和写盘失败无成功 metadata',async()=>{
+test('公开工具：卡片确认→保存→重开→查询；变更、取消和写盘失败无成功 metadata',async()=>{
   const root=await mkdtemp(join(tmpdir(),'snow-import-'));
   let ctx,owner,presetScope,secondAgent,calls=0;
   const archived=[];
   let onArchive=async()=>{};
+  let onQuestion=async request=>({answers:[{id:request.questions[0].id,selected:['确认保存']}]});
   async function boot(){
     const rootContext=new Context();
     owner=rootContext.plugin({async apply(scope){ctx=scope;
     await ctx.plugin(SystemPrompt);await ctx.plugin(Tools);
     await ctx.plugin(Storage);await ctx.plugin(StorageJson,{root});await ctx.plugin(StorageDomain,{backend:'json'});
-    ctx.provide('userQuestions',{ask:async()=>{calls++;throw new Error('不应弹保存确认');}});
+    ctx.provide('userQuestions',{ask:async request=>{calls++;return onQuestion(request);}});
     ctx.provide('workspaceRegistry',{archiveSession:async id=>{await onArchive();archived.push(id);}});
     await ctx.plugin(SnowTrip);
     }});await owner;ctx=rootContext;
@@ -38,8 +39,8 @@ test('公开工具：直接保存→重开→查询；变更、取消和写盘�
       await presetScope.ctx.plugin(SnowTools);
     }});
     bindScopeParent(agent,presetKey);bindScopeParent(secondAgent,presetKey);
-    assert.deepEqual(ctx.tools.schemas(agent).map(t=>t.name).sort(),['snow_query','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_pending_question','snow_clear_field','snow_commit'].sort());
-    assert.deepEqual(ctx.tools.schemas(secondAgent).map(t=>t.name).sort(),['snow_query','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_pending_question','snow_clear_field','snow_commit'].sort());
+    assert.deepEqual(ctx.tools.schemas(agent).map(t=>t.name).sort(),['snow_query','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_pending_question','snow_clear_field','snow_commit'].sort());
+    assert.deepEqual(ctx.tools.schemas(secondAgent).map(t=>t.name).sort(),['snow_query','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_pending_question','snow_clear_field','snow_commit'].sort());
     assert.deepEqual(ctx.tools.schemas({id:'ordinary-session'}),[]);
     assert.deepEqual(ctx.tools.schemas(),[]);
     const denied=await ctx.tools.execute({name:'snow_query',arguments:{},agent:{id:'ordinary-session'},signal:new AbortController().signal,callId:'denied'});
@@ -57,6 +58,8 @@ test('公开工具：直接保存→重开→查询；变更、取消和写盘�
     await ok('snow_set_basic',{draftId,description:'长白山住宿'});
     await ok('snow_set_purchase',{draftId,quote:1299.50,purchaseStatus:'unpurchased'});
     await ok('snow_set_usage',{draftId,nights:3});
+    await ok('snow_set_benefits',{draftId,skiIncluded:true,skiTickets:2,skiBasis:'night',breakfastIncluded:true,breakfastPeople:2,breakfastBasis:'day',spaIncluded:false,splitAllowed:true});
+    await ok('snow_set_basic',{draftId,splitRule:'每次至少住2晚'});
     await ok('snow_hotel',{draftId,action:'add',value:'长白山酒店'});
     await ok('snow_hotel',{draftId,action:'add',value:'长白山酒店'});
     await ok('snow_unavailable_date',{draftId,action:'none'});
@@ -76,12 +79,20 @@ test('公开工具：直接保存→重开→查询；变更、取消和写盘�
     assert.deepEqual((await ok('snow_draft_get',{draftId})).value,draft,'失败步骤不改写已有草稿');
     const denied=await ctx.tools.execute({name:'snow_draft_get',arguments:{draftId},agent:secondAgent,signal:new AbortController().signal,callId:'isolation'});
     assert.equal(denied.isError,true);assert.equal(calls,0);assert.deepEqual(await ctx.snowTrip.listPackages(),[]);
+    onQuestion=async request=>({answers:[{id:request.questions[0].id,selected:['继续调整']}]});
+    const adjusted=await ok('snow_commit',{draftId});
+    assert.equal(adjusted.value.status,'adjusting');assert.equal(packageMetadata(adjusted.meta),null);
+    assert.deepEqual(await ctx.snowTrip.listPackages(),[]);
+    onQuestion=async request=>{const preview=JSON.parse(request.questions[0].detail);assert.equal(preview.preview.quote,129950);return {answers:[{id:request.questions[0].id,selected:['确认保存']}]};};
+    calls=0;
     const success=await ok('snow_commit',{draftId}),record=packageMetadata(success.meta);
+    onQuestion=async request=>({answers:[{id:request.questions[0].id,selected:['确认保存']}]});
     const modelSaved=JSON.parse(success.content.find(c=>c.type==='text').text);
     assert.equal(modelSaved.quote,1299.5);assert.equal(modelSaved.amountUnit,'元');
     const savedDraft=(await ok('snow_draft_get',{draftId})).value;assert.equal(savedDraft.id,record.id);assert.equal(savedDraft.expectedRevision,1);
+    assert.equal(record.skiTickets,2);assert.equal(record.skiBasis,'night');assert.equal(record.breakfastPeople,2);assert.equal(record.spaIncluded,false);assert.equal(record.splitAllowed,true);
     assert.ok(record);assert.equal(record.quote,129950);assert.equal(record.nights,3);assert.equal(record.paid,null);
-    assert.equal(calls,0,'直接保存不调用问题弹窗');assert.equal('sources' in record,false);
+    assert.equal(calls,1,'写入前必须确认');assert.equal('sources' in record,false);
     assert.equal((await ok('snow_commit',{draftId})).value.id,record.id);
     assert.equal((await ctx.snowTrip.listPackages()).length,1,'提交重试不重复新增');
     assert.equal((await execute('snow_set_basic',{draftId,name:'不可修改'})).isError,true);
@@ -104,7 +115,10 @@ test('公开工具：直接保存→重开→查询；变更、取消和写盘�
     assert.equal(updated.value.revision,2);assert.equal(updated.value.description,null);assert.equal(updated.value.quote,129950);
     assert.deepEqual(updated.value.unavailableDates,['2026-12-25']);
     const stale=(await ok('snow_draft',{id:record.id,expectedRevision:2})).value.draftId;
-    await ctx.snowTrip.savePackage({...updated.value,revision:3},2);
+    onQuestion=async request=>{await ctx.snowTrip.savePackage({...updated.value,revision:3},2);return {answers:[{id:request.questions[0].id,selected:['确认保存']}]};};
+    assert.equal((await execute('snow_commit',{draftId:stale})).isError,true,'确认期间版本变化也不能覆盖');
+    assert.equal((await ctx.snowTrip.getPackage(record.id)).revision,3);
+    onQuestion=async request=>({answers:[{id:request.questions[0].id,selected:['确认保存']}]});
     const before=calls;assert.equal((await execute('snow_commit',{draftId:stale})).isError,true);assert.equal(calls,before);
     await ok('snow_draft_discard',{draftId:stale});
     assert.equal((await execute('snow_draft_get',{draftId:stale})).isError,true);

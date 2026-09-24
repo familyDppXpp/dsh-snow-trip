@@ -1,5 +1,5 @@
 import React, {useEffect,useState} from 'react';
-import {packageMetadata,purchaseLabels} from './packages.ts';
+import {packageMetadata,purchaseLabels,benefitSummary} from './packages.ts';
 const money=n=>n===null?'待确认':`${(n/100).toFixed(2)} 元`;
 export function savedPackage(block) {
   return block&&'kind' in block&&!block.isError&&!block.parentCallId?packageMetadata(block.meta):null;
@@ -10,6 +10,7 @@ export function PackageCard({record:p,onOpen,onDelete,saved=false}) {
     <h3>{p.name}</h3>
     {p.description&&<p className="package-description">{p.description}</p>}
     <div className="package-facts"><p>购买平台：{p.purchasePlatform??'待确认'}</p><p>适用酒店：{p.hotels===null?'待确认':p.hotels.join('、')||'已确认无'}</p><p>住宿 {p.nights??'待确认'} 间夜 <span>· 已用 {p.usedNights??'待确认'}</span></p><p>有效期：{p.validFrom??'待确认'} — {p.validTo??'待确认'}</p></div>
+    <PackageBenefits record={p}/>
     <dl className="package-prices"><dt>报价</dt><dd>{money(p.quote)}</dd><dt>实付</dt><dd>{money(p.paid)}</dd><dt>已付额外补款</dt><dd>{money(p.paidExtra)}</dd></dl>
     {p.unknowns.length>0&&<p className="package-missing"><span>待补全</span>{p.unknowns.join('、')}</p>}
     {saved&&<small>保存时快照</small>}
@@ -36,6 +37,6 @@ export function usePackages(actions,refreshKey) {
   return {rows,error,loading,retry:()=>setAttempt(value=>value+1)};
 }
 
-export function TurnPackageCards({matched}) {
-  return <div className="snow snow-turn-packages">{matched.map(record=><PackageCard key={record.id} record={record} saved/>)}</div>;
+export function PackageBenefits({record}) {
+  return <section className="package-benefits" aria-label="包含权益"><h4>包含权益</h4><dl>{benefitSummary(record).map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.text}</dd></div>)}</dl></section>;
 }
