@@ -6,3 +6,6 @@
 - id: agent-presets
   name: '@deepseek-ai/dsh-agent-presets'
   disabled: true
+- id: ui-chat
+  config:
+    turnNavigationHideWidth: 0
