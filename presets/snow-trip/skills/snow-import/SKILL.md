@@ -84,6 +84,7 @@ description: 在同一会话整理单份图文套餐，以原子工具更新草�
 - 雪票：`skiIncluded` 是否包含、`skiTickets` 张数、`skiBasis` 数量口径、`skiRule` 场次/雪场/成人儿童等说明。
 - 早餐：`breakfastIncluded` 是否包含、`breakfastPeople` 人数、`breakfastBasis` 供应口径、`breakfastRule` 供应天数和限制说明。
 - 汤泉：`spaIncluded` 是否包含、`spaPeople` 人数、`spaVisits` 次数、`spaBasis` 使用口径、`spaRule` 房型赠送等限制说明。
+- 其他权益：用 `snow_other_benefit` 逐条 add/remove；none 表示明确无，unknown 表示未提供。记录晚餐券、接送、装备租赁、活动等附加权益，保留数量、使用时间和限制；不重复雪票、早餐、汤泉。不计入待补全，不主动追问。修改一项时移除旧条目、添加新条目，保留其他条目。
 - 拆分：`splitAllowed` 是否允许；具体规则为可选补充，仅在来源明确说明限制时用 `snow_set_basic` 的 `splitRule` 记录；未提供规则不视为待补全，不追问。
 
 是否字段填写 true/false，未知省略；张数/人数/次数为正整数，未知不能填 0。口径为 order（整单）、night（每晚）、day（每日）、other（其他，细节写入对应 Rule）。例如“每晚2张雪票”传 skiIncluded=true、skiTickets=2、skiBasis=night；“每日双早”传 breakfastIncluded=true、breakfastPeople=2、breakfastBasis=day。不得将每晚数量擅自折算为整单总数。未写口径则保持未知，不能默认每晚或整单。

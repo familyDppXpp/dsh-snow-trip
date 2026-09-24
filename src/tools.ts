@@ -93,7 +93,7 @@ export function apply(ctx: Context) {
       const draft=get(String(draftId),exec,true);draft.data={...draft.data,...patch};return view(String(draftId),draft);
     });
   }
-  for(const [name,key,label] of [['snow_hotel','hotels','适用酒店'],['snow_surcharge','surchargeRules','补款规则'],['snow_unavailable_date','unavailableDates','不可用日期'],['snow_pending_question','pendingQuestions','待澄清问题']] as const){
+  for(const [name,key,label] of [['snow_hotel','hotels','适用酒店'],['snow_surcharge','surchargeRules','补款规则'],['snow_unavailable_date','unavailableDates','不可用日期'],['snow_other_benefit','otherBenefits','其他权益'],['snow_pending_question','pendingQuestions','待澄清问题']] as const){
     register(name,`逐条增删草稿${label}。add/remove 时 value 为单个字符串；none 表示已确认没有，unknown 表示未知。`,{...draftParameter,action:{type:'string',enum:['add','remove','none','unknown'],required:true},value:{type:'string',description:key==='unavailableDates'?'单个日期，例如 2026-12-25':'单条文字，不要数组或对象'}},async(args,exec)=>{
       const {draftId,action,value}=parse(z.strictObject({draftId:z.uuid(),action:z.enum(['add','remove','none','unknown']),value:(key==='unavailableDates'?z.iso.date():z.string().trim().min(1).max(4000)).optional()}),args,name);
       if(['add','remove'].includes(action)&&value===undefined)throw new Error('value：请提供单条文字；例如 '+(key==='unavailableDates'?'2026-12-25':'长白山酒店'));
@@ -123,7 +123,7 @@ export function apply(ctx: Context) {
       }]});
       exec.signal.throwIfAborted();
       const selected=answer.answers[0];
-      if(answer.answers.length!==1||selected?.id!=='snow-commit-'+exec.callId||selected.selected.length!==1||selected.selected[0]!=='确认保存'||selected.custom?.trim())return {status:'adjusting',message:'未保存，继续调整。请等待用户补充，不要自行再次提交。'};
+      if(answer.answers.length!==1||selected?.id!=='snow-commit-'+exec.callId||selected.selected.length!==1||selected.selected[0]!=='确认保存'||selected.custom?.trim()){exec.concludeTurn();return {status:'adjusting',message:'未保存，继续调整。请等待用户补充，不要自行再次提交。'};}
       const now=new Date().toISOString();
       const record=packageRecord.parse({...data,id:previous?.id??randomUUID(),revision:previous?previous.revision+1:1,schemaVersion:1,createdAt:previous?.createdAt??now,updatedAt:now,sessionId:previous?.sessionId??owner(exec)});
       await ctx.snowTrip.savePackage(record,previous?.revision);draft.saved=record;return record;
