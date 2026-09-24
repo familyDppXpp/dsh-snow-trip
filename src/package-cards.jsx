@@ -27,15 +27,23 @@ export function SavedPackageCard({block}) {
   const content=Array.isArray(block?.content)?block.content.filter(c=>c?.type==='text'&&typeof c.text==='string').map(c=>c.text).join('\n'):'';
   return <details><summary>套餐保存 · {block?.isError?'保存失败':block&&'kind' in block?'工具结果':'等待确认或保存'}</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{content||'暂无结果'}</pre></details>;
 }
-// 方案核算卡片：从持久化 metadata 读取搭配与快照，历史回放不读当前套餐。
+// 方案核算卡片：从持久化 metadata 读取搭配、快照与脚本结果，历史回放不读当前套餐。
 export function EvaluateCard({block}) {
   const meta=block&&'kind' in block&&!block.isError?evaluateMetadata(block.meta):null;
   if(!meta)return <PlanFallback block={block} label="方案核算"/>;
+  const yuan=n=>n==null?'待确认':`${(n/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})} 元`;
+  const rows=Array.isArray(meta.results?.combos)?meta.results.combos:[];
   return <article className="snow trip-card snow-plan-card" aria-label="方案核算结果">
-    {meta.combos.map((combo,index)=><section key={combo.packageId+index} className="snow-plan-combo">
+    {rows.length?rows.map((combo,index)=><section key={index} className="snow-plan-combo">
+      <h3>{combo.basis||'候选搭配'}</h3>
+      {combo.total!=null&&<p className="snow-plan-total">整趟总价 <strong>{yuan(combo.total)}</strong></p>}
+      {Array.isArray(combo.daily)&&combo.daily.length>0&&<div className="table-scroll"><table><thead><tr><th>日期</th><th>费用</th><th>依据</th></tr></thead><tbody>{combo.daily.map((row,i)=><tr key={i}><td>{row.date}</td><td>{yuan(row.amount)}</td><td>{row.basis??''}</td></tr>)}</tbody></table></div>}
+      {Array.isArray(combo.checks)&&combo.checks.length>0&&<ul className="snow-plan-checks">{combo.checks.map((check,i)=><li key={i}>{check}</li>)}</ul>}
+    </section>):null}
+    {!rows.length&&meta.combos.map((combo,index)=><section key={combo.packageId+index} className="snow-plan-combo">
       <h3>{combo.snapshot.name}</h3>
       <p>{combo.start} 入住 · {combo.nights} 晚 · {combo.snapshot.hotels?.join('、')??'酒店待确认'}</p>
-      <p className="muted">整趟总价与逐日费用见脚本核算结果；版本第 {combo.revision} 版。</p>
+      <p className="muted">版本第 {combo.revision} 版；逐日费用见下方说明。</p>
     </section>)}
   </article>;
 }

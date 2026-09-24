@@ -1,5 +1,6 @@
 import React,{useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {fieldLabels,purchaseLabels,benefitBasisLabels,saveMetadata,savePreviewSchema,packageMetadata} from './packages.ts';
+import {EvaluateCard,PlanFallback,PlanSavedCard} from './package-cards.jsx';
 
 export function saveQuestion(pending) {
   const q=pending?.questions?.[0];
@@ -31,6 +32,12 @@ function PackageDetails({preview:p}) {
   return <>{groups.map(([title,keys],index)=>{const known=keys.filter(key=>!unknown(key,p[key]));return <React.Fragment key={title}>{known.length>0&&<section><h4>{title}</h4><dl>{known.map(key=><div key={key}><dt>{labels[key]}</dt><dd>{shown(key,p[key])}</dd></div>)}</dl></section>}{index===0&&<PackageBenefits record={p}/>}</React.Fragment>;})}{p.unknowns.length>0&&<aside><strong>待补全</strong><p>{p.unknowns.join('、')}</p></aside>}</>;
 }
 export function SaveCard({item,pending}) {
+  // 方案核算与保存走独立卡片组件，不进入套餐确认流程。
+  if(item.kind==='snow_evaluate')return <EvaluateCard block={{kind:'tool-result',meta:item.meta,content:item.content,isError:!!item.error}}/>;
+  if(item.kind==='snow_save_plan')return item.error?<PlanFallback block={{kind:'tool-result',isError:true,content:item.content}} label="方案保存"/>:<PlanSavedCard block={{kind:'tool-result',meta:item.meta,content:item.content}}/>;
+  return <PackageSaveCard item={item} pending={pending}/>;
+}
+function PackageSaveCard({item,pending}) {
   const live=saveQuestion(pending),card=useRef(null),snapshot=useRef(null),[busy,setBusy]=useState(false),[answerError,setAnswerError]=useState('');
   useEffect(()=>{if(live)card.current?.scrollIntoView({block:'end'});},[live?.callId]);
   if(live)snapshot.current=live;

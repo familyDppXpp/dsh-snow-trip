@@ -54,28 +54,37 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
     }
     // 资料未完成与不存在套餐不能参与计算。
     // 版本校验先行（此时尚未改资料）。
-    const wrongRev=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:99,nights:2,start:'2026-12-04'}]});
+    const script='return {amountUnit:"元",combos:[{packageId:c.packageId,start:c.start,nights:c.nights,daily:[],total:0,basis:"测试",checks:[]}]};';
+    const wrongRev=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:99,nights:2,start:'2026-12-04'}],script});
     assert.match(wrongRev.content[0].text,/版本已变更/);
-    const missing=await execute('snow_evaluate',{combos:[{packageId:crypto.randomUUID(),revision:1,nights:2,start:'2026-12-04'}]});
+    const missing=await execute('snow_evaluate',{combos:[{packageId:crypto.randomUUID(),revision:1,nights:2,start:'2026-12-04'}],script});
     assert.match(missing.content[0].text,/不存在/);
-    // 完整套餐：返回沙箱与持久化 metadata。
-    const good=await ok('snow_evaluate',{combos:[
-      {packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'},
-      {packageId:records[0].id,revision:1,nights:2,start:'2026-12-06'},
-    ]});
+    // 完整套餐：脚本实际执行，结果进入持久化 metadata。
+    const good=await ok('snow_evaluate',{
+      combos:[
+        {packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'},
+        {packageId:records[0].id,revision:1,nights:2,start:'2026-12-06'},
+      ],
+      script:'const yuan=v=>v/100;return {amountUnit:"元",combos:combos.map(c=>({packageId:c.packageId,start:c.start,nights:c.nights,daily:[{date:c.start,amount:100,basis:"测试分摊"}],total:100,basis:"临时脚本核算",checks:["脚本执行于受限沙箱"]}))};',
+    });
     const result=JSON.parse(good.content.find(c=>c.type==='text').text);
-    assert.equal(result.combos.length,2);assert.ok(result.scriptSandbox);
-    assert.equal(result.scriptSandbox.combos[0].quote,1200);
-    assert.equal(result.scriptSandbox.combos[1].quote,900);
+    assert.equal(result.status,'computed');assert.equal(result.combos.length,2);
+    assert.equal(result.results.combos[0].daily[0].amount,100);
     const meta=evaluateMetadata(good.meta);
     assert.ok(meta);assert.equal(meta.combos[0].snapshot.name,'基础套餐');assert.equal(meta.amountUnit,'元');
+    assert.equal(meta.results.combos[1].daily[0].amount,100);
     assert.equal(planMetadata(good.meta),null);
+    // 脚本执行失败直接报错，保留输入。
+    const badScript=await execute('snow_evaluate',{combos:[{packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'}],script:'return combos.map(c=>c.undefinedField.nope);'});
+    assert.match(badScript.content[0].text,/核算脚本执行失败/);
+    const banned=await execute('snow_evaluate',{combos:[{packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'}],script:'return require("fs");'});
+    assert.match(banned.content[0].text,/被禁止/);
     // 资料未完成的套餐不能参与计算；旧版本结果不能沿用。
     const incomplete=await ctx.snowTrip.getPackage(records[0].id);
     await ctx.snowTrip.savePackage({...incomplete,description:null,revision:2},1);
-    const blocked=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:2,nights:2,start:'2026-12-04'}]});
+    const blocked=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:2,nights:2,start:'2026-12-04'}],script});
     assert.match(blocked.content[0].text,/资料未完成/);
-    const stale=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:1,nights:2,start:'2026-12-04'}]});
+    const stale=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:1,nights:2,start:'2026-12-04'}],script});
     assert.match(stale.content[0].text,/版本已变更/);
     // 保存：版本变化拒绝；完整数据成功并持久化。
     const plan=items=>({title:'测试方案',start:'2026-12-04',nights:4,budget:2200,total:2120,paid:2100,pending:20,reason:'价格最低',allocation:'1200 元 4 晚按 2 晚分摊 600 元',estimates:[{label:'交通',amount:300,basis:'用户接受'}],items,daily:[{date:'2026-12-04',packageId:items[0].packageId,amount:300,basis:'分摊'},{date:'2026-12-05',packageId:items[0].packageId,amount:300,basis:'分摊'}],sharedCosts:[{label:'餐饮',amount:240,basis:'估算'}],unknowns:['实时有房']});

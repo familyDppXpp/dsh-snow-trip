@@ -1,5 +1,6 @@
 import {normalizePackage,saveMetadata} from './packages.ts';
 // 每次提交独立投影，确认与结果共用 callId；宿主折叠工具过程时卡片仍可见。
+// 方案核算与保存结果同样挂到轮次末尾，不退化为折叠的工具步骤。
 export const saveTurnDefinition={
   kind:'snowSaves',
   match:event=>event.type==='turn/start'?{id:String(event.data.turn),role:'start'}:
@@ -16,10 +17,14 @@ export const saveTurnDefinition={
         const snapshot=state.drafts[draftId];
         return {...state,items:[...state.items,{callId,...(snapshot?{snapshot}:{})}]};
       }
+      // 方案核算与保存结果在轮次末尾展示卡片；输入不完整时不占位。
+      if(['snow_evaluate','snow_save_plan'].includes(event.data.name))return {...state,items:[...state.items,{callId,kind:event.data.name}]};
       return event.data.name.startsWith('snow_')?{...state,calls:{...state.calls,[callId]:true}}:state;
     }
     const callId=String(event.data.message.source.callId);
     const result=event.data.message.content[0];
+    const pending=state.items.find(item=>item.callId===callId);
+    if(pending&&pending.kind)return {...state,items:state.items.map(item=>item.callId===callId?{...item,done:true,meta:event.data.meta,error:result.isError?result.content?.filter(c=>c.type==='text').map(c=>c.text).join('\n')||'执行失败，请调整后重试。':null}:item)};
     if(!state.items.some(item=>item.callId===callId)){
       if(state.calls[callId]&&!result.isError){
         try{

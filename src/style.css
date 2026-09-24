@@ -177,6 +177,19 @@
 
 .snow .snow-save-card>header{display:block;background:transparent;border:0;padding:0;min-height:0}
 
+/* 方案核算与保存卡片：与套餐卡片同一视觉语言 */
+.snow .snow-plan-card{border:1px solid var(--line,#dce4e0);border-radius:16px;background:var(--paper,#f5f7f4);padding:20px;margin:8px 0}
+.snow .snow-plan-card h3{margin:0 0 8px;font-size:17px}
+.snow .snow-plan-card .snow-plan-combo+ .snow-plan-combo{margin-top:14px;border-top:1px dashed var(--line,#dce4e0);padding-top:14px}
+.snow .snow-plan-card .snow-plan-total strong{font-size:16px}
+.snow .snow-plan-card .table-scroll{max-height:260px;overflow:auto;margin:8px 0}
+.snow .snow-plan-card table{border-collapse:collapse;width:100%;font-size:13px}
+.snow .snow-plan-card th,.snow .snow-plan-card td{border-bottom:1px solid var(--line,#dce4e0);padding:6px 8px;text-align:left;white-space:nowrap}
+.snow .snow-plan-card .snow-plan-checks{margin:6px 0 0;padding-left:18px;color:#65766d;font-size:12px}
+.snow .snow-plan-card .package-prices{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0}
+.snow .snow-plan-card .package-prices dt{color:#65766d;font-size:12px}
+.snow .snow-plan-card .package-prices dd{margin:2px 0 0;font-weight:600}
+
 .snow-save-card[data-save-state=confirm] .snow-save-body,.snow-save-card[data-save-state=saving] .snow-save-body{max-height: min(42vh,420px);overflow-y:auto;overscroll-behavior:contain;padding-right:8px}
 .snow-save-card[data-save-state=confirm],.snow-save-card[data-save-state=saving]{scroll-margin-block:16px}
 

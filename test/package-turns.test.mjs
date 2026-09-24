@@ -47,3 +47,19 @@ test('跨轮回放停止的修改卡片保留旧值与新值，不退化为套�
  assert.equal(state.items[0].snapshot.preview.nights,4);
  assert.equal(prior.drafts.draft,undefined);
 });
+
+test('方案核算与保存进入轮次卡片，失败保留原因，不影响套餐确认流程',()=>{
+ let state=saves.start(null,{event:{data:{turn:1}}});
+ const apply=event=>{state=saves.update({state},{event});};
+ apply({type:'tool/call',data:{name:'snow_evaluate',callId:'eval',arguments:'{}'}});
+ apply({type:'tool/call',data:{name:'snow_save_plan',callId:'save',arguments:'{}'}});
+ apply({type:'tool/call',data:{name:'snow_query',callId:'query'}});
+ assert.deepEqual(state.items.map(i=>[i.kind,i.done]),[['snow_evaluate',undefined],['snow_save_plan',undefined]]);
+ apply({type:'tool/result',data:{message:{source:{callId:'eval'},content:[{isError:true,content:[{type:'text',text:'核算脚本执行失败：ReferenceError: x is not defined'}]}]}}});
+ apply({type:'tool/result',data:{meta:{version:1,status:'saved',plan:{id:'p'}},message:{source:{callId:'save'},content:[{content:[{type:'text',text:'{"status":"saved"}'}]}]}}});
+ const [evaluation,plan]=state.items;
+ assert.equal(evaluation.error,'核算脚本执行失败：ReferenceError: x is not defined');
+ assert.equal(plan.error,null);
+ assert.equal(plan.meta.plan.id,'p');
+ assert.equal(state.items.length,2,'snow_query 不生成轮次卡片');
+});

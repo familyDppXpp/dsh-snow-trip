@@ -5,7 +5,8 @@ import '@deepseek-ai/dsh-user-questions';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { normalizePackage, packageInput, packageRecord, fieldLabels, type PackageRecord } from './packages.js';
-import { toCents, planInput, planRecord, planMetadata, evaluateMetaSchema } from './plans.js';
+import { toCents, planInput, planRecord, planMetadata } from './plans.js';
+import vm from 'node:vm';
 
 export const name='snow-trip-tools';
 export const inject=['snowTrip','tools','userQuestions'];
@@ -136,33 +137,44 @@ export function apply(ctx: Context) {
   // —— 出行方案闭环（SNOW-06）：读取、受限脚本核算、保存。决策由会话 LLM 承担，
   // 通用代码只做数据完整性、版本校验与受限脚本执行，不做套餐组合或计费规则。
   const comboItem=z.strictObject({packageId:z.uuid(),revision:z.number().int().min(1),nights:z.number().int().min(1).max(366),start:z.iso.date()});
-  const evaluateInput=z.strictObject({combos:z.array(comboItem).min(1).max(10)});
-  const evaluateParameters:ParameterSchemaSpec={combos:{type:'array',items:{type:'json'},required:true,description:'候选搭配数组；每项 {"packageId":"套餐ID","revision":版本号,"start":"YYYY-MM-DD 入住日","nights":晚数}。一次最多 10 个候选。'}};
-  register('snow_evaluate','按搭配执行本次核算脚本：读取参与套餐的完整原文与版本，对每个候选返回逐日住宿费用、计算依据与约束检查结果。只计算不保存；金额单位为元。日期为入住日，离店日不计费。',evaluateParameters,async(args,exec)=>{
-    const {combos}=parse(evaluateInput,args);
-    const session=owner(exec);
+  const evaluateInput=z.strictObject({combos:z.array(comboItem).min(1).max(10),script:z.string().trim().min(1).max(50000)});
+  const evaluateParameters:ParameterSchemaSpec={
+    combos:{type:'array',items:{type:'json'},required:true,description:'候选搭配数组；每项 {"packageId":"套餐ID","revision":版本号,"start":"YYYY-MM-DD 入住日","nights":晚数}。一次最多 10 个候选。'},
+    script:{type:'string',required:true,description:'你为本次核算临时编写的 JavaScript 函数体（可用 async/await）。沙箱变量 combos 提供候选搭配与套餐原文，金额单位为分。脚本 return {combos:[{packageId,start,nights,daily:[{date,amount,basis}],total,basis,checks:["约束检查结果"]}],amountUnit:"元"}。禁止 require/import/process/eval；每次核算必须实际执行脚本，不得心算。'},
+  };
+  // 受限执行：只有套餐原文与标准内建，无 require/import/process；禁止动态代码生成，超时 5 秒。
+  function runScript(script:string,sandbox:Record<string,unknown>,timeout=5000) {
+    if(/require\s*\(|import\s*\(|process\.|Function\s*\(|eval\s*\(|constructor\s*\[|while\s*\(\s*true\s*\)/.test(script))throw new Error('脚本包含被禁止的访问（require/import/process/Function/eval 等）；请只基于沙箱变量计算');
+    const context=vm.createContext({...sandbox,JSON,Date,Number,String,Array,Object,Boolean,Math,parseInt,parseFloat,isNaN},{codeGeneration:{strings:false,wasm:false}});
+    return vm.runInContext(`(async()=>{\n${script}\n})()`,context,{timeout}) as Promise<unknown>;
+  }
+  register('snow_evaluate','按候选搭配执行本次核算脚本：读取参与套餐的完整原文并校验版本与资料状态，然后实际执行你编写的临时脚本，返回逐日费用、总价、计算依据与约束检查。只计算不保存；脚本执行失败直接返回错误并保留输入，不降级、不重试。',evaluateParameters,async(args,exec)=>{
+    const {combos,script}=parse(evaluateInput,args);
+    owner(exec);
     // 版本与资料完整性在此统一校验；LLM 不能绕过 incomplete 套餐参与计算。
-    const loaded=new Map<string,{record:PackageRecord}>();
+    const loaded=new Map<string,PackageRecord>();
     for(const combo of combos){
       if(loaded.has(combo.packageId))continue;
       const record=await ctx.snowTrip.getPackage(combo.packageId);
       if(!record)throw new Error(`套餐 ${combo.packageId} 不存在，请先 snow_query`);
-      loaded.set(combo.packageId,{record});
+      loaded.set(combo.packageId,record);
     }
     const meta={version:1 as const,amountUnit:'元' as const,combos:combos.map(combo=>{
-      const {record}=loaded.get(combo.packageId)!;
+      const record=loaded.get(combo.packageId)!;
       if(record.revision!==combo.revision)throw new Error(`套餐「${record.name}」版本已变更（当前 ${record.revision}，请求 ${combo.revision}），请重新查询后计算`);
       if(record.completeness!=='complete')throw new Error(`套餐「${record.name}」资料未完成，不能参与计算`);
       return {packageId:combo.packageId,revision:combo.revision,nights:combo.nights,start:combo.start,snapshot:record};
     })};
-    // 受限临时脚本数据：只有本次搭配的套餐原文（纯 JSON，金额单位分转元后提供），
-    // 无函数、无网络、无写盘、无宿主对象；执行由宿主代码运行时承担。
-    const toYuan=(value:number|null)=>value===null?null:value/100;
+    // 受限沙箱数据：只有本次搭配的套餐原文（金额为分）与只读帮助，无宿主对象。
     const sandbox={
-      combos:meta.combos.map(({snapshot,start,nights})=>({name:snapshot.name,hotel:snapshot.hotels,roomType:snapshot.roomType,nightsTotal:snapshot.nights,usedNights:snapshot.usedNights,purchaseStatus:snapshot.purchaseStatus,quote:toYuan(snapshot.quote),paid:toYuan(snapshot.paid),paidExtra:toYuan(snapshot.paidExtra),validFrom:snapshot.validFrom,validTo:snapshot.validTo,splitAllowed:snapshot.splitAllowed,splitRule:snapshot.splitRule,skiIncluded:snapshot.skiIncluded,skiTickets:snapshot.skiTickets,skiBasis:snapshot.skiBasis,skiRule:snapshot.skiRule,breakfastIncluded:snapshot.breakfastIncluded,breakfastPeople:snapshot.breakfastPeople,breakfastBasis:snapshot.breakfastBasis,breakfastRule:snapshot.breakfastRule,spaIncluded:snapshot.spaIncluded,spaPeople:snapshot.spaPeople,spaVisits:snapshot.spaVisits,spaBasis:snapshot.spaBasis,spaRule:snapshot.spaRule,otherBenefits:snapshot.otherBenefits,surchargeRules:snapshot.surchargeRules,unavailableDates:snapshot.unavailableDates,unknowns:snapshot.unknowns,start,nights,amountUnit:'元'})),
+      combos:meta.combos.map(({snapshot,start,nights,packageId,revision})=>({packageId,revision,name:snapshot.name,hotel:snapshot.hotels,roomType:snapshot.roomType,nightsTotal:snapshot.nights,usedNights:snapshot.usedNights,purchaseStatus:snapshot.purchaseStatus,quote:snapshot.quote,paid:snapshot.paid,paidExtra:snapshot.paidExtra,validFrom:snapshot.validFrom,validTo:snapshot.validTo,splitAllowed:snapshot.splitAllowed,splitRule:snapshot.splitRule,skiIncluded:snapshot.skiIncluded,skiTickets:snapshot.skiTickets,skiBasis:snapshot.skiBasis,skiRule:snapshot.skiRule,breakfastIncluded:snapshot.breakfastIncluded,breakfastPeople:snapshot.breakfastPeople,breakfastBasis:snapshot.breakfastBasis,breakfastRule:snapshot.breakfastRule,spaIncluded:snapshot.spaIncluded,spaPeople:snapshot.spaPeople,spaVisits:snapshot.spaVisits,spaBasis:snapshot.spaBasis,spaRule:snapshot.spaRule,otherBenefits:snapshot.otherBenefits,surchargeRules:snapshot.surchargeRules,unavailableDates:snapshot.unavailableDates,unknowns:snapshot.unknowns,start,nights,amountUnit:'分'})),
     };
-    return {status:'ready',...meta,scriptSandbox:sandbox,sessionId:session,instructions:'以上 sandbox 提供套餐原文（金额单位：元）。请基于原始规则临时编写脚本并在下一轮用宿主代码执行能力实际运行，返回逐日费用、总价、计算依据与错误；不要心算金额。脚本只读，不得写套餐或保存方案。'};
-  },false,(_args,value)=>evaluateMetaSchema.safeParse({version:1,amountUnit:'元',combos:value.combos}).success?{version:1,amountUnit:'元',combos:value.combos}:null);
+    const outcome=await runScript(script,sandbox).then(
+      value=>({ok:true as const,value}),
+      error=>({ok:false as const,error:error instanceof Error?`${error.name}: ${error.message}`:String(error)}));
+    if(!outcome.ok)throw new Error(`核算脚本执行失败：${outcome.error}。请修正脚本后重新调用；不降级推荐、不自动重试。`);
+    return {status:'computed',...meta,results:outcome.value};
+  },false,(_args,value)=>value?.status==='computed'?{version:1,amountUnit:'元',combos:value.combos,results:value.results}:null);
   register('snow_save_plan','保存用户明确选中的出行方案。需要完整搭配、逐日费用与计算依据；保存前重新核查参与套餐版本与资料完成状态，套餐有变则拒绝保存。多选保存时逐份调用，不自动重试。',{
     plan:{type:'json',required:true,description:'方案对象：{"title":"方案名","start":"入住日|null","nights":总晚数|null,"budget":预算(元)|null,"total":整趟总价(元)|null,"paid":已付(元)|null,"pending":待付(元)|null,"reason":"推荐理由","allocation":"分摊依据","estimates":[{"label":"交通","amount":300,"basis":"用户接受"}],"items":[{"packageId":"ID","revision":版本,"nights":本次晚数,"start":"入住日"}],"daily":[{"date":"YYYY-MM-DD","packageId":"ID","amount":金额(元)|null,"basis":"依据"}],"sharedCosts":[{"label":"跨天共同费用","amount":0,"basis":"依据"}],"unknowns":["未知项"]}'},
   },async(args,exec)=>{
