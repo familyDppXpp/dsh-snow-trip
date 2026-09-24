@@ -184,3 +184,17 @@ node test/image-import.browser.mjs
 新增雪票、早餐、汤泉的包含状态、数量、口径与条件说明，以及可拆分状态；复用已有拆分说明。确认卡片、更新差异、结果卡片、概览和套餐侧栏使用同一套字段。旧数据读取时补充未知字段并重算待补全项，不改写存储中的业务事实。
 
 `test/benefits.test.mjs` 覆盖数量口径、明确不包含、其他口径缺说明、非法数量和旧数据；公开工具集成检查覆盖权益字段设置、保存与重开。构建与 15 项自动检查通过，2 项私人工作簿检查跳过；浏览器合成数据检查验证雪票每晚、早餐每日、汤泉整单人数/次数、拆分说明及长卡片布局。
+
+## SNOW-06 出行方案闭环 · 第一阶段（2026-09-24）
+
+规格修订：移除独立的 Jev 决策模型，会话 LLM 驱动整个搭配过程的业务判断；原 Jev 独立审核改为 `snow-plan` 技能提示词中的自查要求。临时脚本核算保留：LLM 按套餐原文临时编写脚本并实际执行，不以心算替代。详见 `.scratch/product-agent/issues/06-evaluate.md` 的 2026-09-24 修订段。
+
+实现：
+
+- `src/plans.ts`：方案输入（金额单位元）与持久化记录（金额单位分）schema、`planRecord` 交叉校验（快照与搭配版本一致、逐日费用引用搭配内套餐）、`snow_evaluate`/`snow_save_plan` 卡片 metadata 解析。
+- `src/service.ts`：`snow_trip` 数据域加入 `plans` 表；服务端 `savePlan` 在写入队列内重新核查套餐版本；`listPlans/getPlan` 只读 Remote。
+- `src/tools.ts`：`snow_evaluate` 统一校验版本与 `completeness === 'complete'`，返回套餐原文快照与受限脚本数据（纯 JSON、无函数、无宿主访问）；`snow_save_plan` 保存前重新核查版本与资料状态，多选逐份调用。两个工具经 `presentationMeta` 持久化卡片快照，历史回放不读当前套餐。
+- `presets/snow-trip/skills/snow-plan/SKILL.md`：决策约束（覆盖完整候选空间、不静默截断、默认优先级排序、脚本自查、失败不降级不重试）；`agent.cordis.yml` 提示词同步。
+- 客户端：`snow_evaluate` 核算卡片、`snow_save_plan` 保存卡片，非法或旧版 metadata 回退通用工具结果。
+
+验证：`pnpm typecheck`、`pnpm build`、`pnpm test` 通过（21 项通过，2 项私人工作簿检查跳过）；`git diff --check` 干净；`pnpm pack` 产物含 `./plan-types` 导出与技能目录。`test/plan-tools.integration.test.mjs` 覆盖：版本过期与不存在套餐拒绝、资料未完成拦截、合法搭配返回沙箱与持久化 metadata、保存版本冲突拒绝、非法金额与逐日引用校验、存储重开可读取。真实模型端到端（对话表达需求→生成→保存→回顾）未运行，保留待验收。

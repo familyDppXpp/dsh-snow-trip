@@ -7,9 +7,10 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
 import { packageRecord, type PackageRecord } from './packages.js';
+import { planRecord, type PlanRecord } from './plans.js';
 
 declare module '@deepseek-ai/cordis' { interface Context { snowTrip: SnowTrip } }
-export const snowDomain=defineDomain({name:'snow_trip',version:1,tables:{packages:domainTable(packageRecord)}});
+export const snowDomain=defineDomain({name:'snow_trip',version:1,tables:{packages:domainTable(packageRecord),plans:domainTable(planRecord)}});
 export class SnowTrip extends TypertRemoteService {
   static inject=['storageDomain','workspaceRegistry'];
   private domain!: Domain<typeof snowDomain>;
@@ -44,6 +45,29 @@ export class SnowTrip extends TypertRemoteService {
         await table.put(value.id,value);
       }
     });
+  }
+  // 仅供服务端工具调用；保存前由工具核查套餐版本与资料完成状态。
+  async savePlan(record: PlanRecord): Promise<void> {
+    await this.ready;
+    return this.write(async()=>{
+      const value=planRecord.parse(record);
+      const packages=this.domain.table('packages');
+      for(const entry of value.packages){
+        const current=packages.get(entry.id);
+        if(!current||current.revision!==entry.revision)throw new Error(`套餐 ${entry.snapshot.name} 已变更，方案未保存，请重新计算`);
+      }
+      await this.domain.table('plans').put(value.id,value);
+    });
+  }
+  @Remote('listPlans')
+  async listPlans(): Promise<PlanRecord[]> {
+    await this.ready;
+    return [...this.domain.table('plans').entries()].map(([,p])=>structuredClone(p));
+  }
+  @Remote('getPlan')
+  async getPlan(id: string): Promise<PlanRecord|null> {
+    await this.ready;
+    return structuredClone(this.domain.table('plans').get(z.uuid().parse(id))??null);
   }
   @Remote('deletePackage')
   async deletePackage(id: string, revision: number, archiveSession: boolean): Promise<{sessionId:string|null;archiveError:string|null}> {

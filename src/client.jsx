@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {SavedPackageCard} from './package-cards.jsx';
+import {SavedPackageCard,EvaluateCard,PlanSavedCard} from './package-cards.jsx';
 import { App, PackageSidebarToggle } from './workbench.jsx';
 import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
 import {saveTurnDefinition} from './package-turns.js';
@@ -62,6 +62,8 @@ export async function apply(ctx) {
           view.slots.inject('conversation.composer',()=>view.slots.register({name:'conversation.composer',priority:-1,select:({pendingInteraction})=>saveQuestion(pendingInteraction)?pendingInteraction:null},({matched})=> <div className="snow snow-save-composer"><SaveCard key={matched.key} item={{callId:saveQuestion(matched).callId}} pending={matched}/></div>));
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
           view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
+          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_evaluate'},EvaluateCard));
+          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_plan'},PlanSavedCard));
           view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_commit'},()=>null));
           view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));
           const actions={

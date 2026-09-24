@@ -24,6 +24,9 @@
     },
     "./types": {
       "types": "./lib/types/packages.d.ts"
+    },
+    "./plan-types": {
+      "types": "./lib/types/plans.d.ts"
     }
   },
   "files": [

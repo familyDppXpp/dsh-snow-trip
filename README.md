@@ -14,6 +14,8 @@
 
 使用 DSH 默认 JSON 存储配置时，套餐文件为 `$DSH_HOME/storages/snow_trip.json`；未设置 `DSH_HOME` 时通常位于 `~/.dsh/storages/snow_trip.json`。这是安装者自己的宿主数据，不写入插件安装目录或 Agent 工作目录。下文仓库内 `.local/session-entry-home` 仅为本机隔离测试环境，已被 Git 忽略，也不在插件打包文件清单内。
 
+出行方案闭环：助理通过 `snow-plan` 技能驱动套餐搭配与费用核算。`snow_evaluate` 提交候选搭配并返回套餐原文与受限脚本数据（只读、限本次搭配、无宿主访问），费用由模型临时编写的脚本实际执行得出，不以心算替代；`snow_save_plan` 在用户明确保存时逐份持久化方案，保存前重新核查参与套餐的版本与资料完成状态，套餐有变则拒绝并提示重新计算。方案查询接口为 `snowTrip.listPlans/getPlan`，只读。工作台已存方案页仍读取旧浏览器存储；会话保存的新方案存在宿主 `snow_trip` 数据域。
+
 会话列表支持搜索、重命名、分叉和归档，新增会话自动使用 `~/dsh-snow-trip`。新会话保持空白，不自动发送；关闭工作台不取消执行。会话、附件和套餐保存在本机，助理将任务相关内容发送给 DSH 配置的模型。未发送草稿不保证刷新后恢复。
 
 查询支持 ID、关键词与分页，返回 `total/truncated/nextOffset`。购买平台使用 `purchasePlatform` 记录，例如“微信小程序 xxx”；未知为 null。不再采集或校验 `sources` 消息引用，旧记录兼容读取。

@@ -1,13 +1,13 @@
 ---
 id: SNOW-10
 status: blocked
-blocked_by: [SNOW-04, SNOW-05, SNOW-08, SNOW-09]
+blocked_by: [SNOW-04, SNOW-05, SNOW-06, SNOW-09]
 stories: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
 ---
 
 # SNOW-10 · 移除旧操作流程并完成独立包验收
 
-Blocked by: SNOW-04、SNOW-05、SNOW-08、SNOW-09。
+Blocked by: SNOW-04、SNOW-05、SNOW-06、SNOW-09。
 
 ## 交付
 

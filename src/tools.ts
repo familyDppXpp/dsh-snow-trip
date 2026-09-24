@@ -5,6 +5,7 @@ import '@deepseek-ai/dsh-user-questions';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { normalizePackage, packageInput, packageRecord, fieldLabels, type PackageRecord } from './packages.js';
+import { toCents, planInput, planRecord, planMetadata, evaluateMetaSchema } from './plans.js';
 
 export const name='snow-trip-tools';
 export const inject=['snowTrip','tools','userQuestions'];
@@ -45,9 +46,11 @@ export function apply(ctx: Context) {
     return draft;
   };
   const view=(id:string,draft:Draft)=>({draftId:id,status:draft.saved?'saved':'draft',id:draft.saved?.id??draft.previous?.id??null,expectedRevision:draft.saved?.revision??draft.previous?.revision??null,amountUnit:'元',package:amountsInYuan(draft.data)});
-  const register=(name:string,description:string,parameters:ParameterSchemaSpec,execute:(args:Record<string,unknown>,exec:ToolRunContext)=>Promise<any>,commit=false)=>ctx.tools.register(defineTool({
+  const register=(name:string,description:string,parameters:ParameterSchemaSpec,execute:(args:Record<string,unknown>,exec:ToolRunContext)=>Promise<any>,commit=false,meta?:(args:any,value:any)=>unknown)=>{
+    const presentation=commit?{presentationMeta:(args:any,value:any)=>{const draft=drafts.get(args.draftId)!;return {version:2,status:value.status==='adjusting'?'adjusting':'saved',previous:draft.previous,preview:normalizePackage(draft.data),record:value.status==='adjusting'?null:value};}}:meta?{presentationMeta:(args:any,value:any)=>meta(args,value) as never}:{};
+    return ctx.tools.register(defineTool({
     name,description,parameters,
-    output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(commit?{...amountsInYuan(value as Record<string,unknown>),amountUnit:'元'}:value)}],...(commit?{presentationMeta:(args:any,value:any)=>{const draft=drafts.get(args.draftId)!;return {version:2,status:value.status==='adjusting'?'adjusting':'saved',previous:draft.previous,preview:normalizePackage(draft.data),record:value.status==='adjusting'?null:value};}}:{})},
+    output:{schema:{type:'json'},render:(_args,value)=>[{type:'text',text:JSON.stringify(commit?{...amountsInYuan(value as Record<string,unknown>),amountUnit:'元'}:value)}],...presentation},
     execute,
     finalizeContent:(exec,result)=>{
       if(!result.isError)return;
@@ -56,7 +59,7 @@ export function apply(ctx: Context) {
       const wrong=Object.entries(parameters).filter(([key,spec])=>args&&key in args&&'type' in spec&&((spec.type==='integer'&&!Number.isInteger(args[key]))||(['string','number','boolean'].includes(spec.type)&&typeof args[key]!==spec.type)));
       if(wrong.length)return [{type:'text',text:wrong.map(([key,spec])=>`${key}：收到 ${JSON.stringify(args[key])}；需要 ${'type' in spec?spec.type:''}。示例：${JSON.stringify(example(key,name))}`).join('\n')}];
     },
-  }));
+  }));};
   register('snow_query','查询已存套餐，金额单位为元；草稿不在此列表。返回分页信息。',{id:{type:'string'},query:{type:'string'},offset:{type:'integer'},limit:{type:'integer'}},async args=>{
     const {id,query,offset,limit}=parse(queryInput,args);
     const all=(await ctx.snowTrip.listPackages()).filter(p=>(!id||p.id===id)&&(!query||[p.name,p.description,...(p.hotels??[])].join(' ').includes(query)));
@@ -129,4 +132,59 @@ export function apply(ctx: Context) {
       await ctx.snowTrip.savePackage(record,previous?.revision);draft.saved=record;return record;
     }finally{draft.busy=false;}
   },true);
+
+  // —— 出行方案闭环（SNOW-06）：读取、受限脚本核算、保存。决策由会话 LLM 承担，
+  // 通用代码只做数据完整性、版本校验与受限脚本执行，不做套餐组合或计费规则。
+  const comboItem=z.strictObject({packageId:z.uuid(),revision:z.number().int().min(1),nights:z.number().int().min(1).max(366),start:z.iso.date()});
+  const evaluateInput=z.strictObject({combos:z.array(comboItem).min(1).max(10)});
+  const evaluateParameters:ParameterSchemaSpec={combos:{type:'array',items:{type:'json'},required:true,description:'候选搭配数组；每项 {"packageId":"套餐ID","revision":版本号,"start":"YYYY-MM-DD 入住日","nights":晚数}。一次最多 10 个候选。'}};
+  register('snow_evaluate','按搭配执行本次核算脚本：读取参与套餐的完整原文与版本，对每个候选返回逐日住宿费用、计算依据与约束检查结果。只计算不保存；金额单位为元。日期为入住日，离店日不计费。',evaluateParameters,async(args,exec)=>{
+    const {combos}=parse(evaluateInput,args);
+    const session=owner(exec);
+    // 版本与资料完整性在此统一校验；LLM 不能绕过 incomplete 套餐参与计算。
+    const loaded=new Map<string,{record:PackageRecord}>();
+    for(const combo of combos){
+      if(loaded.has(combo.packageId))continue;
+      const record=await ctx.snowTrip.getPackage(combo.packageId);
+      if(!record)throw new Error(`套餐 ${combo.packageId} 不存在，请先 snow_query`);
+      loaded.set(combo.packageId,{record});
+    }
+    const meta={version:1 as const,amountUnit:'元' as const,combos:combos.map(combo=>{
+      const {record}=loaded.get(combo.packageId)!;
+      if(record.revision!==combo.revision)throw new Error(`套餐「${record.name}」版本已变更（当前 ${record.revision}，请求 ${combo.revision}），请重新查询后计算`);
+      if(record.completeness!=='complete')throw new Error(`套餐「${record.name}」资料未完成，不能参与计算`);
+      return {packageId:combo.packageId,revision:combo.revision,nights:combo.nights,start:combo.start,snapshot:record};
+    })};
+    // 受限临时脚本数据：只有本次搭配的套餐原文（纯 JSON，金额单位分转元后提供），
+    // 无函数、无网络、无写盘、无宿主对象；执行由宿主代码运行时承担。
+    const toYuan=(value:number|null)=>value===null?null:value/100;
+    const sandbox={
+      combos:meta.combos.map(({snapshot,start,nights})=>({name:snapshot.name,hotel:snapshot.hotels,roomType:snapshot.roomType,nightsTotal:snapshot.nights,usedNights:snapshot.usedNights,purchaseStatus:snapshot.purchaseStatus,quote:toYuan(snapshot.quote),paid:toYuan(snapshot.paid),paidExtra:toYuan(snapshot.paidExtra),validFrom:snapshot.validFrom,validTo:snapshot.validTo,splitAllowed:snapshot.splitAllowed,splitRule:snapshot.splitRule,skiIncluded:snapshot.skiIncluded,skiTickets:snapshot.skiTickets,skiBasis:snapshot.skiBasis,skiRule:snapshot.skiRule,breakfastIncluded:snapshot.breakfastIncluded,breakfastPeople:snapshot.breakfastPeople,breakfastBasis:snapshot.breakfastBasis,breakfastRule:snapshot.breakfastRule,spaIncluded:snapshot.spaIncluded,spaPeople:snapshot.spaPeople,spaVisits:snapshot.spaVisits,spaBasis:snapshot.spaBasis,spaRule:snapshot.spaRule,otherBenefits:snapshot.otherBenefits,surchargeRules:snapshot.surchargeRules,unavailableDates:snapshot.unavailableDates,unknowns:snapshot.unknowns,start,nights,amountUnit:'元'})),
+    };
+    return {status:'ready',...meta,scriptSandbox:sandbox,sessionId:session,instructions:'以上 sandbox 提供套餐原文（金额单位：元）。请基于原始规则临时编写脚本并在下一轮用宿主代码执行能力实际运行，返回逐日费用、总价、计算依据与错误；不要心算金额。脚本只读，不得写套餐或保存方案。'};
+  },false,(_args,value)=>evaluateMetaSchema.safeParse({version:1,amountUnit:'元',combos:value.combos}).success?{version:1,amountUnit:'元',combos:value.combos}:null);
+  register('snow_save_plan','保存用户明确选中的出行方案。需要完整搭配、逐日费用与计算依据；保存前重新核查参与套餐版本与资料完成状态，套餐有变则拒绝保存。多选保存时逐份调用，不自动重试。',{
+    plan:{type:'json',required:true,description:'方案对象：{"title":"方案名","start":"入住日|null","nights":总晚数|null,"budget":预算(元)|null,"total":整趟总价(元)|null,"paid":已付(元)|null,"pending":待付(元)|null,"reason":"推荐理由","allocation":"分摊依据","estimates":[{"label":"交通","amount":300,"basis":"用户接受"}],"items":[{"packageId":"ID","revision":版本,"nights":本次晚数,"start":"入住日"}],"daily":[{"date":"YYYY-MM-DD","packageId":"ID","amount":金额(元)|null,"basis":"依据"}],"sharedCosts":[{"label":"跨天共同费用","amount":0,"basis":"依据"}],"unknowns":["未知项"]}'},
+  },async(args,exec)=>{
+    const {plan}=parse(z.strictObject({plan:planInput}),args);
+    const session=owner(exec);
+    const cents=toCents(plan.budget),total=toCents(plan.total),paid=toCents(plan.paid),pending=toCents(plan.pending);
+    const estimates=plan.estimates.map(e=>({label:e.label,amount:toCents(e.amount) as number,basis:e.basis}));
+    const sharedCosts=plan.sharedCosts.map(e=>({label:e.label,amount:toCents(e.amount) as number,basis:e.basis}));
+    const daily=plan.daily.map(row=>({...row,amount:row.amount===null?null:toCents(row.amount) as number}));
+    const now=new Date().toISOString();
+    // 保存前重新读取套餐：版本或资料状态变化时整份拒绝，不偷偷替换快照。
+    const packages=[];
+    for(const item of plan.items){
+      const record=await ctx.snowTrip.getPackage(item.packageId);
+      if(!record)throw new Error(`套餐 ${item.packageId} 不存在，方案未保存`);
+      if(record.revision!==item.revision)throw new Error(`套餐「${record.name}」已变更（当前版本 ${record.revision}），方案未保存，请重新计算`);
+      if(record.completeness!=='complete')throw new Error(`套餐「${record.name}」资料未完成，方案未保存，请先补全资料`);
+      packages.push({id:record.id,revision:record.revision,snapshot:record});
+    }
+    const record=planRecord.parse({id:randomUUID(),schemaVersion:1,createdAt:now,sessionId:session,title:plan.title,start:plan.start,nights:plan.nights,budget:cents,total,paid,pending,reason:plan.reason,allocation:plan.allocation,estimates,items:plan.items,daily,sharedCosts,unknowns:plan.unknowns,packages});
+    await ctx.snowTrip.savePlan(record);
+    // 返回值给模型精简摘要；plan 快照仅进入持久化 metadata 供卡片回放。
+    return {status:'saved',planId:record.id,amountUnit:'元',title:record.title,total:record.total===null?null:record.total/100,items:record.items.length,plan:record};
+  },false,(_args,value)=>value?.status==='saved'?{version:1,status:'saved',plan:value.plan}:null);
 }
