@@ -4,7 +4,7 @@ const money=n=>n===null?'待确认':`${(n/100).toFixed(2)} 元`;
 export function savedPackage(block) {
   return block&&'kind' in block&&!block.isError&&!block.parentCallId?packageMetadata(block.meta):null;
 }
-export function PackageCard({record:p,onOpen,saved=false}) {
+export function PackageCard({record:p,onOpen,onDelete,saved=false}) {
   return <article className="snow trip-card snow-package-card" data-package-id={p.id} data-revision={p.revision}><div className="card-body">
     <div className="card-meta"><span className="package-status">{saved?'已保存 · ':''}{purchaseLabels[p.purchaseStatus]}</span><span>{p.completeness==='incomplete'?'待补全':'资料完整'}</span></div>
     <h3>{p.name}</h3>
@@ -13,14 +13,17 @@ export function PackageCard({record:p,onOpen,saved=false}) {
     <dl className="package-prices"><dt>报价</dt><dd>{money(p.quote)}</dd><dt>实付</dt><dd>{money(p.paid)}</dd><dt>已付额外补款</dt><dd>{money(p.paidExtra)}</dd></dl>
     {p.unknowns.length>0&&<p className="package-missing"><span>待补全</span>{p.unknowns.join('、')}</p>}
     {saved&&<small>保存时快照</small>}
+    {(onOpen||onDelete)&&<div className="package-actions">
     {onOpen&&<button className="primary package-open" onClick={()=>onOpen(p)}>{p.completeness==='incomplete'?'继续补全':'补充信息'} <span aria-hidden="true">→</span></button>}
+    {onDelete&&<button className="package-delete" onClick={()=>onDelete(p)}>删除套餐</button>}
+    </div>}
   </div></article>;
 }
 export function SavedPackageCard({block}) {
   const record=savedPackage(block);
-  if(record)return <div className="snow"><PackageCard record={record} saved/></div>;
+  if(record)return <p>已保存套餐：{record.name} · 第 {record.revision} 版</p>;
   const content=Array.isArray(block?.content)?block.content.filter(c=>c?.type==='text'&&typeof c.text==='string').map(c=>c.text).join('\n'):'';
-  return <details><summary>snow_save_packages · {block?.isError?'保存失败':block&&'kind' in block?'工具结果':'等待确认或保存'}</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{content||'暂无结果'}</pre></details>;
+  return <details><summary>套餐保存 · {block?.isError?'保存失败':block&&'kind' in block?'工具结果':'等待确认或保存'}</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{content||'暂无结果'}</pre></details>;
 }
 export function usePackages(actions,refreshKey) {
   const [attempt,setAttempt]=useState(0);
@@ -31,4 +34,8 @@ export function usePackages(actions,refreshKey) {
     return()=>{active=false;};
   },[actions,refreshKey,attempt]);
   return {rows,error,loading,retry:()=>setAttempt(value=>value+1)};
+}
+
+export function TurnPackageCards({matched}) {
+  return <div className="snow snow-turn-packages">{matched.map(record=><PackageCard key={record.id} record={record} saved/>)}</div>;
 }

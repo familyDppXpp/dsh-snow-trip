@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {SavedPackageCard} from './package-cards.jsx';
-import { App } from './workbench.jsx';
+import {SavedPackageCard,TurnPackageCards} from './package-cards.jsx';
+import { App, PackageSidebarToggle } from './workbench.jsx';
 import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
+import {packageTurnDefinition,selectTurnPackages} from './package-turns.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
 
@@ -49,16 +50,37 @@ export async function apply(ctx) {
         await local.plugin({name:`snow-trip-${key}`,inject:plugin.inject,Config:plugin.Config,apply:plugin.apply});
       }
       await local.plugin({
-        name:'snow-trip-session-entry',inject:['slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
+        name:'snow-trip-session-entry',inject:['uiConversation','slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
+          view.uiConversation.events.register(packageTurnDefinition);
+          view.slots.inject('conversation.chat.node',()=>{
+            const original=view.slots.entries('conversation.chat.node').find(entry=>entry.options.key==='assistant-step');
+            const Assistant=original.component;
+            function PackageAnswer(props) {
+              const tail=props.useTurnData('turn-tail');
+              const records=props.useTurnData('snowPackages');
+              const seq=props.node.data.finalNode?.seq;
+              const matched=seq!==undefined&&tail?.closing?.finalNode.seq===seq?selectTurnPackages({turn:{data:{get:()=>records}},seq}):null;
+              return <>{matched&&<TurnPackageCards matched={matched}/>}<Assistant {...props}/></>;
+            }
+            return view.slots.register({name:'conversation.chat.node',key:'assistant-step',priority:-1,locale:original.locale},PackageAnswer);
+          });
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
-          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
+          for(const key of ['snow_save_packages','snow_commit'])view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key},SavedPackageCard));
+          view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));
           const actions={
             listPackages:async()=>{const result=await view.remote.snowTrip.listPackages();if(!result.ok)throw new Error(result.error.message);return result.value;},
+            deletePackage:async(record,archive)=>{
+              const result=await view.remote.snowTrip.deletePackage(record.id,record.revision,archive);
+              if(!result.ok)throw new Error(result.error.message);
+              if(result.value.sessionId===lastSession)lastSession=undefined;
+              if(result.value.archiveError)return `套餐已删除，但会话归档失败：${result.value.archiveError}。请从会话菜单重试归档。`;
+              return result.value.sessionId?'套餐已删除，会话已归档。':'套餐已删除。';
+            },
             lastSession:()=>lastSession,
             sessionState:id=>view.sessions.binding(id)?.session,
             workspaceList:{subscribe:listener=>view.workspaces.list.subscribe(listener),getSnapshot:()=>view.workspaces.list.getSnapshot()},
-            archive:async id=>{await view.workspaces.archiveSession(id);if(lastSession===id)lastSession=undefined;},
+            archive:async id=>{const result=await view.remote.snowTrip.archiveSession(id);if(!result.ok)throw new Error(result.error.message);if(lastSession===id)lastSession=undefined;},
             fork:async id=>{const child=await view.sessions.fork({sessionId:id,increaseTitle:true});await view.sessions.refresh();openSnowSession(view.sessions,child);lastSession=child;return child;},
             rename:(id,title)=>renameSnowSession(view.sessions,id,title),
             close:()=>close(),

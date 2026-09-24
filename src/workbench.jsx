@@ -1,9 +1,57 @@
-import React, { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { createContext, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {date,evaluate,money,text} from './ledger.js';
 import {PackageCard,usePackages} from './package-cards.jsx';
 import {packageStats,packageCandidates} from './package-explore.js';
+import {fieldLabels,purchaseLabels} from './packages.ts';
 import {storage} from './storage.js';
-import {snowSessions, sessionTitle, groupSessions} from './sessions.js';
+import {snowSessions, sessionTitle, groupSessions, packagesForSession} from './sessions.js';
+
+const PackageSidebarContext=createContext(null);
+export function PackageSidebarToggle() {
+  const panel=useContext(PackageSidebarContext);
+  if(!panel?.available)return null;
+  return <span className="snow"><button className="icon-button snow-header-button" aria-label={panel.open?'收起套餐详情':'展开套餐详情'} title={panel.open?'收起套餐详情':'展开套餐详情'} aria-expanded={panel.open} aria-controls="snow-package-sidebar" onClick={panel.toggle}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button></span>;
+}
+function PackageFacts({record,fields}) {
+  return <dl className="snow-detail-facts">{fields.map(key=>{
+    const value=record[key];
+    const shown=value===null?'待确认':Array.isArray(value)?(value.length?value.join('；'):'已确认无'):['quote','paid','paidExtra'].includes(key)?yuan(value/100):typeof value==='boolean'?(value?'是':'否'):String(value);
+    return <div key={key}><dt>{fieldLabels[key]}</dt><dd className={value===null?'is-unknown':undefined}>{shown}</dd></div>;
+  })}</dl>;
+}
+function PackageSidebar({records,onClose,error,loading,onRetry,width,onWidth}) {
+  const panel=useRef(null),drag=useRef(null);
+  const [maxWidth,setMaxWidth]=useState(600);
+  useEffect(()=>{
+    const layout=panel.current.parentElement;
+    const measure=()=>setMaxWidth(Math.max(0,Math.min(600,layout.clientWidth-(window.innerWidth>1150?280:0))));
+    const observer=new ResizeObserver(measure);observer.observe(layout);window.addEventListener('resize',measure);measure();
+    return()=>{observer.disconnect();window.removeEventListener('resize',measure);};
+  },[]);
+  const minWidth=Math.min(280,maxWidth),shownWidth=Math.max(minWidth,Math.min(width,maxWidth));
+  const resize=value=>onWidth(Math.max(minWidth,Math.min(value,maxWidth)));
+
+  return <aside className="snow snow-package-sidebar" ref={panel} style={{width:shownWidth}} id="snow-package-sidebar" aria-label="套餐详情" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}}}>
+    <div className="snow-package-resizer" role="separator" aria-label="调整套餐详情宽度" aria-orientation="vertical" aria-controls="snow-package-sidebar" aria-valuemin={minWidth} aria-valuemax={maxWidth} aria-valuenow={shownWidth} tabIndex={0}
+      onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.focus();drag.current={x:event.clientX,width:shownWidth};event.currentTarget.setPointerCapture(event.pointerId);}}
+      onPointerMove={event=>{if(drag.current)resize(drag.current.width+drag.current.x-event.clientX);}}
+      onPointerUp={event=>{drag.current=null;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);}}
+      onPointerCancel={()=>{drag.current=null;}} onLostPointerCapture={()=>{drag.current=null;}}
+      onKeyDown={event=>{const next={ArrowLeft:shownWidth+10,ArrowRight:shownWidth-10,Home:minWidth,End:maxWidth}[event.key];if(next!==undefined){event.preventDefault();resize(next);}}}
+    />
+    <div className="snow-package-sidebar-head"><h2>套餐详情 <small aria-label={`${records.length} 个套餐`}>{records.length}</small></h2><button className="icon-button snow-header-button" title="收起套餐详情" aria-label="收起套餐详情" onClick={onClose}><Icon name="close"/></button></div>
+    <div className="snow-package-sidebar-body">{error&&<p className="error" role="alert">详情刷新失败，以下为上次读取的内容。<button onClick={onRetry}>重试</button></p>}{loading&&<p role="status">正在刷新…</p>}{records.map((record,index)=><details className="snow-detail-package" key={record.id} open={index===0?true:undefined}>
+      <summary><span><strong>{record.name}</strong><small>{purchaseLabels[record.purchaseStatus]}</small></span><span className="snow-session-tag">{record.completeness==='incomplete'?'待补全':'资料完整'}</span></summary>
+      <div className="snow-package-detail">
+        <div className="snow-detail-highlights"><div><span>报价</span><strong>{record.quote===null?'待确认':yuan(record.quote/100)}</strong></div><div><span>住宿间夜</span><strong>{record.nights??'待确认'}{record.nights!==null&&<small> 间夜</small>}</strong></div></div>
+        <section><h3>住宿信息</h3><PackageFacts record={record} fields={['hotels','roomType','resort','region','description']}/></section>
+        <section><h3>购买与使用</h3><PackageFacts record={record} fields={['purchasePlatform','paid','paidExtra','validFrom','validTo','usedNights','voided']}/></section>
+        <details className="snow-detail-section"><summary>使用规则</summary><PackageFacts record={record} fields={['splitRule','surchargeRules','unavailableDates']}/></details>
+        {record.unknowns.length>0&&<details className="snow-detail-section snow-detail-pending"><summary>待补全 <span>{record.unknowns.length} 项</span></summary><ul>{record.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></details>}
+      </div>
+    </details>)}</div>
+  </aside>;
+}
 
 const yuan=n=>n==null?'待确认':new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',maximumFractionDigits:2}).format(n);
 const initial={start:'2026-12-04',nights:'',region:'全部目的地',query:'',budget:''};
@@ -80,13 +128,16 @@ export function App({useSessions, renderSlot, actions}) {
   const sessions=useSessions(state=>state);
   const [sessionBusy,setSessionBusy]=useState(false),[sessionError,setSessionError]=useState('');
   const [imagePreview,setImagePreview]=useState(null);
+  const [packageSidebarOpen,setPackageSidebarOpen]=useState(true);
+  const [packageSidebarWidth,setPackageSidebarWidth]=useState(340);
+  const [pendingDelete,setPendingDelete]=useState(null),[deleteBusy,setDeleteBusy]=useState(false),[deleteError,setDeleteError]=useState('');
   const [pendingArchive,setPendingArchive]=useState(null),[sessionMenu,setSessionMenu]=useState(null);
   const workspaceState=useSyncExternalStore(actions.workspaceList.subscribe,actions.workspaceList.getSnapshot);
   const [pendingRename,setPendingRename]=useState(null),[renameError,setRenameError]=useState('');
   const rows=snowSessions(sessions).filter(row=>!workspaceState.archivedSessionIds.includes(row.id)),current=rows.find(row=>row.id===sessions.current);
   const conversation=useRef(null),sessionList=useRef(null);
   const [sessionQuery,setSessionQuery]=useState('');
-  const sessionGroups=groupSessions(rows,sessionQuery);
+  const [collapsedGroups,setCollapsedGroups]=useState({});
   async function startSession() {
     setSessionError('');setSessionQuery('');setSessionBusy(true);setView('explore');
     try {await actions.create();setView('conversation');}
@@ -119,6 +170,8 @@ export function App({useSessions, renderSlot, actions}) {
     finally{setSessionBusy(false);}
   }
   const host=usePackages(actions,`${view}:${current?.updatedAt}:${current?.running}`);
+  const sessionGroups=groupSessions(rows,sessionQuery,host.rows);
+  const sessionPackages=packagesForSession(host.rows,current?.id);
   const stats=packageStats(host.rows);
   const candidates=packageCandidates(host.rows,filter,sort);
   const openPackage=record=>{try{actions.continuePackage(record);setView('conversation');}catch(e){setSessionError(e.message);}};
@@ -130,17 +183,17 @@ export function App({useSessions, renderSlot, actions}) {
   function toggle(id){if(selection.includes(id))setSelection(selection.filter(x=>x!==id));else if(selection.length<3)setSelection([...selection,id]);else setNotice('最多对比 3 个方案，请先移除一个。');}
   function search(e){e.preventDefault();if(!date(form.start)||form.nights!==''&&(!Number.isInteger(Number(form.nights))||Number(form.nights)<1||Number(form.nights)>366)||form.budget!==''&&money(form.budget)===null){setFormError('请填写有效入住日期、1–366 晚和非负补款预算。');startInput.current.focus();return;}setFormError('');setFilter({...form,query:form.query.trim()});setNotice('已按当前条件更新候选方案。');}
   const tabs=[['explore','grid','找出行方案'],['saved','save','已存方案']];
-  return <div className="snow-workbench"><div className="snow snow-rail" style={{width:railSize.width}}><aside className="rail" id="snow-sidebar"><div className="brand"><div className="brand-mark"><Icon size={27}/></div><div><b>雪季出行</b><small>我的山野计划</small></div></div><div className="season-label">26 / 27 雪季</div><nav aria-label="工作台导航">{tabs.map(([id,icon,label])=><button key={id} className={view===id?'active':''} aria-current={view===id?'page':undefined} onClick={()=>setView(id)}><Icon name={icon}/><span>{label}</span>{id==='saved'&&saved.length>0&&<em>{saved.length}</em>}</button>)}</nav>
+  return <PackageSidebarContext.Provider value={{available:sessionPackages.length>0,open:packageSidebarOpen,toggle:()=>setPackageSidebarOpen(open=>!open)}}><div className="snow-workbench"><div className="snow snow-rail" style={{width:railSize.width}}><aside className="rail" id="snow-sidebar"><div className="brand"><div className="brand-mark"><Icon size={27}/></div><div><b>雪季出行</b><small>我的山野计划</small></div></div><div className="season-label">26 / 27 雪季</div><nav aria-label="工作台导航">{tabs.map(([id,icon,label])=><button key={id} className={view===id?'active':''} aria-current={view===id?'page':undefined} onClick={()=>setView(id)}><Icon name={icon}/><span>{label}</span>{id==='saved'&&saved.length>0&&<em>{saved.length}</em>}</button>)}</nav>
     <section className="snow-session-controls" aria-label="助理会话">
       <button className="snow-session-new" disabled={sessionBusy} onClick={startSession}><span aria-hidden="true">＋</span>{sessionBusy?'正在准备会话…':'新增会话'}</button>
       {sessionError&&<p className="error" role="alert">{sessionError}</p>}
       <div className="snow-session-search"><Icon name="search" size={14}/><input aria-label="搜索会话" placeholder="搜索会话标题" value={sessionQuery} onChange={event=>setSessionQuery(event.target.value)} onKeyDown={event=>{if(event.key==='Escape'&&sessionQuery){event.preventDefault();event.stopPropagation();setSessionQuery('');}}}/>{sessionQuery&&<button aria-label="清空会话搜索" onClick={()=>setSessionQuery('')}><Icon name="close" size={12}/></button>}</div>
       <div className="snow-session-list" aria-label="雪季会话列表" ref={sessionList}>
-        {!sessionGroups.length?<div className="snow-session-empty"><p>{sessionQuery?'没有匹配的会话':'还没有会话'}</p><small>{sessionQuery?'换个关键词，或清空搜索。':'点击“新增会话”，开始准备下一程。'}</small></div>:sessionGroups.map(group=><section className="snow-session-group" key={group.label} aria-label={group.label}><h3>{group.label}</h3>{group.items.map(row=>{
+        {host.error?<div className="snow-session-empty" role="alert">会话分类加载失败<button onClick={host.retry}>重试</button></div>:host.loading&&!host.rows.length?<div className="snow-session-empty" role="status">正在加载会话分类…</div>:!sessionGroups.length?<div className="snow-session-empty"><p>{sessionQuery?'没有匹配的会话':'还没有会话'}</p><small>{sessionQuery?'换个关键词，或清空搜索。':'点击“新增会话”，开始准备下一程。'}</small></div>:sessionGroups.map(group=><section className="snow-session-group" key={group.label} aria-label={group.label}><h3><button className="snow-group-toggle" aria-expanded={!!sessionQuery.trim()||!collapsedGroups[group.label]} onClick={()=>setCollapsedGroups({...collapsedGroups,[group.label]:!collapsedGroups[group.label]})}><span aria-hidden="true">{!sessionQuery.trim()&&collapsedGroups[group.label]?'▸':'▾'}</span>{group.label}<span className="snow-group-count">{group.items.length}</span></button></h3>{(sessionQuery.trim()||!collapsedGroups[group.label])&&group.items.map(row=>{
           const title=sessionTitle(row),selected=view==='conversation'&&row.id===current?.id;
           return <div className={`snow-session-row${selected?' is-current':''}`} key={row.id} data-session-id={row.id}>
             <button className="snow-session-open" title={title} aria-current={selected?'page':undefined} disabled={sessionBusy} onClick={()=>{try{actions.open(row.id);setView('conversation');setSessionError('');}catch(error){setSessionError(error.message);}}}>
-              <strong>{title}</strong><span className="snow-session-meta"><span className={row.running?'is-running':''}>{row.running?'正在执行':row.completed?'已完成':row.blank?'尚未开始':'可继续'}</span>{!!row.updatedAt&&<time dateTime={new Date(row.updatedAt).toISOString()} title={new Date(row.updatedAt).toLocaleString('zh-CN')}>{new Date(row.updatedAt).toLocaleString('zh-CN',group.label==='更早'?{month:'numeric',day:'numeric'}:{hour:'2-digit',minute:'2-digit'})}</time>}</span>
+              <span className="snow-session-heading"><strong>{title}</strong>{row.packageStatus&&<span className="snow-session-tag">{row.packageStatus}</span>}</span><span className="snow-session-meta"><span className={row.running?'is-running':''}>{row.running?'正在执行':row.completed?'已完成':row.blank?'尚未开始':'可继续'}</span>{!!row.updatedAt&&<time dateTime={new Date(row.updatedAt).toISOString()} title={new Date(row.updatedAt).toLocaleString('zh-CN')}>{new Date(row.updatedAt).toLocaleString('zh-CN',new Date(row.updatedAt).toDateString()!==new Date().toDateString()?{month:'numeric',day:'numeric'}:{hour:'2-digit',minute:'2-digit'})}</time>}</span>
             </button>
             <div className="snow-session-actions">
             <button aria-label={`会话操作：${title}`} title="会话操作" disabled={sessionBusy} aria-haspopup="menu" aria-expanded={sessionMenu?.row.id===row.id} onClick={event=>setSessionMenu({row,anchor:event.currentTarget})}>···</button></div>
@@ -163,16 +216,27 @@ export function App({useSessions, renderSlot, actions}) {
   <section className="stats" aria-label="台账概况"><div><span>已录入套餐</span><strong>{host.loading||host.error?'—':stats.count.toString().padStart(2,'0')}<small> 份</small></strong></div><div><span>已知住宿间夜</span><strong>{host.loading||host.error?'—':stats.nights}<small> 晚</small></strong>{stats.nightsUnknown>0&&<small>{stats.nightsUnknown} 份晚数待确认</small>}</div><div><span>已知实付与补款合计</span><strong>{host.loading||host.error?'—':yuan(stats.paid/100)}</strong>{stats.paidUnknown>0&&<small>{stats.paidUnknown} 份金额未完整，非最终总额</small>}</div><div><span>已知目的地区域</span><strong>{host.loading||host.error?'—':stats.regions.length}<small> 处</small></strong>{stats.regionsUnknown>0&&<small>{stats.regionsUnknown} 份地区待确认</small>}</div></section>
   <section className="search-panel"><div className="section-head"><h2><Icon name="search"/> 找一程适合的出行</h2><span>先选日期，再看套餐怎么用</span></div><form noValidate onSubmit={search}><div className="filter-grid"><Field label="入住日期"><input ref={startInput} aria-invalid={!!formError} aria-describedby={formError?'snow-filter-error':undefined} type="date" value={form.start} onChange={e=>setForm({...form,start:e.target.value})}/></Field><Field label="住宿晚数"><select value={form.nights} onChange={e=>setForm({...form,nights:e.target.value})}><option value="">按各套餐晚数</option>{[1,2,3,4,5,7,10,15].map(n=><option key={n} value={n}>{n} 晚</option>)}</select></Field><Field label="目的地区域"><select value={form.region} onChange={e=>setForm({...form,region:e.target.value})}>{['全部目的地',...stats.regions].map(n=><option key={n}>{n}</option>)}</select></Field><Field label="房间补款上限（元）"><input type="number" min="0" placeholder="不限" value={form.budget} onChange={e=>setForm({...form,budget:e.target.value})}/></Field><button className="primary search-button" type="submit"><Icon name="search"/> 查找方案</button></div><div className="filter-bottom"><div className="text-search"><Icon name="search" size={17}/><input aria-label="搜索套餐或酒店" placeholder="搜索酒店、套餐或雪场" value={form.query} onChange={e=>setForm({...form,query:e.target.value})}/>{form.query&&<button type="button" aria-label="清空搜索" onClick={e=>{setForm({...form,query:''});setFilter({...filter,query:''});e.currentTarget.previousElementSibling.focus();}}><Icon name="close" size={14}/></button>}</div><span>补款未知的方案保留，避免错过候选</span></div>{formError&&<p id="snow-filter-error" role="alert" className="error">{formError}</p>}</form></section>
   <div className="results-head"><div><h2>你的出行候选 <span>{host.loading||host.error?'—':candidates.length}</span></h2><p>{filter.start} 入住 · 根据已录入资料核对，待确认项不代表可用或有房</p></div><Field label="排序"><select value={sort} onChange={e=>setSort(e.target.value)}><option value="source">录入顺序</option><option value="nights">住宿晚数优先</option></select></Field></div>
-  {host.error?<div className="empty" role="alert">读取套餐失败：{host.error}<button onClick={host.retry}>重试</button></div>:host.loading?<div className="empty" role="status">正在读取已录入套餐…</div>:!host.rows.length?<div className="empty"><Icon name="book" size={36}/><h3>先记下一份套餐</h3><p>粘贴套餐说明，和助理核对后保存。信息不全也可以先记下来。</p><button className="primary" onClick={startSession} disabled={sessionBusy}>{sessionBusy?'正在准备…':'开始录入'}</button></div>:!candidates.length?<div className="empty"><h3>没有符合筛选条件的套餐</h3><p>试试放宽目的地或搜索关键词。</p><button onClick={()=>{setForm(initial);setFilter(initial);}}>重置筛选</button></div>:<div className="cards">{candidates.map(({record,notes})=><div className="package-candidate" key={record.id}><PackageCard record={record} onOpen={openPackage}/>{notes.length>0&&<aside className="package-trip-notes" aria-label="本次出行核对提示"><strong>本次出行需核对</strong><ul>{notes.map(note=><li key={note}>{note}</li>)}</ul></aside>}</div>)}</div>}{ledger&&<section aria-label="历史台账候选"><h2>历史 Excel 台账候选</h2><div className="cards">{results.map(r=>{const p=r.pkg;return <article key={p.id} className={`trip-card ${selection.includes(p.id)?'selected':''}`}><div className={`card-scenery scenery-${p.region}`}><Icon size={75}/><span className="destination"><Icon name="pin" size={14}/>{p.region}{p.regionInferred?' · 地区推断':''}</span><span className="package-id">套餐 {p.id}</span></div><div className="card-body"><div className="card-meta"><span>{p.status||'状态待确认'}</span><span>{p.split?'可拆分使用':'连住 / 拆分待确认'}</span></div><h3>{p.hotel||p.name}</h3><p className="package-name" title={p.name}>{p.name}</p><div className="stay"><Icon name="calendar" size={16}/>{r.start.slice(5)} — {r.end.slice(5)}<b>{r.nights} 晚</b></div><div className="cost-row"><div><small>台账房间补款{r.needsHotel?' · 示例':''}</small><strong>{r.complete?yuan(r.amount):'待核对'}{r.complete&&<em> / 本次</em>}</strong></div><button className="text-button" onClick={()=>setDetail(r)}>查看依据 <Icon name="arrow" size={15}/></button></div><p className="paid">原订单已付 {yuan(p.paidExtra===null?null:p.paid+p.paidExtra)}{p.split?' · 总间夜金额':''}</p><div className={`card-warning ${r.reasons.length?'blocked':''}`}><Icon name="info" size={14}/><span>{r.reasons[0]||(r.complete?(r.needsHotel?'加价仅为指定酒店示例，需确认门店':'加价已按晚展开，权益及库存仍需确认'):'年份、房型或部分日期加价待确认')}</span></div><div className="card-actions"><button onClick={()=>setDetail(r)}>套餐详情</button><button className={selection.includes(p.id)?'chosen':''} aria-pressed={selection.includes(p.id)} onClick={()=>toggle(p.id)}>{selection.includes(p.id)?<Icon name="check" size={16}/>:<Icon name="compare" size={16}/>} {selection.includes(p.id)?'已选对比':'加入对比'}</button></div></div></article>;})}</div></section>}</>}
+  {host.error?<div className="empty" role="alert">读取套餐失败：{host.error}<button onClick={host.retry}>重试</button></div>:host.loading?<div className="empty" role="status">正在读取已录入套餐…</div>:!host.rows.length?<div className="empty"><Icon name="book" size={36}/><h3>先记下一份套餐</h3><p>粘贴套餐说明，和助理核对后保存。信息不全也可以先记下来。</p><button className="primary" onClick={startSession} disabled={sessionBusy}>{sessionBusy?'正在准备…':'开始录入'}</button></div>:!candidates.length?<div className="empty"><h3>没有符合筛选条件的套餐</h3><p>试试放宽目的地或搜索关键词。</p><button onClick={()=>{setForm(initial);setFilter(initial);}}>重置筛选</button></div>:<div className="cards">{candidates.map(({record,notes})=><div className="package-candidate" key={record.id}><PackageCard record={record} onOpen={openPackage} onDelete={record=>{setDeleteError('');setPendingDelete({record,archive:!host.rows.some(p=>p.id!==record.id&&p.sessionId===record.sessionId)});}}/>{notes.length>0&&<aside className="package-trip-notes" aria-label="本次出行核对提示"><strong>本次出行需核对</strong><ul>{notes.map(note=><li key={note}>{note}</li>)}</ul></aside>}</div>)}</div>}{ledger&&<section aria-label="历史台账候选"><h2>历史 Excel 台账候选</h2><div className="cards">{results.map(r=>{const p=r.pkg;return <article key={p.id} className={`trip-card ${selection.includes(p.id)?'selected':''}`}><div className={`card-scenery scenery-${p.region}`}><Icon size={75}/><span className="destination"><Icon name="pin" size={14}/>{p.region}{p.regionInferred?' · 地区推断':''}</span><span className="package-id">套餐 {p.id}</span></div><div className="card-body"><div className="card-meta"><span>{p.status||'状态待确认'}</span><span>{p.split?'可拆分使用':'连住 / 拆分待确认'}</span></div><h3>{p.hotel||p.name}</h3><p className="package-name" title={p.name}>{p.name}</p><div className="stay"><Icon name="calendar" size={16}/>{r.start.slice(5)} — {r.end.slice(5)}<b>{r.nights} 晚</b></div><div className="cost-row"><div><small>台账房间补款{r.needsHotel?' · 示例':''}</small><strong>{r.complete?yuan(r.amount):'待核对'}{r.complete&&<em> / 本次</em>}</strong></div><button className="text-button" onClick={()=>setDetail(r)}>查看依据 <Icon name="arrow" size={15}/></button></div><p className="paid">原订单已付 {yuan(p.paidExtra===null?null:p.paid+p.paidExtra)}{p.split?' · 总间夜金额':''}</p><div className={`card-warning ${r.reasons.length?'blocked':''}`}><Icon name="info" size={14}/><span>{r.reasons[0]||(r.complete?(r.needsHotel?'加价仅为指定酒店示例，需确认门店':'加价已按晚展开，权益及库存仍需确认'):'年份、房型或部分日期加价待确认')}</span></div><div className="card-actions"><button onClick={()=>setDetail(r)}>套餐详情</button><button className={selection.includes(p.id)?'chosen':''} aria-pressed={selection.includes(p.id)} onClick={()=>toggle(p.id)}>{selection.includes(p.id)?<Icon name="check" size={16}/>:<Icon name="compare" size={16}/>} {selection.includes(p.id)?'已选对比':'加入对比'}</button></div></div></article>;})}</div></section>}</>}
   {view==='saved'&&<><div className="page-title"><span className="eyebrow">留住合适的选择</span><h1>已存方案</h1><p>保存的是当时的台账与费用快照，更新台账后请重新核对。</p></div>{saved.length?saved.map(plan=><section className="saved-plan" key={plan.id}><div><h2>{plan.filter.start} 出发 · {plan.options.map(x=>x.hotel).join(' / ')}</h2><p className="muted">保存于 {new Date(plan.createdAt).toLocaleString('zh-CN')} · {plan.fileName}</p></div><div className="saved-options">{plan.options.map(o=><div key={o.id}><h3>{o.hotel}</h3><p>{o.start} → {o.end} · {o.nights} 晚</p><p>预计新增：{Object.values(o.costs).every(n=>n!==null)?yuan(Object.values(o.costs).reduce((a,n)=>a+n,0)):'费用未完整'}</p>{o.conditions.map(x=><small className="error" key={x}>{x}</small>)}</div>)}</div><button onClick={()=>{const blob=new Blob([JSON.stringify(plan,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`雪季方案-${plan.filter.start}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>导出方案 JSON</button></section>):<div className="empty"><Icon name="save" size={36}/><h3>还没有保存的方案</h3><p>目前还没有历史方案。已录入套餐可在“找出行方案”中核对。</p><button onClick={()=>setView('explore')}>去找出行方案</button></div>}</>}
   <footer className="page-footer"><span>雪季出行工作台</span><span>{ledger?'来源：'+ledger.fileName:'文字录入 · 核对后保存'}</span></footer></div>
   {selection.length>0&&view==='explore'&&<div className="compare-bar"><div><Icon name="compare"/><b>已选 {selection.length} / 3</b><span>{chosen.map(r=>r.pkg.hotel.split('（')[0]).join(' · ')}</span></div><button className="text-button" onClick={()=>setSelection([])}>清空</button><button className="primary" onClick={()=>setComparing(true)}>对比与规划 <Icon name="arrow" size={17}/></button></div>}</main></div>
-  {view==='conversation'&&current&&<main className="snow-session-main"><div className="snow">{actions.sessionState(current.id)&&<SessionFeedback state={actions.sessionState(current.id)}/>}</div><div className="snow-conversation" ref={conversation} onClickCapture={event=>{
+  {view==='conversation'&&current&&<main className="snow-session-main"><div className="snow">{actions.sessionState(current.id)&&<SessionFeedback state={actions.sessionState(current.id)}/>}</div><div className="snow-session-layout"><div className="snow-conversation" ref={conversation} onClickCapture={event=>{
     // 宿主图片灯箱使用 body portal，会被工作台原生 dialog 遮挡；复用宿主图片 URL 在内层 dialog 预览。
     const image=event.target.closest('button')?.querySelector('img');
     if(image){event.preventDefault();event.stopPropagation();setImagePreview({src:image.currentSrc||image.src,alt:image.alt});}
-  }}>{renderSlot('conversation',{})}</div></main>}
+  }}>{renderSlot('conversation',{})}</div>{packageSidebarOpen&&sessionPackages.length>0&&<PackageSidebar key={current.id} width={packageSidebarWidth} onWidth={setPackageSidebarWidth} records={sessionPackages} error={host.error} loading={host.loading} onRetry={host.retry} onClose={()=>setPackageSidebarOpen(false)}/>}</div></main>}
   {imagePreview&&<Modal title="截图预览" onClose={()=>setImagePreview(null)} wide><img src={imagePreview.src} alt={imagePreview.alt} style={{display:'block',maxWidth:'100%',maxHeight:'70vh',margin:'auto'}}/></Modal>}
+  {pendingDelete&&<Modal title="删除套餐" dismissible={!deleteBusy} onClose={()=>setPendingDelete(null)}>
+    <p>确定删除“{pendingDelete.record.name}”吗？删除后无法恢复。</p>
+    <p>{pendingDelete.archive?'这是该会话关联的最后一个套餐，删除后会同时归档会话。':'该会话还关联其他套餐，不会归档。'}聊天记录和已存方案快照保留。</p>
+    {deleteError&&<p className="error" role="alert">{deleteError}</p>}
+    <div className="modal-actions"><button autoFocus disabled={deleteBusy} onClick={()=>setPendingDelete(null)}>取消</button><button disabled={deleteBusy} className="primary" onClick={async()=>{
+      if(deleteBusy)return;setDeleteBusy(true);setDeleteError('');
+      try{setNotice(await actions.deletePackage(pendingDelete.record,pendingDelete.archive));setPendingDelete(null);}
+      catch(error){setDeleteError(error.message);}
+      finally{setDeleteBusy(false);host.retry();}
+    }}>{deleteBusy?'正在删除…':'确认删除'}</button></div>
+  </Modal>}
   {pendingRename&&<Modal title="编辑会话标题" dismissible={!sessionBusy} onClose={()=>setPendingRename(null)}>
     <form onSubmit={async event=>{
       event.preventDefault();if(sessionBusy)return;
@@ -190,7 +254,7 @@ export function App({useSessions, renderSlot, actions}) {
   {sessionMenu&&<SessionMenu anchor={sessionMenu.anchor} onClose={()=>setSessionMenu(null)}>
       <button role="menuitem" onClick={()=>{setRenameError('');setPendingRename({id:sessionMenu.row.id,title:sessionTitle(sessionMenu.row)});setSessionMenu(null);}}><Icon name="edit"/>重命名</button>
       <button role="menuitem" onClick={async()=>{const id=sessionMenu.row.id;setSessionMenu(null);setSessionBusy(true);setSessionError('');try{await actions.fork(id);setSessionQuery('');setView('conversation');}catch(error){setSessionError('分叉失败：'+error.message);}finally{setSessionBusy(false);}}}><Icon name="fork"/>分叉会话</button>
-      <button role="menuitem" onClick={()=>{setSessionError('');setPendingArchive(sessionMenu.row);setSessionMenu(null);}}><Icon name="archive"/>归档会话</button>
+      {!host.loading&&!host.error&&!host.rows.some(record=>record.sessionId===sessionMenu.row.id)&&<button role="menuitem" onClick={()=>{setSessionError('');setPendingArchive(sessionMenu.row);setSessionMenu(null);}}><Icon name="archive"/>归档会话</button>}
   </SessionMenu>}
   {pendingArchive&&<Modal title="归档会话" dismissible={!sessionBusy} onClose={()=>setPendingArchive(null)}>
     <p>确定归档“{sessionTitle(pendingArchive)}”吗？</p>
@@ -201,5 +265,5 @@ export function App({useSessions, renderSlot, actions}) {
   {comparing&&<Comparison results={chosen} filter={filter} onClose={()=>setComparing(false)} onSave={async plan=>{const next=[{...plan,fileName:ledger.fileName,importedAt:ledger.importedAt},...saved];await storage('plans',next);setSaved(next);setComparing(false);setNotice('方案快照已保存在本机，可在“已存方案”查看。');}}/>}
   {detail&&<Detail result={detail} onClose={()=>setDetail(null)}/>}
 
-  </div>;
+  </div></PackageSidebarContext.Provider>;
 }
