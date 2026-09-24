@@ -157,3 +157,10 @@
 .snow .snow-header-button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 
 .snow-turn-packages{display:grid;gap:16px;margin:16px 0;width:100%;min-width:0}
+
+.snow-package-sidebar{position:relative}
+.snow-package-resizer{position:absolute;inset:0 auto 0 0;width:8px;cursor:col-resize;touch-action:none;user-select:none;z-index:6}
+.snow-package-resizer::after{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:transparent}
+.snow-package-resizer:hover::after,.snow-package-resizer:focus-visible::after{background:var(--primary)}
+.snow-package-resizer:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+@media(max-width:1150px){.snow-package-sidebar{position:absolute}}

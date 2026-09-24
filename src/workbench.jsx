@@ -19,8 +19,26 @@ function PackageFacts({record,fields}) {
     return <div key={key}><dt>{fieldLabels[key]}</dt><dd className={value===null?'is-unknown':undefined}>{shown}</dd></div>;
   })}</dl>;
 }
-function PackageSidebar({records,onClose,error,loading,onRetry}) {
-  return <aside className="snow snow-package-sidebar" id="snow-package-sidebar" aria-label="套餐详情" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}}}>
+function PackageSidebar({records,onClose,error,loading,onRetry,width,onWidth}) {
+  const panel=useRef(null),drag=useRef(null);
+  const [maxWidth,setMaxWidth]=useState(600);
+  useEffect(()=>{
+    const layout=panel.current.parentElement;
+    const measure=()=>setMaxWidth(Math.max(0,Math.min(600,layout.clientWidth-(window.innerWidth>1150?280:0))));
+    const observer=new ResizeObserver(measure);observer.observe(layout);window.addEventListener('resize',measure);measure();
+    return()=>{observer.disconnect();window.removeEventListener('resize',measure);};
+  },[]);
+  const minWidth=Math.min(280,maxWidth),shownWidth=Math.max(minWidth,Math.min(width,maxWidth));
+  const resize=value=>onWidth(Math.max(minWidth,Math.min(value,maxWidth)));
+
+  return <aside className="snow snow-package-sidebar" ref={panel} style={{width:shownWidth}} id="snow-package-sidebar" aria-label="套餐详情" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}}}>
+    <div className="snow-package-resizer" role="separator" aria-label="调整套餐详情宽度" aria-orientation="vertical" aria-controls="snow-package-sidebar" aria-valuemin={minWidth} aria-valuemax={maxWidth} aria-valuenow={shownWidth} tabIndex={0}
+      onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.focus();drag.current={x:event.clientX,width:shownWidth};event.currentTarget.setPointerCapture(event.pointerId);}}
+      onPointerMove={event=>{if(drag.current)resize(drag.current.width+drag.current.x-event.clientX);}}
+      onPointerUp={event=>{drag.current=null;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);}}
+      onPointerCancel={()=>{drag.current=null;}} onLostPointerCapture={()=>{drag.current=null;}}
+      onKeyDown={event=>{const next={ArrowLeft:shownWidth+10,ArrowRight:shownWidth-10,Home:minWidth,End:maxWidth}[event.key];if(next!==undefined){event.preventDefault();resize(next);}}}
+    />
     <div className="snow-package-sidebar-head"><h2>套餐详情 <small aria-label={`${records.length} 个套餐`}>{records.length}</small></h2><button className="icon-button snow-header-button" title="收起套餐详情" aria-label="收起套餐详情" onClick={onClose}><Icon name="close"/></button></div>
     <div className="snow-package-sidebar-body">{error&&<p className="error" role="alert">详情刷新失败，以下为上次读取的内容。<button onClick={onRetry}>重试</button></p>}{loading&&<p role="status">正在刷新…</p>}{records.map((record,index)=><details className="snow-detail-package" key={record.id} open={index===0?true:undefined}>
       <summary><span><strong>{record.name}</strong><small>{purchaseLabels[record.purchaseStatus]}</small></span><span className="snow-session-tag">{record.completeness==='incomplete'?'待补全':'资料完整'}</span></summary>
@@ -111,6 +129,7 @@ export function App({useSessions, renderSlot, actions}) {
   const [sessionBusy,setSessionBusy]=useState(false),[sessionError,setSessionError]=useState('');
   const [imagePreview,setImagePreview]=useState(null);
   const [packageSidebarOpen,setPackageSidebarOpen]=useState(true);
+  const [packageSidebarWidth,setPackageSidebarWidth]=useState(340);
   const [pendingDelete,setPendingDelete]=useState(null),[deleteBusy,setDeleteBusy]=useState(false),[deleteError,setDeleteError]=useState('');
   const [pendingArchive,setPendingArchive]=useState(null),[sessionMenu,setSessionMenu]=useState(null);
   const workspaceState=useSyncExternalStore(actions.workspaceList.subscribe,actions.workspaceList.getSnapshot);
@@ -205,7 +224,7 @@ export function App({useSessions, renderSlot, actions}) {
     // 宿主图片灯箱使用 body portal，会被工作台原生 dialog 遮挡；复用宿主图片 URL 在内层 dialog 预览。
     const image=event.target.closest('button')?.querySelector('img');
     if(image){event.preventDefault();event.stopPropagation();setImagePreview({src:image.currentSrc||image.src,alt:image.alt});}
-  }}>{renderSlot('conversation',{})}</div>{packageSidebarOpen&&sessionPackages.length>0&&<PackageSidebar key={current.id} records={sessionPackages} error={host.error} loading={host.loading} onRetry={host.retry} onClose={()=>setPackageSidebarOpen(false)}/>}</div></main>}
+  }}>{renderSlot('conversation',{})}</div>{packageSidebarOpen&&sessionPackages.length>0&&<PackageSidebar key={current.id} width={packageSidebarWidth} onWidth={setPackageSidebarWidth} records={sessionPackages} error={host.error} loading={host.loading} onRetry={host.retry} onClose={()=>setPackageSidebarOpen(false)}/>}</div></main>}
   {imagePreview&&<Modal title="截图预览" onClose={()=>setImagePreview(null)} wide><img src={imagePreview.src} alt={imagePreview.alt} style={{display:'block',maxWidth:'100%',maxHeight:'70vh',margin:'auto'}}/></Modal>}
   {pendingDelete&&<Modal title="删除套餐" dismissible={!deleteBusy} onClose={()=>setPendingDelete(null)}>
     <p>确定删除“{pendingDelete.record.name}”吗？删除后无法恢复。</p>
