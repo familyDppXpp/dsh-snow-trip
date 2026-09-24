@@ -180,15 +180,58 @@
 /* 方案核算与保存卡片：与套餐卡片同一视觉语言 */
 .snow .snow-plan-card{border:1px solid var(--line,#dce4e0);border-radius:16px;background:var(--paper,#f5f7f4);padding:20px;margin:8px 0}
 .snow .snow-plan-card h3{margin:0 0 8px;font-size:17px}
+.snow .snow-plan-card h4{margin:12px 0 6px;font-size:13px}
 .snow .snow-plan-card .snow-plan-combo+ .snow-plan-combo{margin-top:14px;border-top:1px dashed var(--line,#dce4e0);padding-top:14px}
 .snow .snow-plan-card .snow-plan-total strong{font-size:16px}
-.snow .snow-plan-card .table-scroll{max-height:260px;overflow:auto;margin:8px 0}
+.snow .snow-plan-card .table-scroll{max-height:280px;overflow:auto;margin:8px 0}
 .snow .snow-plan-card table{border-collapse:collapse;width:100%;font-size:13px}
 .snow .snow-plan-card th,.snow .snow-plan-card td{border-bottom:1px solid var(--line,#dce4e0);padding:6px 8px;text-align:left;white-space:nowrap}
 .snow .snow-plan-card .snow-plan-checks{margin:6px 0 0;padding-left:18px;color:#65766d;font-size:12px}
 .snow .snow-plan-card .package-prices{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0}
 .snow .snow-plan-card .package-prices dt{color:#65766d;font-size:12px}
 .snow .snow-plan-card .package-prices dd{margin:2px 0 0;font-weight:600}
+.snow .snow-plan-badge{display:inline-block;font-size:11px;border-radius:5px;padding:3px 7px;background:#eaf2eb;color:#306449;font-weight:600;margin-right:6px}
+.snow .snow-plan-badge-suggest{background:#f4efe2;color:#7a6432}
+.snow .snow-plan-badge-soft{background:#eef1ee;color:#65766d}
+.snow .snow-plan-muted{color:#63736d;font-size:13px;line-height:1.7}
+.snow .snow-plan-note{font-size:13px;margin:6px 0}
+.snow .snow-plan-error{color:#9a4031;font-size:13px;font-weight:600}
+.snow .snow-plan-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
+.snow .snow-plan-fields.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.snow .snow-plan-fields label{display:block;font-size:12px;color:#63736d}
+.snow .snow-plan-fields input{display:block;width:100%;margin-top:5px;border:1px solid var(--line,#dce4e0);border-radius:8px;padding:9px;background:#fcfdfa;font:inherit;color:inherit}
+.snow .snow-plan-package{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line,#dce4e0);padding:11px;border-radius:10px;margin-top:8px;font-size:14px;cursor:pointer}
+.snow .snow-plan-package input{margin-top:3px;flex-shrink:0;accent-color:#23664d;width:16px;height:16px}
+.snow .snow-plan-package.is-checked{border-color:#84af94;background:#f1f7f1}
+.snow .snow-plan-package small{display:block;margin-top:3px;color:#758179}
+.snow .snow-plan-estimates{margin:10px 0}
+.snow .snow-plan-estimates summary,.snow .snow-plan-card details summary{cursor:pointer;font-size:13px;color:#23664d;padding:4px 0}
+.snow .snow-plan-estimate-field{display:block;font-size:12px;color:#63736d;margin:8px 0}
+.snow .snow-plan-estimate-field input{display:block;width:100%;margin-top:5px;border:1px solid var(--line,#dce4e0);border-radius:8px;padding:9px;background:#fcfdfa;font:inherit;color:inherit}
+.snow .snow-plan-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.snow .snow-plan-actions button{border:1px solid var(--line,#dce4e0);background:#fff;color:inherit;padding:9px 16px;border-radius:9px;font:inherit;cursor:pointer}
+.snow .snow-plan-actions button.primary{background:#23664d;color:#fff;border-color:#23664d}
+.snow .snow-plan-actions button:disabled{opacity:.45;cursor:not-allowed}
+.snow .snow-plan-bar{padding:14px;border-radius:10px;background:#edf3ec;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.snow .snow-plan-bar span{margin-right:auto;font-weight:600}
+.snow .snow-plan-bar button{border:1px solid var(--line,#dce4e0);background:#fff;color:inherit;padding:9px 16px;border-radius:9px;font:inherit;cursor:pointer}
+.snow .snow-plan-bar button.primary{background:#23664d;color:#fff;border-color:#23664d}
+.snow .snow-plan-bar button:disabled{opacity:.45;cursor:not-allowed}
+.snow .snow-plan-result{border:1px solid var(--line,#dce4e0);border-radius:12px;padding:16px;margin:12px 0;background:#fff}
+.snow .snow-plan-result.is-selected{border:2px solid #23664d;background:#fcfefb}
+.snow .snow-plan-result-head{display:flex;gap:12px;justify-content:space-between;align-items:flex-start}
+.snow .snow-plan-money{text-align:right;flex-shrink:0}
+.snow .snow-plan-money strong{font-size:24px;letter-spacing:-0.5px;display:block}
+.snow .snow-plan-money small{color:#758179}
+.snow .snow-plan-reason{background:#edf4ec;border-radius:8px;padding:9px 12px;font-size:13px}
+.snow .snow-plan-pills{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 0}
+.snow .snow-plan-pill{background:#f1f3ed;border-radius:20px;padding:4px 10px;font-size:12px}
+.snow .snow-plan-shared{font-size:13px;margin:6px 0}
+.snow .snow-plan-warn{border-color:#e7d7b4;background:#fbf6e8}
+.snow .snow-plan-ok{border-color:#b8d8bc;background:#eef7ed}
+.snow .snow-plan-card small{color:#758179}
+@media(max-width:640px){.snow .snow-plan-fields,.snow .snow-plan-fields.two{grid-template-columns:1fr}.snow .snow-plan-result-head{flex-direction:column}.snow .snow-plan-money{text-align:left}.snow .snow-plan-money strong{font-size:21px}}
+
 
 .snow-save-card[data-save-state=confirm] .snow-save-body,.snow-save-card[data-save-state=saving] .snow-save-body{max-height: min(42vh,420px);overflow-y:auto;overscroll-behavior:contain;padding-right:8px}
 .snow-save-card[data-save-state=confirm],.snow-save-card[data-save-state=saving]{scroll-margin-block:16px}

@@ -198,3 +198,15 @@ node test/image-import.browser.mjs
 - 客户端：`snow_evaluate` 核算卡片、`snow_save_plan` 保存卡片，非法或旧版 metadata 回退通用工具结果。
 
 验证：`pnpm typecheck`、`pnpm build`、`pnpm test` 通过（21 项通过，2 项私人工作簿检查跳过）；`git diff --check` 干净；`pnpm pack` 产物含 `./plan-types` 导出与技能目录。`test/plan-tools.integration.test.mjs` 覆盖：版本过期与不存在套餐拒绝、资料未完成拦截、合法搭配返回沙箱与持久化 metadata、保存版本冲突拒绝、非法金额与逐日引用校验、存储重开可读取。真实模型端到端（对话表达需求→生成→保存→回顾）未运行，保留待验收。
+
+### SNOW-06 阶段卡片补齐（2026-09-24 晚）
+
+用户验收发现方案卡片未按原型实现（原型 `prototype/plan-loop` 的七类卡片在产品里一个都没有），本轮补齐交互层：
+
+- 新增 `snow_plan_stage` 工具：LLM 一次调用呈现一张阶段卡（confirm/estimate/results/discussion/review/status）并等待用户操作；卡片渲染在客户端 `src/plan-question-card.jsx`，走宿主 `ask_user_question` 卡片链路（composer + 工作台镜像），与 `snow_commit` 确认卡同通道。
+- 卡片内容：条件确认（选填表单、建议日期/晚数标注、套餐推荐预勾、更多套餐折叠、交通餐饮估算折叠、唯一主动作"生成方案"）；估算确认（分项金额可改、估算与用户事实分列）；结果选择（勾选、优先推荐/备选徽标、整趟总价、每日费用表、跨天共同费用单列、分摊依据、约束检查、统一操作栏"继续讨论/保存所选（N）"）；讨论比较（零/单/多选三态，多选对比表）；回顾快照（保存时费用+继续调整，原方案不覆盖）；状态卡（版本变化/空结果/失败+入口）。用户仍可自由输入；零选择不阻塞。
+- 回答协议：编辑负载经 custom JSON（{values,ids,estimates}）回传，快捷动作经 selected 标签；跳过回传空 selected。工具原样交回 LLM 决策，不做业务改写。
+- `snow_plan_stage` 的问题 id（snow-plan-<stage>-<key>）与 detail 负载自洽校验：伪造或不一致的问题回退普通问题渲染，不显示业务卡片。
+- 删除过程中产生的未使用草稿 `src/plan-cards.jsx`、`src/plan-context.js`（与 plan-question-card 重复，code-review 自查发现后移除）。
+
+验证：`pnpm typecheck`、`pnpm build`、`pnpm test` 通过（30 项通过、2 项私人工作簿检查跳过）；`test/plan-cards.test.mjs` 用宿主 React SSR 检查五张卡的标记结构（表单/徽标/费用表/操作栏/三态/回退）；`test/plan-question.test.mjs` 覆盖负载解析与伪造拒绝；`test/plan-stage.integration.test.mjs` 经真实宿主 Tools 验证编辑回传、按钮选择、跳过与取消。真实模型端到端（卡片出现在真实会话、用户在卡上完成选择到保存闭环）待验收。

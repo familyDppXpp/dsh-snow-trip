@@ -134,6 +134,22 @@ export function apply(ctx: Context) {
     }finally{draft.busy=false;}
   },true);
 
+  // —— 方案阶段卡：LLM 通过一次调用呈现交互卡片并等待用户编辑结果。
+  // 卡片渲染在客户端（plan-question-card.jsx），这里只负责呈现请求与回答校验。
+  const stageStages=['confirm','estimate','results','discussion','review','status'] as const;
+  const stageParameters:ParameterSchemaSpec={stage:{type:'string',enum:[...stageStages],required:true,description:'卡片阶段'},key:{type:'string',required:true,description:'同一阶段卡片的实例键（如 retry-2）；同一 key 重复调用返回相同卡片'},detail:{type:'json',required:true,description:'卡片内容 JSON，结构见技能文档：confirm 含 input/ids/suggestions/packages；estimate 含 start/nights/suggested/estimates/scope；results 含 results 数组（每项 title/start/end/nights/total/paid/pending/budget/estimated/daily/sharedCosts/allocation/checks/reason/switches）；discussion 含 results/selected/message；review 含 plan；status 含 notice（title/text/tone/actions）'},question:{type:'string',description:'问题正文；留空由卡片自身承载'},options:{type:'array',items:{type:'json'},description:'可选的快捷选项；每项 {label,description?}。多选用 multiSelect'},multiSelect:{type:'boolean',description:'是否允许多选'}};
+  register('snow_plan_stage','向用户展示一张方案闭环阶段卡（条件确认/估算确认/结果选择/讨论比较/回顾/状态），等待用户在卡片上操作后返回其编辑与选择结果。结果列表必须来自实际脚本核算，不得虚构；每次展示为一次调用。',stageParameters,async(args,exec)=>{
+    const {stage,key,detail,question,options,multiSelect}=parse(z.strictObject({stage:z.enum(stageStages),key:z.string().trim().min(1).max(80),detail:z.record(z.string(),z.unknown()),question:z.string().trim().max(2000).optional(),options:z.array(z.object({label:z.string().min(1).max(200),description:z.string().max(500).optional()})).max(12).optional(),multiSelect:z.boolean().optional()}),args);
+    const answer=await ctx.userQuestions.ask({agent:exec.agent!,signal:exec.signal,questions:[{
+      id:`snow-plan-${stage}-${key}`,header:`雪季方案 · ${stage}`,question:question??'请在卡片中确认或修改，也可以直接在输入框继续说明。',
+      detail:JSON.stringify({...detail,stage,key}),
+      ...(options?.length?{options,multiSelect:multiSelect===true}:{})}]});
+    exec.signal.throwIfAborted();
+    const item=answer.answers[0];
+    // 卡片交互未产生结构化负载时，custom/selected 就是用户表达；原样交回 LLM 决策。
+    return {status:'answered',stage,selected:item?.selected??[],custom:item?.custom?.trim()||null};
+  });
+
   // —— 出行方案闭环（SNOW-06）：读取、受限脚本核算、保存。决策由会话 LLM 承担，
   // 通用代码只做数据完整性、版本校验与受限脚本执行，不做套餐组合或计费规则。
   const comboItem=z.strictObject({packageId:z.uuid(),revision:z.number().int().min(1),nights:z.number().int().min(1).max(366),start:z.iso.date()});
