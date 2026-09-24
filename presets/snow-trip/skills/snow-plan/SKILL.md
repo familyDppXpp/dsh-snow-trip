@@ -10,11 +10,12 @@ description: 出行方案闭环：从需求确认到逐步搭配、脚本核算�
 ## 标准流程
 
 1. `snow_query` 读取全部已存套餐；只使用 `completeness === 'complete'` 的套餐参与计算。
-2. **条件确认**：`snow_plan_stage({stage:'confirm',key:'c1',detail:{...}})` 展示确认卡。detail 携带 `input`（已知的 start/nights/budget，未知省略）、`ids`（推荐预勾的套餐 ID）、`suggestions`（建议的日期/晚数，明确标注非用户事实）、`packages`（完整套餐摘要数组：id/name/purchaseStatus/nights/splitAllowed/completeness）。所有输入选填；预算留空表示不限。工具返回的 custom 是用户编辑后的表单 JSON（{values,ids,estimates}）或自由输入文字。
+1. `snow_query` 读取全部已存套餐；只使用 `completeness === 'complete'` 的套餐参与计算。
+2. **条件确认**：`snow_plan_stage({stage:'confirm',key:'c1',detail:{...}})` 展示确认卡。detail 携带 `input`（已知的 start/nights/budget，未知省略）、`ids`（推荐预勾的套餐 ID）、`suggestions`（建议的日期/晚数，明确标注非用户事实）、`packages`（完整套餐摘要数组：id/name/purchaseStatus/nights/splitAllowed/completeness）。所有输入选填；预算留空表示不限。工具返回的 custom 是用户编辑后的表单 JSON（{values,ids,estimates}）或自由输入文字。**不要在 question 里罗列选项或重复卡片内容，不要传 options（工具已移除该参数）**——表单和按钮都由卡片渲染；纯文本追问与通用选项列表都不允许。
 3. **估算确认**：交通、餐饮等缺项由你提出明确标注的估算提案，`snow_plan_stage({stage:'estimate',...})` 分项展示（estimates:[{label:'交通',amount:分,basis:'示例估算'}]、scope 说明）；用户可修改后接受。未经接受不当作已确认费用；遗漏不等于 0，估算不等于来源报价。
 4. **逐步搭配与核算**：读取全部可选套餐与有界日期／晚数空间，逐步决定候选用哪些套餐、哪些日期和晚数。候选须覆盖完整空间，不得静默截断。核算时调用 `snow_evaluate({combos, script})`：script 是你按套餐原文临时编写的 JavaScript 函数体，工具在受限沙箱中实际执行并返回逐日费用、总价、计算依据与约束检查。每次核算必须实际执行脚本，不要心算金额；脚本只使用沙箱变量 combos（金额单位分），禁止 require/import/process/eval。脚本执行失败时向用户展示失败原因并保留输入，修正脚本后重新调用；不降级、不自动重试。
 5. **自查**：脚本表达的规则逐条对应套餐原文；核对约束（有效期、不可用日、拆分、剩余间夜、酒店适用）与预算后再保留候选。规则歧义不能静默变成事实。
-6. **结果展示**：候选足够后按默认优先级（满足明确条件 → 整趟总价更低 → 少换酒店 → 少浪费权益）结合用户明确偏好排序，`snow_plan_stage({stage:'results',...})` 展示。detail.results 每项含 title/start/end/nights/total/paid/pending/budget/estimated/daily:[{date,hotel,amount,basis}]/sharedCosts/allocation/checks/reason/switches；金额单位为分（卡片自动显示为元）。每份突出推荐理由、行程与整趟总价，逐日费用表直接可见，不折叠；跨天共同费用单列。卡片自带"继续讨论"和"保存所选"，selected 是用户勾选的下标数组；工具返回的 selected/custom 就是用户的选择或后续想法。
+6. **结果展示**：候选足够后按默认优先级（满足明确条件 → 整趟总价更低 → 少换酒店 → 少浪费权益）结合用户明确偏好排序，`snow_plan_stage({stage:'results',...})` 展示。detail.results 每项含 title/start/end/nights/total/paid/pending/budget/estimated/daily:[{date,hotel,amount,basis}]/sharedCosts/allocation/checks/reason/switches；金额单位为分（卡片自动显示为元）。每份突出推荐理由、行程与整趟总价，逐日费用表直接可见，不折叠；跨天共同费用单列。卡片自带"继续讨论"和"保存所选"，不要传 options；工具返回的 selected/custom 就是用户的选择或后续想法。
 7. **讨论比较**：用户选择后 `snow_plan_stage({stage:'discussion',...})` 展示：多选为对比表（总价/换酒店/理由），单选为单方案讨论，零选为继续交流；均提供调整入口。讨论复用已有核算，不另建计算分支。
 8. **保存**：仅当用户明确保存时逐份调用 `snow_save_plan`；每份独立返回成功或失败，失败不自动重试。保存后可用 `snow_plan_stage({stage:'status',...})` 展示逐项结果。
 9. **回顾**：读取 `listPlans`（会话侧）/ `snow_query` 方案快照，`snow_plan_stage({stage:'review',detail:{plan}})` 展示当时行程与费用；继续调整走条件确认（带 parent），使用最新套餐重新核算，保存为新方案，原方案不被覆盖。
@@ -24,7 +25,7 @@ description: 出行方案闭环：从需求确认到逐步搭配、脚本核算�
 | 工具 | 用途 |
 | --- | --- |
 | `snow_query` | 读取已存套餐（金额单位元），只选资料完整的套餐参与计算 |
-| `snow_plan_stage` | 展示阶段卡片（confirm/estimate/results/discussion/review/status）并等待用户操作 |
+| `snow_plan_stage` | 唯一的用户交互通道：展示阶段卡片（confirm/estimate/results/discussion/review/status）并等待用户操作；不传 options，表单与按钮由卡片渲染 |
 | `snow_evaluate` | 提交候选搭配与本次临时脚本，工具在受限沙箱中实际执行并返回核算结果；只计算不保存 |
 | `snow_save_plan` | 保存用户明确选中的方案；多选逐份调用，每份独立返回结果 |
 | `listPlans`（Remote） | 读取已存方案快照用于回顾 |

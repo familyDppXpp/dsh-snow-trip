@@ -105,5 +105,9 @@ export async function apply(ctx) {
     }});
     try{await fiber;return mount;}catch(error){await fiber.dispose();throw error;}
   }
+  // 主界面（工作台弹窗外）也渲染方案阶段卡片：DSH 主会话的 pendingInteraction
+  // 由宿主通用 QuestionComposer 显示为选项列表；这里注册方案卡识别，优先级与
+  // 工作台内一致（-1，先于宿主通用 composer，同 saveQuestion 的做法）。
+  ctx.slots.inject('conversation.composer',()=>ctx.slots.register({name:'conversation.composer',id:'snow-plan-main',priority:-1,select:({pendingInteraction})=>planQuestion(pendingInteraction)?pendingInteraction:null},({matched})=><div className="snow snow-save-composer"><PlanQuestionCard key={matched.key} pending={matched}/></div>));
   ctx.slots.inject('sidebar.footer.action',()=>ctx.slots.register({name:'sidebar.footer.action',id:'dsh-snow-trip',inject:()=>({prepare})},Entry));
 }

@@ -27,15 +27,12 @@ test('方案问题卡识别 snow-plan 前缀并校验 id 与负载自洽',()=>{
   }
 });
 
-test('planQuestionItem 构造服务端请求项，id/键/负载回环一致',()=>{
-  const item=planQuestionItem('results','r1',{question:'请选择',results:[{title:'搭配'}]},[{label:'继续讨论'},{label:'保存所选'}],'雪季方案 · results',true);
+test('planQuestionItem 构造服务端请求项，不携带通用选项（按钮由卡片渲染）',()=>{
+  const item=planQuestionItem('results','r1',{question:'请选择',results:[{title:'搭配'}]});
   assert.equal(item.id,'snow-plan-results-r1');
-  assert.equal(item.header,'雪季方案 · results');
-  assert.equal(item.multiSelect,true);
-  assert.deepEqual(item.options.map(o=>o.label),['继续讨论','保存所选']);
+  assert.deepEqual(item.options,undefined);assert.equal(item.multiSelect,undefined);
   const parsed=planQuestion({questions:[item]});
   assert.ok(parsed);assert.equal(parsed.stage,'results');
-  // 不传 options 时无 multiSelect 键。
   const plain=planQuestionItem('confirm','c2',{question:'x'});
   assert.equal('multiSelect' in plain,false);assert.equal('options' in plain,false);
 });

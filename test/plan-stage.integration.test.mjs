@@ -51,9 +51,9 @@ test('snow_plan_stage 展示卡片并返回用户编辑；取消保留输入不�
     const value=JSON.parse(edited.content.find(c=>c.type==='text').text);
     assert.equal(value.status,'answered');assert.equal(value.custom,JSON.stringify({values:{start:'2026-12-11',nights:'3',budget:'2200'},ids:['p1','p2'],estimates:[]}));
     assert.deepEqual(value.selected,[]);
-    // 快捷按钮：selected 承载标签。
+    // 快捷按钮：卡片按钮的标签经 selected 回传（工具不接收 options 参数）。
     answer=async request=>({answers:[{id:request.questions[0].id,selected:['保存所选']}]});
-    const buttons=await execute('snow_plan_stage',{stage:'results',key:'r1',detail:{results:[{title:'搭配一',total:212000}],selected:[0]},options:[{label:'继续讨论'},{label:'保存所选'}]});
+    const buttons=await execute('snow_plan_stage',{stage:'results',key:'r1',detail:{results:[{title:'搭配一',total:212000}],selected:[0]}});
     const btnValue=JSON.parse(buttons.content.find(c=>c.type==='text').text);
     assert.deepEqual(btnValue.selected,['保存所选']);assert.equal(btnValue.custom,null);
     // 用户跳过：空 selected + 空 custom，仍返回卡片数据，不阻塞流程。
