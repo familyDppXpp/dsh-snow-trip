@@ -18,12 +18,14 @@ import {evaluateMetadata,planMetadata} from '../lib/types/plans.js';
 test('方案闭环：核算校验版本与完整状态，保存核查版本并逐份持久化',async()=>{
   const root=await mkdtemp(join(tmpdir(),'snow-plan-'));
   let ctx,agent,presetScope,owner;
+  const confirmAnswer=request=>{const c=JSON.parse(request.questions[0].detail);return {answers:[{id:request.questions[0].id,selected:['生成方案'],custom:JSON.stringify({values:{...c.input,budget:c.input.budget??''},ids:c.ids,fees:c.fees})}]};};
+  let answer=async request=>request.questions[0].id.startsWith('snow-plan-confirm-')?confirmAnswer(request):({answers:[{id:request.questions[0].id,selected:['保存所选'],custom:JSON.stringify({stage:'results',selected:[0]})}]});
   async function boot(){
     const rootContext=new Context();
     owner=rootContext.plugin({async apply(scope){ctx=scope;
     await ctx.plugin(SystemPrompt);await ctx.plugin(Tools);
     await ctx.plugin(Storage);await ctx.plugin(StorageJson,{root});await ctx.plugin(StorageDomain,{backend:'json'});
-    ctx.provide('userQuestions',{ask:async()=>{throw new Error('方案工具不弹确认');}});
+    ctx.provide('userQuestions',{ask:request=>answer(request)});
     ctx.provide('workspaceRegistry',{archiveSession:async()=>{}});
     await ctx.plugin(SnowTrip);
     }});await owner;ctx=rootContext;
@@ -52,67 +54,99 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
       await ctx.snowTrip.savePackage(record);
       records.push(await ctx.snowTrip.getPackage(record.id));
     }
-    // 资料未完成与不存在套餐不能参与计算。
-    // 版本校验先行（此时尚未改资料）。
-    const script='return {amountUnit:"元",combos:[{packageId:c.packageId,start:c.start,nights:c.nights,daily:[],total:0,basis:"测试",checks:[]}]};';
-    const wrongRev=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:99,nights:2,start:'2026-12-04'}],script});
-    assert.match(wrongRev.content[0].text,/版本已变更/);
-    const missing=await execute('snow_evaluate',{combos:[{packageId:crypto.randomUUID(),revision:1,nights:2,start:'2026-12-04'}],script});
-    assert.match(missing.content[0].text,/不存在/);
-    // 完整套餐：脚本实际执行，结果进入持久化 metadata。
-    const good=await ok('snow_evaluate',{
-      combos:[
-        {packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'},
-        {packageId:records[0].id,revision:1,nights:2,start:'2026-12-06'},
-      ],
-      script:'const yuan=v=>v/100;return {amountUnit:"元",combos:combos.map(c=>({packageId:c.packageId,start:c.start,nights:c.nights,daily:[{date:c.start,amount:100,basis:"测试分摊"}],total:100,basis:"临时脚本核算",checks:["脚本执行于受限沙箱"]}))};',
-    });
-    const result=JSON.parse(good.content.find(c=>c.type==='text').text);
-    assert.equal(result.status,'computed');assert.equal(result.combos.length,2);
-    assert.equal(result.results.combos[0].daily[0].amount,100);
-    const meta=evaluateMetadata(good.meta);
-    assert.ok(meta);assert.equal(meta.combos[0].snapshot.name,'基础套餐');assert.equal(meta.amountUnit,'元');
-    assert.equal(meta.results.combos[1].daily[0].amount,100);
-    assert.equal(planMetadata(good.meta),null);
-    // 脚本执行失败直接报错，保留输入。
-    const badScript=await execute('snow_evaluate',{combos:[{packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'}],script:'return combos.map(c=>c.undefinedField.nope);'});
-    assert.match(badScript.content[0].text,/核算脚本执行失败/);
-    const banned=await execute('snow_evaluate',{combos:[{packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'}],script:'return require("fs");'});
-    assert.match(banned.content[0].text,/被禁止/);
-    // 资料未完成的套餐不能参与计算；旧版本结果不能沿用。
-    const incomplete=await ctx.snowTrip.getPackage(records[0].id);
-    await ctx.snowTrip.savePackage({...incomplete,description:null,revision:2},1);
-    const blocked=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:2,nights:2,start:'2026-12-04'}],script});
-    assert.match(blocked.content[0].text,/资料未完成/);
-    const stale=await execute('snow_evaluate',{combos:[{packageId:records[0].id,revision:1,nights:2,start:'2026-12-04'}],script});
-    assert.match(stale.content[0].text,/版本已变更/);
-    // 保存：版本变化拒绝；完整数据成功并持久化。
-    const plan=items=>({title:'测试方案',start:'2026-12-04',nights:4,budget:2200,total:2120,paid:2100,pending:20,reason:'价格最低',allocation:'1200 元 4 晚按 2 晚分摊 600 元',estimates:[{label:'交通',amount:300,basis:'用户接受'}],items,daily:[{date:'2026-12-04',packageId:items[0].packageId,amount:300,basis:'分摊'},{date:'2026-12-05',packageId:items[0].packageId,amount:300,basis:'分摊'}],sharedCosts:[{label:'餐饮',amount:240,basis:'估算'}],unknowns:['实时有房']});
-    const staleSave=await execute('snow_save_plan',{plan:plan([{packageId:records[1].id,revision:99,nights:2,start:'2026-12-04'}])});
-    assert.match(staleSave.content[0].text,/已变更.*未保存|已变更/);
-    const blockedSave=await execute('snow_save_plan',{plan:plan([{packageId:records[0].id,revision:2,nights:2,start:'2026-12-06'}])});
-    assert.match(blockedSave.content[0].text,/资料未完成/);
-    const saved=await ok('snow_save_plan',{plan:plan([{packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'}])});
-    const savedValue=JSON.parse(saved.content.find(c=>c.type==='text').text);
-    assert.equal(savedValue.status,'saved');assert.equal(savedValue.total,2120);
-    const planMeta=planMetadata(saved.meta);
-    assert.ok(planMeta);assert.equal(planMeta.packages.length,1);assert.equal(planMeta.total,212000);
-    assert.deepEqual((await ctx.snowTrip.listPlans()).map(p=>p.id),[planMeta.id]);
-    assert.deepEqual((await ctx.snowTrip.getPlan(planMeta.id)).title,'测试方案');
-    assert.equal(await ctx.snowTrip.getPlan(crypto.randomUUID()),null);
-    // 非法金额与引用校验。
-    const badMoney=await execute('snow_save_plan',{plan:{...plan([{packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'}]),total:100.005}});
-    assert.match(badMoney.content[0].text,/最多两位小数/);
-    const badRef=await execute('snow_save_plan',{plan:{...plan([{packageId:records[1].id,revision:1,nights:2,start:'2026-12-04'}]),daily:[{date:'2026-12-04',packageId:crypto.randomUUID(),amount:100,basis:'无'}]}});
-    assert.match(badRef.content[0].text,/不在本次搭配中/);
-    // 存储重开可读取；写盘失败准确返回失败，不产生成功 metadata。
-    const plansBefore=await ctx.snowTrip.listPlans();
-    await ctx.snowTrip.savePlan({...plansBefore[0],id:crypto.randomUUID(),title:'第二份'});
-    assert.equal((await ctx.snowTrip.listPlans()).length,2);
-    // 存储重开（dispose 后重新打开同一目录）后可读取，方案不丢。
+    const prepare=async(extra={})=>JSON.parse((await ok('snow_prepare_plan',{conditions:{start:'2026-12-04',nights:2,rooms:1,budget:200000,fees:[{id:'meal',label:'餐饮',quantity:2,unitPrice:10000,basis:'用户提供每日 100 元',source:'user'}],...extra},needsConfirmation:false,userEvidence:'12月4日住两晚，一间房，每日餐饮100元，预算2000元'})).content[0].text);
+    const saveAnswer=answer;
+    answer=async request=>{const card=JSON.parse(request.questions[0].detail);assert.equal(card.planning,true);return {answers:[{id:request.questions[0].id,selected:['生成方案'],custom:JSON.stringify({values:{start:'2026-12-04',nights:'2',budget:'2000',rooms:'1'},ids:[],fees:card.fees.map(f=>({...f,unitPrice:12345}))})}]};};
+    const confirmed=JSON.parse((await ok('snow_prepare_plan',{conditions:{start:'2026-12-04',nights:2,rooms:1,fees:[{id:'meal',label:'餐饮',quantity:2,unitPrice:10000,basis:'模型估算',source:'estimate'}]},needsConfirmation:true})).content[0].text);
+    assert.equal(confirmed.confirmedByCard,true);assert.equal(confirmed.conditions.fees[0].unitPrice,12345);assert.equal(confirmed.conditions.budget,200000);
+    answer=async()=>{throw new Error('技术重试不应再次询问用户');};
+    const repeated=JSON.parse((await ok('snow_prepare_plan',{conditions:confirmed.conditions,needsConfirmation:true})).content[0].text);
+    assert.equal(repeated.planningId,confirmed.planningId);
+    let asked=0;
+    answer=async request=>{asked++;const card=JSON.parse(request.questions[0].detail);return {answers:[{id:request.questions[0].id,selected:['生成方案'],custom:JSON.stringify({values:{start:card.input.start,nights:String(card.input.nights),rooms:'1',budget:''},ids:card.ids,fees:card.fees})}]};};
+    const unlimitedConditions={...confirmed.conditions};delete unlimitedConditions.budget;
+    const unlimitedArgs={conditions:unlimitedConditions,needsConfirmation:true};
+    const unlimited=JSON.parse((await ok('snow_prepare_plan',unlimitedArgs)).content[0].text);
+    assert.equal(asked,1,'更改预算需要重新确认');assert.equal(unlimited.conditions.budget,null);
+    const unlimitedRetry=JSON.parse((await ok('snow_prepare_plan',unlimitedArgs)).content[0].text);
+    assert.equal(asked,1,'不限预算技术重试不得重复确认');assert.equal(unlimitedRetry.planningId,unlimited.planningId);
+    answer=saveAnswer;
+    const p=await prepare();
+    const items=[{packageId:records[0].id,revision:1,nights:2,start:'2026-12-04'}];
+    const script='return {daily:items.flatMap(s=>Array.from({length:s.nights},(_,i)=>({date:new Date(Date.parse(s.start)+i*86400000).toISOString().slice(0,10),packageId:s.packageId,surcharge:0,basis:"无日期补款"}))),coverage:[],total:65000}';
+    const input={planningId:p.planningId,title:'测试方案',reason:'整趟成本较低',items,script};
+    // 对外声明具有嵌套整数字段，不能再把 items 声明为任意 JSON。
+    const def=ctx.tools.get('snow_evaluate',agent);
+    assert.ok(JSON.stringify(def.parameters).includes('integer'));
+    const badType=await execute('snow_evaluate',{...input,items:[{...items[0],revision:'1',nights:'2'}]});
+    assert.equal(badType.isError,true);
+    assert.match(badType.content[0].text,/revision|nights/);
+    const zero=await execute('snow_evaluate',{...input,items:[{...items[0],nights:0}]});assert.match(zero.content[0].text,/items\[0\].nights/);
+    const wrong=await execute('snow_evaluate',{...input,items:[{...items[0],revision:99}]});assert.match(wrong.content[0].text,/版本/);
+    const syntax=await execute('snow_evaluate',{...input,script:'return {'});assert.match(syntax.content[0].text,/script/);
+    const wrongTotal=await execute('snow_evaluate',{...input,script:script.replace('65000','1')});assert.match(wrongTotal.content[0].text,/65000/);
+    const missingDay=await execute('snow_evaluate',{...input,script:'return {daily:[],coverage:[],total:0}'});assert.equal(missingDay.isError,true);
+    assert.equal((await ctx.snowTrip.listCalculations(p.planningId)).length,0);
+    const computed=JSON.parse((await ok('snow_evaluate',input)).content[0].text);
+    assert.equal(computed.status,'computed');assert.equal(computed.passed,1);
+    const result=await ctx.snowTrip.getCalculation(computed.resultId);
+    assert.equal(result.plan.total,65000);assert.equal(result.plan.daily[0].amount,22500);assert.equal(result.plan.sharedCosts[0].amount,20000);
+    const {validateSegments,calculate}=await import('../lib/types/planning.js');
+    const planning=await ctx.snowTrip.getPlanning(p.planningId);
+    assert.throws(()=>validateSegments(planning,[{...items[0],start:'2026-12-05'}],records),/连续入住/);
+    assert.throws(()=>validateSegments(planning,items,[{...records[0],splitAllowed:false}]),/不可拆分/);
+    assert.throws(()=>validateSegments(planning,items,[{...records[0],usedNights:3}]),/剩余间夜/);
+    assert.throws(()=>validateSegments(planning,items,[{...records[0],unavailableDates:['2026-12-05']}]),/不可用日期/);
+    assert.throws(()=>validateSegments(planning,items,[{...records[0],validTo:'2026-12-04'}]),/有效期/);
+    const out={daily:items.flatMap(i=>[0,1].map(n=>({date:`2026-12-0${4+n}`,packageId:i.packageId,surcharge:0,basis:'测试'}))),coverage:[{feeId:'meal',quantity:1,basis:'套餐覆盖一次正餐'}],total:55000};
+    assert.equal(calculate(planning,items,[records[0]],out,'权益核算','测试').plan.total,55000);
+    assert.throws(()=>calculate(planning,items,[records[0]],{...out,coverage:[{feeId:'meal',quantity:3,basis:'错误'}]},'测试','测试'),/覆盖数量/);
+    const rounded=calculate(planning,items,[{...records[0],paid:90001}],{...out,total:55001},'尾差','测试');
+    assert.deepEqual(rounded.plan.daily.map(d=>d.amount),[22501,22500]);
+    const list=JSON.parse((await ok('snow_plan_results',{planningId:p.planningId,complete:true})).content[0].text);
+    assert.equal(list.comparisonComplete,true);assert.equal(list.results[0].resultId,computed.resultId);
+    // 结果卡不能接受模型填写的金额，旧接口不再是绕过核算的入口。
+    const forged=await execute('snow_plan_stage',{stage:'results',key:'forged',detail:{results:[{total:1}]}});assert.equal(forged.isError,true);
+    answer=async request=>({answers:[{id:request.questions[0].id,selected:['取消本次操作']}]});
+    for(const [name,args] of [['snow_save_plan',{resultId:computed.resultId}],['snow_plan_stage',{stage:'results',key:'cancel',planningId:p.planningId}]]){
+      const cancelled=await ok(name,args);assert.equal(cancelled.concludesTurn,true);assert.equal(JSON.parse(cancelled.content[0].text).interaction.action,'cancel');
+    }
+    answer=async request=>({answers:[{id:request.questions[0].id,selected:[],custom:'先比较两份方案的雪票费用'}]});
+    for(const [name,args] of [['snow_save_plan',{resultId:computed.resultId}],['snow_plan_stage',{stage:'results',key:'supplement',planningId:p.planningId}]]){
+      const response=await ok(name,args),feedback=JSON.parse(response.content[0].text).interaction;
+      assert.equal(feedback.action,'supplement');assert.equal(feedback.custom,'先比较两份方案的雪票费用');assert.equal(feedback.card.results[0].resultId,computed.resultId);assert.notEqual(response.concludesTurn,true);
+    }
+    assert.deepEqual(await ctx.snowTrip.listPlans(),[]);answer=saveAnswer;
+    const saved=JSON.parse((await ok('snow_save_plan',{resultId:computed.resultId})).content[0].text);
+    assert.equal(saved.plan.total,65000);assert.equal((await ctx.snowTrip.listPlans()).length,1);
+    await ok('snow_save_plan',{resultId:computed.resultId});assert.equal((await ctx.snowTrip.listPlans()).length,1);
+    const second=JSON.parse((await ok('snow_evaluate',{...input,title:'第二候选'})).content[0].text);
+    const realSave=ctx.snowTrip.savePlan.bind(ctx.snowTrip);let failedAttempts=0;
+    ctx.snowTrip.savePlan=async plan=>{if(plan.id===second.resultId){failedAttempts++;throw new Error('模拟写盘失败');}return realSave(plan);};
+    answer=async request=>({answers:[{id:request.questions[0].id,selected:['保存所选'],custom:JSON.stringify({stage:'results',selected:[0,1]})}]});
+    const partial=JSON.parse((await ok('snow_plan_stage',{stage:'results',key:'save-both',planningId:p.planningId,resultIds:[computed.resultId,second.resultId]})).content[0].text);
+    assert.deepEqual(partial.items.map(r=>r.status),['saved','failed']);assert.equal(failedAttempts,1);
+    ctx.snowTrip.savePlan=realSave;answer=saveAnswer;
+    // 更改规划后，旧核算记录保留但不能作为新条件下的结果使用。
+    const newer=await prepare({budget:60000});
+    assert.equal((await execute('snow_save_plan',{resultId:computed.resultId})).isError,true);
+    const over=await execute('snow_evaluate',{...input,planningId:newer.planningId});assert.match(over.content[0].text,/超过预算/);
+    assert.ok(await ctx.snowTrip.getCalculation(computed.resultId));
+    // 停止终止异步脚本，保留已经通过的候选。
+    const latest=await prepare();
+    await ok('snow_evaluate',{...input,planningId:latest.planningId});
+    const controller=new AbortController();
+    setTimeout(()=>controller.abort(new Error('用户停止')),100);
+    await execute('snow_evaluate',{...input,planningId:latest.planningId,script:'await Promise.resolve(); while(true){}'},controller.signal);
+    assert.equal((await ctx.snowTrip.listCalculations(latest.planningId)).length,1);
+    assert.equal((await ctx.snowTrip.getPlanning(latest.planningId)).status,'stopped');
+    // 套餐改变后结果不能保存。
+    await ctx.snowTrip.savePackage({...records[0],revision:2},1);
+    const stale=await execute('snow_save_plan',{resultId:(await ctx.snowTrip.listCalculations(latest.planningId))[0].id});assert.match(stale.content[0].text,/版本/);
+    const legacy={...await ctx.snowTrip.getPlanning(latest.planningId),id:crypto.randomUUID(),confirmedByCard:false};await ctx.snowTrip.createPlanning(legacy);
+    assert.match((await execute('snow_evaluate',{...input,planningId:legacy.id})).content[0].text,/缺少卡片确认记录/);
     await owner.dispose();await boot();
-    const reopened=await ctx.snowTrip.listPlans();
-    assert.equal(reopened.length,2);
-    assert.deepEqual(reopened.map(p=>p.title).sort(),['测试方案','第二份']);
+    assert.equal((await ctx.snowTrip.listPlans()).length,1);
+    assert.equal((await ctx.snowTrip.getCalculation(computed.resultId)).plan.total,65000);
   }finally{await presetScope?.dispose();await owner?.dispose();await rm(root,{recursive:true,force:true});}
 });

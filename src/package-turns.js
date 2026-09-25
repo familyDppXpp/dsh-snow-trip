@@ -1,6 +1,6 @@
 import {normalizePackage,saveMetadata} from './packages.ts';
 // 每次提交独立投影，确认与结果共用 callId；宿主折叠工具过程时卡片仍可见。
-// 方案核算与保存结果同样挂到轮次末尾，不退化为折叠的工具步骤。
+// 只为套餐停止状态与旧快照恢复保留投影，后台核算不生成卡片。
 export const saveTurnDefinition={
   kind:'snowSaves',
   match:event=>event.type==='turn/start'?{id:String(event.data.turn),role:'start'}:
@@ -17,8 +17,7 @@ export const saveTurnDefinition={
         const snapshot=state.drafts[draftId];
         return {...state,items:[...state.items,{callId,...(snapshot?{snapshot}:{})}]};
       }
-      // 方案核算与保存结果在轮次末尾展示卡片；输入不完整时不占位。
-      if(['snow_evaluate','snow_save_plan'].includes(event.data.name))return {...state,items:[...state.items,{callId,kind:event.data.name}]};
+
       return event.data.name.startsWith('snow_')?{...state,calls:{...state.calls,[callId]:true}}:state;
     }
     const callId=String(event.data.message.source.callId);
@@ -48,4 +47,29 @@ export const saveTurnDefinition={
     return {...state,records,items:state.items.map(item=>item.callId===callId?{...item,done:true,meta:event.data.meta,stopped,error:stopped?null:error}:item)};
   },
   buildLocationData:({state},scope,previous)=>scope!=='turn'||!state?null:previous?.value===state.items?previous:{kind:'turn',turn:state.turn,key:'snowSaves',value:state.items},
+};
+
+
+// 交互完成即发布只读反馈，不依赖整轮结束；后台工具不匹配。
+export const confirmedPlanDefinition={
+ kind:'snow-confirmed-plan',target:'chat',
+ match:event=>event.type==='tool/result'&&event.surfaceOp==='append'&&((event.data.meta?.status==='prepared'&&!event.data.meta?.reused&&event.data.meta?.conditions)||event.data.meta?.interaction||event.data.meta?.status==='save_results'||event.data.meta?.version===1&&event.data.meta?.status==='saved'&&event.data.meta?.plan||["saved","adjusting","cancelled"].includes(event.data.meta?.status)&&event.data.meta?.version===2)?{id:String(event.data.message.source.callId),role:'start'}:null,
+ start:(_context,{event})=>({seq:event.seq,data:event.data.meta}),
+ update:({state})=>state,
+ // 业务交互记录独立于轮次处理过程，按原始事件序号保留位置。
+ buildViewNode:context=>context.state?{key:context.key,id:context.id,kind:'snow-confirmed-plan',target:'chat',anchorSeq:context.state.seq,location:{kind:'session'},visibility:'visible',data:context.state.data}:null,
+};
+
+// 通用提问按 callId 配对题目与回答，完成后独立留在消息流。
+export const questionAnswerDefinition={
+ kind:'snow-question-answer',target:'chat',
+ match:event=>event.type==='tool/call'&&event.data.name==='ask_user_question'?{id:String(event.data.callId),role:'start'}:event.type==='tool/result'&&event.surfaceOp==='append'?{id:String(event.data.message.source.callId),role:'update'}:null,
+ start:(_context,{event})=>{try{return {questions:JSON.parse(event.data.arguments).questions,seq:event.seq};}catch{return {questions:[],seq:event.seq};}},
+ update:({state},{event})=>{
+  if(!state)return state;
+  const result=event.data.message.content.find(c=>c.type==='tool-result');
+  if(!result||result.isError)return state;
+  try{const value=JSON.parse(result.content.filter(c=>c.type==='text').map(c=>c.text).join(''));if(!Array.isArray(value.answers))return state;return {...state,seq:event.seq,answers:value.answers};}catch{return state;}
+ },
+ buildViewNode:context=>context.state?.answers?{key:context.key,id:context.id,kind:'snow-question-answer',target:'chat',anchorSeq:context.state.seq,location:{kind:'session'},visibility:'visible',data:context.state}:null,
 };

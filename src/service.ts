@@ -8,9 +8,10 @@ import { z } from 'zod';
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
 import { packageRecord, type PackageRecord } from './packages.js';
 import { planRecord, type PlanRecord } from './plans.js';
+import {planningRecord,resultRecord,type Planning,type Calculation} from './planning.js';
 
 declare module '@deepseek-ai/cordis' { interface Context { snowTrip: SnowTrip } }
-export const snowDomain=defineDomain({name:'snow_trip',version:1,tables:{packages:domainTable(packageRecord),plans:domainTable(planRecord)}});
+export const snowDomain=defineDomain({name:'snow_trip',version:1,tables:{packages:domainTable(packageRecord),plans:domainTable(planRecord),planning:domainTable(planningRecord),calculations:domainTable(resultRecord)}});
 export class SnowTrip extends TypertRemoteService {
   static inject=['storageDomain','workspaceRegistry'];
   private domain!: Domain<typeof snowDomain>;
@@ -51,6 +52,8 @@ export class SnowTrip extends TypertRemoteService {
     await this.ready;
     return this.write(async()=>{
       const value=planRecord.parse(record);
+      const calculation=this.domain.table('calculations').get(value.id);
+      if(calculation&&this.domain.table('planning').get(calculation.planningId)?.supersededBy)throw new Error('出行条件已变化，旧结果不能保存为当前方案');
       const packages=this.domain.table('packages');
       for(const entry of value.packages){
         const current=packages.get(entry.id);
@@ -59,6 +62,24 @@ export class SnowTrip extends TypertRemoteService {
       await this.domain.table('plans').put(value.id,value);
     });
   }
+  async createPlanning(value:Planning):Promise<void> {
+    await this.ready;return this.write(async()=>{
+      const p=planningRecord.parse(value),table=this.domain.table('planning');
+      for(const [id,old] of table.entries())if(old.sessionId===p.sessionId&&!old.supersededBy)await table.put(id,{...old,supersededBy:p.id});
+      await table.put(p.id,p);
+    });
+  }
+  async currentPlanning(sessionId:string):Promise<Planning|null>{await this.ready;return structuredClone([...this.domain.table('planning').entries()].map(([,p])=>p).find(p=>p.sessionId===sessionId&&!p.supersededBy)??null);}
+  async getPlanning(id:string):Promise<Planning|null>{await this.ready;return structuredClone(this.domain.table('planning').get(id)??null);}
+  async setPlanningStatus(id:string,status:Planning['status']):Promise<void>{await this.ready;return this.write(async()=>{await this.domain.table('planning').update(id,p=>({...p,status}));});}
+  async putCalculation(value:Calculation):Promise<void>{await this.ready;return this.write(async()=>{
+    const p=this.domain.table('planning').get(value.planningId);
+    if(!p||p.supersededBy)throw new Error('出行条件已变化，请使用新规划重新核算');
+    for(const entry of value.plan.packages)if(this.domain.table('packages').get(entry.id)?.revision!==entry.revision)throw new Error('套餐版本已变化，请重新核算');
+    await this.domain.table('calculations').put(value.id,resultRecord.parse(value));
+  });}
+  async getCalculation(id:string):Promise<Calculation|null>{await this.ready;return structuredClone(this.domain.table('calculations').get(id)??null);}
+  async listCalculations(planningId:string):Promise<Calculation[]>{await this.ready;return [...this.domain.table('calculations').entries()].map(([,v])=>structuredClone(v)).filter(v=>v.planningId===planningId);}
   @Remote('listPlans')
   async listPlans(): Promise<PlanRecord[]> {
     await this.ready;

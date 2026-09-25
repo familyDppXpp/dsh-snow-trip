@@ -39,8 +39,8 @@ test('公开工具：卡片确认→保存→重开→查询；变更、取消�
       await presetScope.ctx.plugin(SnowTools);
     }});
     bindScopeParent(agent,presetKey);bindScopeParent(secondAgent,presetKey);
-    assert.deepEqual(ctx.tools.schemas(agent).map(t=>t.name).sort(),['snow_query','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_other_benefit','snow_pending_question','snow_clear_field','snow_commit','snow_evaluate','snow_save_plan','snow_plan_stage'].sort());
-    assert.deepEqual(ctx.tools.schemas(secondAgent).map(t=>t.name).sort(),['snow_query','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_other_benefit','snow_pending_question','snow_clear_field','snow_commit','snow_evaluate','snow_save_plan','snow_plan_stage'].sort());
+    assert.deepEqual(ctx.tools.schemas(agent).map(t=>t.name).sort(),['snow_query','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_other_benefit','snow_pending_question','snow_clear_field','snow_commit','snow_evaluate','snow_save_plan','snow_plan_stage','snow_prepare_plan','snow_plan_results'].sort());
+    assert.deepEqual(ctx.tools.schemas(secondAgent).map(t=>t.name).sort(),['snow_query','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_other_benefit','snow_pending_question','snow_clear_field','snow_commit','snow_evaluate','snow_save_plan','snow_plan_stage','snow_prepare_plan','snow_plan_results'].sort());
     assert.deepEqual(ctx.tools.schemas({id:'ordinary-session'}),[]);
     assert.deepEqual(ctx.tools.schemas(),[]);
     const denied=await ctx.tools.execute({name:'snow_query',arguments:{},agent:{id:'ordinary-session'},signal:new AbortController().signal,callId:'denied'});
@@ -80,6 +80,9 @@ test('公开工具：卡片确认→保存→重开→查询；变更、取消�
     assert.deepEqual((await ok('snow_draft_get',{draftId})).value,draft,'失败步骤不改写已有草稿');
     const denied=await ctx.tools.execute({name:'snow_draft_get',arguments:{draftId},agent:secondAgent,signal:new AbortController().signal,callId:'isolation'});
     assert.equal(denied.isError,true);assert.equal(calls,0);assert.deepEqual(await ctx.snowTrip.listPackages(),[]);
+    onQuestion=async request=>({answers:[{id:request.questions[0].id,selected:['取消本次操作']}]});
+    const cancelled=await ok('snow_commit',{draftId});
+    assert.equal(cancelled.concludesTurn,true);assert.equal(cancelled.meta.status,'cancelled');assert.equal(cancelled.meta.record,null);assert.deepEqual(await ctx.snowTrip.listPackages(),[]);
     onQuestion=async request=>({answers:[{id:request.questions[0].id,selected:['继续调整']}]});
     const adjusted=await ok('snow_commit',{draftId});
     assert.equal(adjusted.concludesTurn,true);assert.equal(adjusted.meta.preview.nights,3);assert.deepEqual(adjusted.meta.preview.otherBenefits,['晚餐券2张，入住期间使用']);assert.equal(adjusted.value.status,'adjusting');assert.equal(packageMetadata(adjusted.meta),null);

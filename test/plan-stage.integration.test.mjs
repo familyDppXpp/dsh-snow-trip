@@ -11,6 +11,8 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import Storage from '@deepseek-ai/dsh-storage';
 import * as StorageJson from '@deepseek-ai/dsh-storage-json';
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
+import {wireStages,brokenEstimate} from './plan-wire-fixtures.mjs';
+import {planQuestion} from '../src/plan-question.js';
 import {SnowTrip} from '../lib/service.js';
 
 test('snow_plan_stage 展示卡片并返回用户编辑；取消保留输入不写入',async()=>{
@@ -37,33 +39,40 @@ test('snow_plan_stage 展示卡片并返回用户编辑；取消保留输入不�
   const execute=(name,args)=>ctx.tools.execute({name,arguments:args,agent,signal:new AbortController().signal,callId:`call-${Math.random()}`});
   try{
     await boot();
-    // 用户编辑表单：custom 携带编辑负载，selected 为空。
+    const querySchema=ctx.tools.schemas(agent).find(t=>t.name==='snow_query');
+    assert.match(querySchema.parameters.properties.limit.description??'',/1.*50/,'模型应能看到每页范围');
+    assert.equal((await execute('snow_query',{limit:100})).isError,true);
+    assert.equal((await execute('snow_query',{limit:50})).isError,false);
     answer=async request=>{
-      const q=request.questions[0];
-      assert.equal(q.id,'snow-plan-confirm-c1');
-      const detail=JSON.parse(q.detail);
-      assert.equal(detail.stage,'confirm');assert.equal(detail.key,'c1');
-      assert.deepEqual(detail.ids,['p1']);
-      return {answers:[{id:q.id,selected:[],custom:JSON.stringify({values:{start:'2026-12-11',nights:'3',budget:'2200'},ids:['p1','p2'],estimates:[]})}]};
+      const card=planQuestion({questions:request.questions});assert.equal(card.invalid,undefined);assert.equal(card.planning,true);
+      return {answers:[{id:request.questions[0].id,selected:[],custom:'先不要生成'}]};
     };
-    const edited=await execute('snow_plan_stage',{stage:'confirm',key:'c1',detail:{input:{},ids:['p1'],packages:[{id:'p1',name:'A',completeness:'complete'}]}});
-    assert.equal(edited.isError,false,edited.content?.map(c=>c.text).join('\n')||'stage 失败');
-    const value=JSON.parse(edited.content.find(c=>c.type==='text').text);
-    assert.equal(value.status,'answered');assert.equal(value.custom,JSON.stringify({values:{start:'2026-12-11',nights:'3',budget:'2200'},ids:['p1','p2'],estimates:[]}));
-    assert.deepEqual(value.selected,[]);
-    // 快捷按钮：卡片按钮的标签经 selected 回传（工具不接收 options 参数）。
-    answer=async request=>({answers:[{id:request.questions[0].id,selected:['保存所选']}]});
-    const buttons=await execute('snow_plan_stage',{stage:'results',key:'r1',detail:{results:[{title:'搭配一',total:212000}],selected:[0]}});
-    const btnValue=JSON.parse(buttons.content.find(c=>c.type==='text').text);
-    assert.deepEqual(btnValue.selected,['保存所选']);assert.equal(btnValue.custom,null);
-    // 用户跳过：空 selected + 空 custom，仍返回卡片数据，不阻塞流程。
+    const input={conditions:{start:'2027-02-06',nights:7,rooms:1,fees:[{id:'meal',label:'餐饮',quantity:7,unitPrice:10000,basis:'每日估算',source:'estimate'}]},needsConfirmation:true};
+    const zeroBudget=await execute('snow_prepare_plan',{...input,conditions:{...input.conditions,budget:0}});
+    assert.equal(zeroBudget.isError,true);assert.match(zeroBudget.content[0].text,/conditions.budget.*省略/);
+    const cancelled=await execute('snow_prepare_plan',input);
+    assert.equal(JSON.parse(cancelled.content[0].text).status,'adjusting');
+    assert.equal(cancelled.concludesTurn,undefined,'有补充说明应继续模型循环');
+    assert.equal(JSON.parse(cancelled.content[0].text).custom,'先不要生成');
+    answer=async request=>({answers:[{id:request.questions[0].id,selected:[],custom:'加上往返机票费用'}]});
+    const supplemented=await execute('snow_prepare_plan',input);
+    assert.equal(supplemented.concludesTurn,undefined);
+    assert.equal(JSON.parse(supplemented.content[0].text).custom,'加上往返机票费用');
+    assert.equal(JSON.parse(supplemented.content[0].text).planningId,undefined);
     answer=async request=>({answers:[{id:request.questions[0].id,selected:[]}]});
-    const skipped=await execute('snow_plan_stage',{stage:'discussion',key:'d1',detail:{results:[],selected:[],message:''}});
-    assert.equal(JSON.parse(skipped.content.find(c=>c.type==='text').text).status,'answered');
-    // 取消（aborted）：工具失败，无写入。
-    answer=async()=>{throw new Error('ask_user_question was aborted before the user answered');};
-    const aborted=await execute('snow_plan_stage',{stage:'confirm',key:'c2',detail:{}});
-    assert.equal(aborted.isError,true,aborted.content?.map(c=>c.text).join('\n'));
-    assert.match(aborted.content[0].text,/aborted before|无法取消|停止/);
+    const skipped=await execute('snow_prepare_plan',input);
+    assert.equal(skipped.concludesTurn,true,'无补充时保持停止等待');
+    answer=async request=>({answers:[{id:request.questions[0].id,selected:['取消本次操作']}]});
+    const explicitCancel=await execute('snow_prepare_plan',input);
+    assert.equal(explicitCancel.concludesTurn,true);assert.equal(JSON.parse(explicitCancel.content[0].text).interaction.action,'cancel');
+    const bypass=await execute('snow_prepare_plan',{...input,needsConfirmation:false,userEvidence:'用户没有确认这个估算'});
+    assert.equal(bypass.isError,false);assert.equal(JSON.parse(bypass.content[0].text).interaction.action,'cancel','needsConfirmation:false 也必须等待卡片操作');
+    const userOnly=await execute('snow_prepare_plan',{...input,conditions:{...input.conditions,fees:input.conditions.fees.map(f=>({...f,source:'user',unitPrice:0}))},needsConfirmation:false,userEvidence:'用户已经回答过'});
+    assert.equal(JSON.parse(userOnly.content[0].text).interaction.action,'cancel','模型标注用户来源也不能跳过卡片');
+    // 旧的任意 JSON 结果和独立费用阶段不能再创建业务卡片。
+    for(const stage of ['confirm','estimate','results']){
+      const legacy=await execute('snow_plan_stage',{stage,key:'legacy',detail:{results:[]}});assert.equal(legacy.isError,true);
+    }
+    assert.deepEqual(await ctx.snowTrip.listPlans(),[]);
   }finally{await presetScope?.dispose();await owner?.dispose();await rm(root,{recursive:true,force:true});}
 });

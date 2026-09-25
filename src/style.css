@@ -238,3 +238,226 @@
 
 .snow-save-composer{width:100%;max-width:760px;margin:auto}.snow .snow-save-composer .snow-save-card{max-width:none;margin:8px 0;padding:16px 20px}.snow-save-composer .snow-save-card h3{margin-bottom:12px}.snow-save-composer .snow-save-body{max-height:32vh!important}.snow-save-composer .snow-save-card footer{margin-top:12px}
 .snow .package-benefits{margin:16px 0}.snow .package-benefits h4{margin:0 0 8px;font-size:13px}.snow .package-benefits dl{margin:0}.snow .package-benefits dl>div{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;padding:7px 0;border-bottom:1px solid #edf0ed}.snow .package-benefits dt{color:#65766d}.snow .package-benefits dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;font-size:13px}
+
+/* 估算卡沿用工作台配色；覆盖宿主会话对 header 的通用布局。 */
+.snow .snow-plan-card>.snow-plan-heading{position:static;display:block;min-height:0;padding:0 0 16px;margin:0;border-bottom:1px solid var(--line);background:transparent}
+.snow .snow-plan-heading .snow-plan-badge{padding:0;background:none;letter-spacing:.04em;font-size:12px;margin-bottom:8px;color:var(--primary)}
+.snow .snow-plan-heading h3{font-size:20px;line-height:1.4;margin:0;font-weight:650}
+.snow .snow-plan-heading .snow-plan-intro{margin-top:6px;color:var(--muted);font-size:13px}
+.snow .snow-plan-card[data-plan-stage=estimate]{background:var(--surface);padding:24px;border-radius:12px;box-shadow:0 4px 20px #233a3406}
+.snow .snow-estimate-body{max-height:min(44dvh,440px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:8px}
+.snow .snow-estimate-trip{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:14px 0;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.snow .snow-estimate-trip>span:last-child{margin-left:auto}
+.snow .snow-estimate-row{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:24px;align-items:center;padding:16px 0;border-bottom:1px solid var(--line);cursor:text}
+.snow .snow-estimate-name{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:14px;font-weight:600;line-height:1.5}
+.snow .snow-estimate-name small{font-size:11px;font-weight:400;color:var(--muted)}
+.snow .snow-estimate-basis{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.snow .snow-estimate-amount{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:7px;background:var(--paper);padding-left:12px;color:var(--muted)}
+.snow .snow-estimate-amount:focus-within{border-color:var(--primary);outline:2px solid var(--soft)}
+.snow .snow-estimate-amount input{min-width:0;width:100%;min-height:44px;border:0;border-radius:7px;background:transparent;padding:8px;color:var(--ink);font-size:16px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;outline-offset:0}
+.snow .snow-estimate-scope{display:grid;grid-template-columns:56px minmax(0,1fr);gap:12px;padding:16px 0 4px;font-size:12px;line-height:1.7;color:var(--muted)}
+.snow .snow-estimate-scope strong{font-weight:500;color:var(--ink)}
+.snow .snow-plan-submit{justify-content:flex-end;align-items:center;padding-top:16px;margin-top:12px;border-top:1px solid var(--line)}
+.snow .snow-plan-submit>span{margin-right:auto;font-size:12px;color:var(--muted)}
+.snow .snow-plan-submit button{min-height:44px}
+.snow .snow-plan-more,.snow .snow-plan-message{border:0;border-radius:0;background:transparent;box-shadow:none;margin:16px 0 0;padding:0}
+.snow .snow-plan-card .snow-plan-more>summary,.snow .snow-plan-card .snow-plan-message>summary{width:fit-content;min-height:36px;padding:6px 0;background:transparent;align-content:center;list-style-position:inside}
+.snow .snow-plan-card .snow-plan-more>summary:hover,.snow .snow-plan-card .snow-plan-message>summary:hover{background:transparent;color:var(--ink);text-decoration:underline;text-underline-offset:4px}
+.snow .snow-plan-message-body{display:grid;gap:10px;padding-top:10px}
+.snow .snow-plan-message-body label{font-size:12px;color:var(--muted)}
+.snow .snow-plan-message-body textarea{display:block;box-sizing:border-box;width:100%;min-height:80px;max-height:160px;resize:vertical;border:1px solid var(--line);border-radius:7px;padding:12px;background:var(--paper);font:inherit;font-size:14px;color:var(--ink);margin-top:6px}
+.snow .snow-plan-message-body button{justify-self:end;min-height:44px}
+.snow .snow-plan-message-body p{font-size:12px;color:var(--muted)}
+@media(max-width:640px){.snow .snow-plan-card[data-plan-stage=estimate]{padding:16px}.snow .snow-estimate-row{grid-template-columns:minmax(0,1fr) 104px;gap:12px}.snow .snow-estimate-name{display:block}.snow .snow-estimate-name small{display:block;margin-top:2px}.snow .snow-plan-heading h3{font-size:18px}.snow .snow-plan-submit>span{width:100%}.snow .snow-plan-submit button{width:100%}}
+
+/* 合并确认卡：费用名称、数量和单价保持同一行。 */
+.snow .snow-plan-card[data-planning="true"]{background:#fff}
+.snow .snow-fee-row{grid-template-columns:minmax(0,1fr) 100px 132px;align-items:end}
+.snow .snow-fee-row>label{min-width:0;display:grid;gap:6px}
+@media(max-width:600px){.snow .snow-fee-row{grid-template-columns:1fr 1fr}.snow .snow-fee-row>.snow-estimate-copy{grid-column:1/-1}}
+
+/* 结果卡：费用完整展开，选择控件不继承通用输入框尺寸。 */
+.snow .snow-plan-card[data-plan-stage="results"]{background:#fff;min-width:0}
+.snow .snow-plan-result{padding:20px;margin:20px 0;border-radius:10px;min-width:0}
+.snow .snow-plan-result.is-selected{border:1px solid #23664d;box-shadow:inset 3px 0 #23664d;background:#fafcf9}
+.snow .snow-plan-result .snow-result-select{display:flex;align-items:center;gap:9px;width:fit-content;min-height:44px;margin-bottom:8px;cursor:pointer;font-size:13px;color:var(--muted)}
+.snow .snow-plan-result .snow-result-select input[type="checkbox"]{display:inline-block;width:18px;height:18px;min-width:18px;min-height:18px;max-width:18px;max-height:18px;margin:0;padding:0;flex:0 0 18px;accent-color:#23664d;appearance:auto}
+.snow .snow-plan-result-head>div:first-child{min-width:0}
+.snow .snow-plan-result-head h3{font-size:20px;line-height:1.4;margin:8px 0}
+.snow .snow-plan-money strong{font-size:28px;font-variant-numeric:tabular-nums}
+.snow .snow-plan-money small{display:block;margin-top:5px;font-size:12px}
+.snow .snow-plan-reason{background:transparent;border-left:2px solid #8eae9c;border-radius:0;padding:0 0 0 12px;margin:16px 0;line-height:1.8;color:var(--ink)}
+.snow .snow-plan-card .snow-result-daily{max-height:none;overflow:visible;margin:20px 0}
+.snow .snow-result-daily table{table-layout:fixed;min-width:0;width:100%}
+.snow .snow-result-daily th,.snow .snow-result-daily td{white-space:normal;overflow-wrap:anywhere;vertical-align:top;line-height:1.7;padding:12px 8px}
+.snow .snow-result-daily th{position:static;background:#f5f7f4;font-size:12px;color:var(--muted);font-weight:500}
+.snow .snow-result-daily th:first-child{width:24%}
+.snow .snow-result-daily th:nth-child(2){width:21%}
+.snow .snow-result-daily td:nth-child(2){font-variant-numeric:tabular-nums;font-weight:600}
+.snow .snow-plan-shared{padding:12px 0;border-bottom:1px solid var(--line);line-height:1.7}
+.snow .snow-shared-basis{display:block;margin-top:4px;color:var(--muted);overflow-wrap:anywhere}
+.snow .snow-result-allocation{margin:12px 0;overflow-wrap:anywhere}
+.snow .snow-result-verified{color:var(--muted);font-size:12px;margin:10px 0}
+.snow .snow-plan-card[data-plan-stage="results"] .snow-plan-bar{position:sticky;bottom:0;z-index:2;background:#fff;border-top:1px solid var(--line);border-radius:0;padding:16px 0;margin-top:20px}
+@media(max-width:600px){.snow .snow-plan-result{padding:14px}.snow .snow-plan-result-head{flex-direction:column}.snow .snow-plan-money{text-align:left}.snow .snow-result-daily th:first-child{width:27%}.snow .snow-result-daily th:nth-child(2){width:25%}.snow .snow-result-daily td,.snow .snow-result-daily th{padding:10px 4px;font-size:12px}.snow .snow-plan-bar>span{width:100%;font-size:13px}}
+
+/* 底部交互最多占屏幕三分之一，把主要空间留给消息。 */
+.snow.snow-save-composer:has(>.snow-plan-card){max-height:33.333dvh;min-height:0}
+.snow.snow-save-composer>.snow-plan-card{box-sizing:border-box;max-height:calc(33.333dvh - 16px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.snow.snow-save-composer .snow-estimate-body{max-height:none!important;overflow:visible}
+.snow.snow-save-composer .snow-plan-submit,
+.snow.snow-save-composer .snow-plan-card .snow-plan-bar{position:sticky;bottom:-20px;z-index:2;background:#fff;padding:10px 0;margin-top:12px;border-top:1px solid var(--line)}
+@media(max-width:640px){.snow.snow-save-composer .snow-plan-card[data-plan-stage=estimate] .snow-plan-submit{bottom:-16px}}
+.snow.snow-save-composer>.snow-plan-card{padding:12px}
+.snow.snow-save-composer .snow-plan-card>.snow-plan-heading{padding-bottom:8px}
+.snow.snow-save-composer .snow-plan-heading .snow-plan-badge{display:none}
+.snow.snow-save-composer .snow-plan-heading h3{font-size:16px}
+.snow.snow-save-composer .snow-plan-card[data-plan-stage=results] .snow-plan-intro{display:none}
+.snow.snow-save-composer .snow-plan-result{padding:12px;margin:10px 0}
+.snow.snow-save-composer .snow-result-select{min-height:32px;margin-bottom:4px}
+.snow.snow-save-composer .snow-plan-submit,
+.snow.snow-save-composer .snow-plan-card .snow-plan-bar{bottom:-12px}
+
+/* 结果面板：标签切换方案，正文滚动，操作区保持可见。 */
+.snow.snow-save-composer:has(>.snow-plan-card[data-plan-stage=results]){max-height:80dvh;max-width:var(--dsh-chat-content-width,680px)}
+.snow.snow-save-composer>.snow-plan-card[data-plan-stage=results]{height:calc(80dvh - 16px);max-height:none;display:flex;flex-direction:column;overflow:hidden;scrollbar-gutter:auto;gap:8px}
+.snow.snow-save-composer .snow-plan-card[data-plan-stage=results]>:not(.snow-result-panels){flex-shrink:0}
+.snow .snow-result-tabs{display:flex;gap:20px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.snow .snow-result-tabs [role=tab]{flex-shrink:0;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);padding:10px 2px;font:inherit;font-size:14px;cursor:pointer}
+.snow .snow-result-tabs [aria-selected=true]{border-bottom-color:#23664d;color:#23664d;font-weight:600}
+.snow .snow-result-tabs [role=tab]:focus-visible{outline:2px solid #23664d;outline-offset:-2px}
+.snow .snow-result-panels>.snow-plan-result[hidden]{display:none}
+.snow.snow-save-composer .snow-result-panels{min-height:0;flex:1;overflow:hidden}
+.snow.snow-save-composer .snow-result-panels>.snow-plan-result{box-sizing:border-box;height:100%;margin:0;border:0;border-radius:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.snow.snow-save-composer .snow-plan-result-head{flex-direction:row;gap:16px;clear:both}
+.snow.snow-save-composer .snow-plan-result-head h3{font-size:16px;margin:4px 0}
+.snow.snow-save-composer .snow-plan-money{text-align:left}
+.snow.snow-save-composer .snow-plan-money strong{font-size:24px}
+.snow.snow-save-composer .snow-plan-result .snow-result-select{float:right;min-height:28px;margin:0 0 4px 8px}
+.snow.snow-save-composer .snow-plan-card[data-plan-stage=results] .snow-plan-bar{position:static;margin:0;padding:8px 0 0}
+.snow.snow-save-composer .snow-plan-card[data-plan-stage=results]>.snow-plan-message{margin:0;max-height:45%;overflow:auto}
+.snow.snow-save-composer .snow-plan-card[data-plan-stage=results]>.snow-plan-message>summary{min-height:28px;padding:2px 0;font-size:12px}
+
+/* 已存方案：紧凑页头、突出整趟成本，完整展开费用依据。 */
+.snow .snow-saved-title{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:0 0 24px}
+.snow .snow-saved-title h1{font-weight:600;line-height:1.4;font-family:inherit;font-size:26px;margin:0 0 8px}
+.snow .snow-saved-title h1 span{font-size:13px;font-weight:400;color:var(--muted);margin-left:10px}
+.snow .snow-saved-title p{line-height:1.7}
+.snow .snow-saved-title>button{flex-shrink:0}
+.snow .snow-saved-entry{border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:24px;overflow:hidden}
+.snow .snow-saved-entry>.snow-saved-card{border:0;margin:0;border-radius:0;box-shadow:none}
+.snow .snow-saved-card{padding:24px;background:#fff}
+.snow .snow-saved-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.snow .snow-saved-label,.snow .snow-saved-footnote{font-size:12px;color:var(--muted)}
+.snow .snow-saved-head h3{font-size:20px;line-height:1.4;margin:8px 0}
+.snow .snow-saved-head p{font-size:13px;color:var(--muted)}
+.snow .snow-saved-total{text-align:right;flex-shrink:0}
+.snow .snow-saved-total span{display:block;font-size:12px;color:var(--muted);margin-bottom:8px}
+.snow .snow-saved-total strong{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.snow .snow-saved-reason{font-size:13px;line-height:1.8;margin:20px 0;padding-left:12px;border-left:2px solid #8eae9c}
+.snow .snow-saved-card .snow-saved-daily{max-height:none;overflow:visible;margin:20px 0}
+.snow .snow-saved-daily table{table-layout:fixed;width:100%}
+.snow .snow-saved-daily th:first-child{width:24%}
+.snow .snow-saved-daily th:nth-child(2){width:22%}
+.snow .snow-saved-daily td,.snow .snow-saved-daily th{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.7;padding:12px 8px}
+.snow .snow-saved-daily td:nth-child(2){font-weight:600;font-variant-numeric:tabular-nums}
+.snow .snow-saved-entry>button{display:flex;margin:0 24px 20px auto;color:var(--primary)}
+@media(max-width:640px){.snow .snow-saved-head{flex-direction:column;gap:14px}.snow .snow-saved-total{text-align:left}.snow .snow-saved-card{padding:16px}.snow .snow-saved-title{align-items:flex-start}.snow .snow-saved-entry>button{margin-right:16px}}
+
+/* 仅底部套餐保存确认面板占八成屏高，历史卡片与方案卡片保持原样。 */
+.snow.snow-save-composer>.snow-save-card:is([data-save-state=confirm],[data-save-state=saving]){box-sizing:border-box;height:calc(80dvh - 16px);display:flex;flex-direction:column;overflow:hidden}
+.snow.snow-save-composer>.snow-save-card:is([data-save-state=confirm],[data-save-state=saving])>.snow-save-body{flex:1;min-height:0;max-height:none!important;overflow-y:auto;overscroll-behavior:contain}
+.snow.snow-save-composer>.snow-save-card:is([data-save-state=confirm],[data-save-state=saving])>:not(.snow-save-body){flex-shrink:0}
+
+/* 套餐修改按内容收缩，仅在超过八成屏高时滚动。 */
+.snow.snow-save-composer>.snow-save-card[data-save-mode=update]:is([data-save-state=confirm],[data-save-state=saving]){height:auto;max-height:calc(80dvh - 16px)}
+.snow.snow-save-composer>.snow-save-card[data-save-mode=update]:is([data-save-state=confirm],[data-save-state=saving])>.snow-save-body{flex:0 1 auto}
+
+/* 出行条件确认卡按内容自适应，独立于结果页和套餐保存卡。 */
+.snow.snow-save-composer:has(>.snow-plan-card[data-plan-stage=confirm]){max-height:80dvh}
+.snow.snow-save-composer>.snow-plan-card[data-plan-stage=confirm]{height:auto;max-height:calc(80dvh - 16px)}
+
+.snow .snow-saved-breakdown{margin:20px 0;padding:16px;background:var(--soft);border-radius:8px}
+.snow .snow-saved-breakdown h4{margin:0 0 12px;font-size:14px}
+.snow .snow-saved-breakdown dl{margin:0}
+.snow .snow-saved-breakdown dl>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:10px 0}
+.snow .snow-saved-breakdown dt{font-size:13px}
+.snow .snow-saved-breakdown dt small{display:block;color:var(--muted);font-size:12px;line-height:1.7;margin-top:4px}
+.snow .snow-saved-breakdown dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+.snow .snow-saved-breakdown .snow-saved-sum{border-top:1px solid var(--line);margin-top:8px}
+.snow .snow-saved-breakdown>p{font-size:12px;line-height:1.8;color:var(--muted);margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* 最后一项共同费用与操作栏共用一条分隔线。 */
+.snow .snow-plan-card[data-plan-stage=confirm] .snow-fee-row:last-child{border-bottom:0}
+
+.snow.snow-confirmed-plan{box-sizing:border-box;background:#f3f7f3;margin:20px 0;padding:24px;border:1px solid #b8ccbf;border-left:4px solid #386b55;border-radius:12px}
+.snow.snow-confirmed-plan>header{background:transparent;padding:0 0 14px;border:0;border-bottom:1px solid #cbd9cf;margin-bottom:18px}
+.snow-confirmed-plan h3{font-size:18px;margin:6px 0 16px}
+.snow-confirmed-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;margin:0 0 20px}
+.snow-confirmed-facts dt{font-size:12px;color:var(--muted)}
+.snow-confirmed-facts dd{margin:4px 0 0;font-size:14px}
+.snow-confirmed-plan h4{font-size:13px;margin:16px 0 8px}
+.snow-confirmed-plan ul{padding-left:20px;font-size:13px;line-height:1.8}
+.snow-confirmed-fee{padding:10px 0;border-bottom:1px solid var(--line)}
+.snow-confirmed-fee p{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:13px}
+.snow-confirmed-fee small{display:block;color:var(--muted);line-height:1.7;margin-top:4px}
+.snow-confirmed-plan>.snow-plan-muted{font-size:12px;margin-top:16px}
+
+/* 结果面板可让出消息空间，回看已确认条件。 */
+.snow .snow-plan-context-toggle{float:right;font-size:12px;min-height:32px;padding:4px 10px}
+.snow.snow-save-composer>.snow-plan-card[data-plan-stage=results][data-collapsed=true]{height:auto}
+.snow.snow-save-composer>.snow-plan-card[data-collapsed=true]>:not(.snow-plan-heading){display:none}
+.snow-confirmed-plan{scroll-margin-block:16px}
+
+.snow-confirmed-plan .snow-confirmed-status{display:inline-block;background:#dfebe2;color:#28543e;border-radius:4px;padding:4px 8px;font-size:12px;font-weight:600}
+
+.snow .snow-plan-actions,.snow .snow-save-card footer{align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.snow .snow-plan-actions button.snow-cancel-action,.snow .snow-plan-bar button.snow-cancel-action,.snow .snow-save-card button.snow-cancel-action{background:transparent;border-color:transparent;box-shadow:none;color:var(--muted,#62756c);font-size:13px;min-height:44px;padding:9px 14px;width:auto;white-space:nowrap}
+.snow button.snow-cancel-action:not(:disabled):hover{background:var(--soft,#edf3ec);color:var(--ink,#243f36)}
+.snow button.snow-cancel-action:focus-visible{outline:2px solid var(--primary,#23664d);outline-offset:2px}
+.snow .snow-save-card footer button.primary{order:1}
+@media(max-width:640px){.snow .snow-plan-submit button{width:auto}.snow .snow-plan-submit>span{flex-basis:100%}}
+.snow-workbench [data-chat-flow-kind="tool-call"]:has([data-snow-hidden-tool]){display:none}
+/* 工作台保留所有助理正文；思考内容由宿主 ReasoningRow 自身折叠。 */
+.snow-workbench [data-chat-flow-kind="assistant-step"][hidden="until-found"],
+.snow-workbench [data-turn-process-inline][hidden="until-found"]{content-visibility:visible}
+.snow-workbench [data-chat-flow-kind="assistant-step"]:not(:empty){margin-top:16px}
+
+.snow .snow-result-outcome{padding:12px 0 16px;border-bottom:1px solid var(--line);color:var(--primary)}
+.snow .snow-result-outcome p{margin:8px 0 0;color:var(--ink);font-size:14px}
+.snow .snow-plan-card[data-readonly=true] .snow-plan-heading{padding-top:14px}
+
+
+.snow.snow-question-record{padding:20px 24px;border:1px solid var(--line,#dce4e0);border-left:3px solid var(--primary,#23664d);border-radius:14px;background:var(--paper,#f4f7f3);color:var(--ink,#243f36)}
+.snow .snow-question-tabs{display:flex;gap:20px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:20px}
+.snow .snow-question-tabs button{flex-shrink:0;padding:10px 2px 14px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer}
+.snow .snow-question-tabs button[aria-selected=true]{border-bottom-color:var(--primary);color:var(--ink);font-weight:600}
+.snow .snow-question-tab-status{margin-left:8px;font-size:12px;color:var(--primary)}
+.snow .snow-question-prompt{font-size:15px;line-height:1.7;margin:0 0 18px;white-space:pre-wrap}
+.snow .snow-question-detail{font-size:13px;line-height:1.6;white-space:pre-wrap;color:var(--muted);margin-bottom:16px}
+.snow .snow-question-options{display:grid;gap:10px}
+.snow .snow-question-option{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:1px solid transparent;border-radius:10px;background:var(--surface,#fff);color:var(--muted);line-height:1.6}
+.snow .snow-question-option strong{font-size:14px;font-weight:500}
+.snow .snow-question-option p{margin:3px 0 0;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.snow .snow-question-option.is-selected{border-color:#8caf9c;background:#edf5ef;color:var(--ink)}
+.snow .snow-question-number{font-size:12px;min-width:20px;line-height:24px;text-align:center;background:#eff1ee;border-radius:4px}
+.snow .snow-question-check{margin-left:auto;color:var(--primary);flex-shrink:0}
+.snow .snow-question-custom{border-style:dashed;border-color:var(--line)}
+.snow .snow-question-verdict{display:flex;justify-content:space-between;align-items:center;margin-top:20px;color:var(--muted);font-size:12px}
+.snow .snow-question-verdict button:disabled{min-height:36px;padding:7px 20px;background:#e3e9e4;color:#53665b;border:0;border-radius:8px;cursor:default;opacity:1}
+.snow .snow-question-tabs button:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+@media(max-width:600px){.snow.snow-question-record{padding:16px}.snow .snow-question-tabs{gap:16px}.snow .snow-question-option{padding:12px}}
+
+/* 保存后保留原选择卡的布局，保存凭据另起一张卡。 */
+.snow-plan-save-record>.snow-plan-card[data-readonly=true]{box-sizing:border-box;max-height:80dvh;display:flex;flex-direction:column;overflow:hidden;padding:12px;gap:8px}
+.snow-plan-save-record>.snow-plan-card[data-readonly=true]>.snow-plan-heading{padding:0 0 8px}
+.snow-plan-save-record .snow-plan-heading .snow-plan-badge{display:none}
+.snow-plan-save-record .snow-plan-heading h3{font-size:16px}
+.snow-plan-save-record .snow-result-panels{min-height:0;overflow:auto;overscroll-behavior:contain}
+.snow-plan-save-record .snow-result-panels>.snow-plan-result{margin:0;padding:12px;border:0;border-radius:0}
+.snow-plan-save-record .snow-result-select{float:right;min-height:28px;margin:0 0 4px 8px;cursor:default}
+.snow-plan-save-record .snow-plan-result-head{clear:both}
+.snow-plan-save-record .snow-plan-result-head h3{font-size:16px}
+.snow-plan-save-record .snow-plan-money strong{font-size:24px}
+.snow-plan-save-record>.snow-saved-results{margin-top:20px}
+.snow-plan-save-record>.snow-plan-card[data-readonly=true]>:not(.snow-result-panels){flex-shrink:0}

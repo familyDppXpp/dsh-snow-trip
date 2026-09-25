@@ -29,7 +29,7 @@ test('浏览器产物注册正确包名，工厂仅使用宿主 React',async()=>
   vm.runInNewContext(await readFile(new URL('../lib/client.js',import.meta.url),'utf8'),{window:{__ModuleLoader__:{load:v=>{handoff=v;}}},console,setTimeout,clearTimeout,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer});
   assert.equal(handoff.id,'dsh-snow-trip');
   const mod=handoff.factory(id=>{if(id==='react')return React;if(id==='react/jsx-runtime')return jsx;throw Error('非预期外部依赖：'+id);});
-  assert.deepEqual(Array.from(mod.inject),['slots','modules','sessions','remote','uiSession']);assert.equal(typeof mod.apply,'function');
+  assert.deepEqual(Array.from(mod.inject),['slots','modules','sessions','remote','uiSession','uiConversation']);assert.equal(typeof mod.apply,'function');
 });
 test('用户当前工作簿回归（通过 SNOW_TEST_WORKBOOK 显式指定）',{skip:!process.env.SNOW_TEST_WORKBOOK},async()=>{
   const bytes=await readFile(process.env.SNOW_TEST_WORKBOOK);

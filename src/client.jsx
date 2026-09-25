@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {SavedPackageCard,EvaluateCard,PlanSavedCard} from './package-cards.jsx';
+import {SavedPackageCard,PlanInteractionCard,QuestionAnswerCard} from './package-cards.jsx';
 import { App, PackageSidebarToggle } from './workbench.jsx';
 import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
-import {saveTurnDefinition} from './package-turns.js';
+import {saveTurnDefinition,confirmedPlanDefinition,questionAnswerDefinition} from './package-turns.js';
 import {SaveCard,SaveCards,saveQuestion} from './save-card.jsx';
-import {PlanQuestionCard} from './plan-question-card.jsx';
+import {PlanQuestionCard,PlanStageFailure} from './plan-question-card.jsx';
 import {planQuestion} from './plan-question.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
 
-export const inject=['slots','modules','sessions','remote','uiSession'];
+export const inject=['slots','modules','sessions','remote','uiSession','uiConversation'];
 const uiPlugins=['ui-renderer','locale','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions','ui-input-trigger','ui-commands','ui-skill','ui-model-selection','ui-permission-presets'];
 
 function Entry({wide, prepare}) {
@@ -56,20 +56,24 @@ export async function apply(ctx) {
         name:'snow-trip-session-entry',inject:['uiConversation','slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
           view.uiConversation.events.register(saveTurnDefinition);
+          registerConfirmedPlan(view);
+          view.uiConversation.events.register(questionAnswerDefinition);
+          view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'snow-question-answer'},({node})=><QuestionAnswerCard data={node.data}/>));
+          view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'system-prompt',priority:-1},()=>null));
+          view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'tool-call',priority:-1,select:()=>true},()=> <span data-snow-hidden-tool="true"/>));
+          view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'turn-process',priority:-1},()=>null));
+
           // 使用宿主的轮次末尾扩展点，结果不插入旧消息，也不受工具折叠影响。
           view.slots.inject('conversation.chat.turnTail',()=>view.slots.register({
             name:'conversation.chat.turnTail',priority:-1,
-            select:({turn})=>{const items=turn.data.get('snowSaves');return items?.length?items:null;},
+            select:({turn})=>{const items=turn.data.get('snowSaves')?.filter(item=>item.stopped);return items?.length?items:null;},
           },({matched,sessionId})=><SaveCards items={matched} store={view.uiSession.pendingInteractions} sessionId={sessionId}/>));
           view.slots.inject('conversation.composer',()=>view.slots.register({name:'conversation.composer',priority:-1,select:({pendingInteraction})=>planQuestion(pendingInteraction)?pendingInteraction:(saveQuestion(pendingInteraction)?pendingInteraction:null)},({matched})=> planQuestion(matched)?<div className="snow snow-save-composer"><PlanQuestionCard key={matched.key} pending={matched}/></div>:<div className="snow snow-save-composer"><SaveCard key={matched.key} item={{callId:saveQuestion(matched).callId}} pending={matched}/></div>));
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
           view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
-          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_evaluate'},EvaluateCard));
-          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_plan'},PlanSavedCard));
-          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_plan_stage'},()=>null));
-          view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_commit'},()=>null));
           view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));
           const actions={
+            listPlans:async()=>{const result=await view.remote.snowTrip.listPlans();if(!result.ok)throw new Error(result.error.message);return result.value;},
             listPackages:async()=>{const result=await view.remote.snowTrip.listPackages();if(!result.ok)throw new Error(result.error.message);return result.value;},
             deletePackage:async(record,archive)=>{
               const result=await view.remote.snowTrip.deletePackage(record.id,record.revision,archive);
@@ -105,9 +109,17 @@ export async function apply(ctx) {
     }});
     try{await fiber;return mount;}catch(error){await fiber.dispose();throw error;}
   }
+  ctx.uiConversation.events.register(saveTurnDefinition);
+  ctx.slots.inject('conversation.chat.turnTail',()=>ctx.slots.register({name:'conversation.chat.turnTail',id:'snow-stopped-main',priority:-1,select:({turn})=>{const items=turn.data.get('snowSaves')?.filter(item=>item.stopped);return items?.length?items:null;}},({matched,sessionId})=><SaveCards items={matched} store={ctx.uiSession.pendingInteractions} sessionId={sessionId}/>));
+  registerConfirmedPlan(ctx);
   // 主界面（工作台弹窗外）也渲染方案阶段卡片：DSH 主会话的 pendingInteraction
   // 由宿主通用 QuestionComposer 显示为选项列表；这里注册方案卡识别，优先级与
   // 工作台内一致（-1，先于宿主通用 composer，同 saveQuestion 的做法）。
-  ctx.slots.inject('conversation.composer',()=>ctx.slots.register({name:'conversation.composer',id:'snow-plan-main',priority:-1,select:({pendingInteraction})=>planQuestion(pendingInteraction)?pendingInteraction:null},({matched})=><div className="snow snow-save-composer"><PlanQuestionCard key={matched.key} pending={matched}/></div>));
+  ctx.slots.inject('conversation.composer',()=>ctx.slots.register({name:'conversation.composer',id:'snow-plan-main',priority:-1,select:({pendingInteraction})=>planQuestion(pendingInteraction)||saveQuestion(pendingInteraction)?pendingInteraction:null},({matched})=><div className="snow snow-save-composer">{planQuestion(matched)?<PlanQuestionCard key={matched.key} pending={matched}/>:<SaveCard key={matched.key} item={{callId:saveQuestion(matched).callId}} pending={matched}/>}</div>));
   ctx.slots.inject('sidebar.footer.action',()=>ctx.slots.register({name:'sidebar.footer.action',id:'dsh-snow-trip',inject:()=>({prepare})},Entry));
+}
+
+function registerConfirmedPlan(ctx){
+ ctx.uiConversation.events.register(confirmedPlanDefinition);
+ ctx.slots.inject('conversation.chat.node',()=>ctx.slots.register({name:'conversation.chat.node',key:'snow-confirmed-plan'},({node})=>node.data.version===2?<div className="snow snow-save-cards"><SaveCard item={{done:true,meta:node.data}}/></div>:<PlanInteractionCard data={node.data}/>));
 }

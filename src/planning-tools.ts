@@ -1,0 +1,115 @@
+import type {Context} from '@deepseek-ai/cordis';
+import {defineTool,type ParameterSchemaSpec,type ToolRunContext} from '@deepseek-ai/dsh-tools';
+import {Worker} from 'node:worker_threads';
+import {randomUUID} from 'node:crypto';
+import {isDeepStrictEqual} from 'node:util';
+import {z} from 'zod';
+import {conditions,segment,validate,validateSegments,calculate,PlanningError,dateAfter,type Planning,type Calculation} from './planning.js';
+import {planQuestionSchema} from './plan-question.js';
+import {toCents} from './plans.js';
+import type {} from './service.js';
+import '@deepseek-ai/dsh-user-questions';
+const str={type:'string' as const,required:true as const};
+const int={type:'integer' as const,required:true as const};
+const conditionParameters:ParameterSchemaSpec={start:{...str,description:'YYYY-MM-DD'},nights:{...int,description:'1–366 晚'},budget:{type:'integer',description:'不限预算必须省略此字段；设置上限时为正整数分，禁止用 0 表示不限'},rooms:{...int,description:'使用房间数，须已明确或待用户确认'},people:{type:'integer'},skiDays:{type:'integer'},packageIds:{type:'array',items:{type:'string'},description:'省略或空数组：全部完整套餐'},fees:{type:'array',items:{type:'object',additionalProperties:false,properties:{id:str,label:str,quantity:{type:'number',required:true},unitPrice:{...int,description:'单位价格，整数分'},basis:str,source:{type:'string',enum:['user','estimate'],required:true}}}}};
+const itemParameters:ParameterSchemaSpec={packageId:str,revision:int,start:str,nights:int};
+// 在独立线程中执行，超时/停止会终止整个线程，包括 await 后的脚本。
+async function runScript(script:string,input:unknown,signal:AbortSignal):Promise<unknown>{
+ signal.throwIfAborted();
+ return new Promise((resolve,reject)=>{
+  const worker=new Worker(`const {parentPort,workerData}=require('node:worker_threads');const vm=require('node:vm');const context=vm.createContext({}, {codeGeneration:{strings:false,wasm:false},microtaskMode:'afterEvaluate'});try{vm.runInContext('globalThis.input=JSON.parse('+JSON.stringify(JSON.stringify(workerData))+')',context);vm.runInContext('globalThis.output=undefined;globalThis.failure=undefined; (async()=>{ const {conditions,items,packages}=input; '+workerData.script+'\\n})().then(v=>output=JSON.stringify(v),e=>failure=String(e));',context,{timeout:5000});if(context.failure)throw Error(context.failure);if(context.output===undefined)throw Error('脚本未返回可序列化结果；不支持外部异步 IO');parentPort.postMessage({value:JSON.parse(context.output)});}catch(e){parentPort.postMessage({error:String(e)});}`,{eval:true,workerData:{...(input as object),script},resourceLimits:{maxOldGenerationSizeMb:64}});
+  const finish=(error:unknown,value?:unknown)=>{clearTimeout(timer);signal.removeEventListener('abort',abort);void worker.terminate();error?reject(error):resolve(value);};
+  const abort=()=>finish(signal.reason??new Error('已停止'));
+  const timer=setTimeout(()=>finish(new PlanningError('technical','script：执行超过 5 秒')),5000);
+  signal.addEventListener('abort',abort,{once:true});
+  worker.once('message',m=>finish(m.error?new PlanningError('technical',`script：${m.error}`):null,m.value));
+  worker.once('error',e=>finish(new PlanningError('technical',`script：${e.message}`)));
+  worker.once('exit',code=>{if(code!==0)finish(new PlanningError('technical',`script：执行线程退出 ${code}`));});
+ });
+}
+export function registerPlanningTools(ctx:Context){
+ const owner=(exec:ToolRunContext)=>{exec.signal.throwIfAborted();if(!exec.agent)throw new Error('需要当前会话');return exec.agent.id;};
+ const add=(name:string,description:string,parameters:ParameterSchemaSpec,execute:(args:any,exec:ToolRunContext)=>Promise<any>)=>ctx.tools.register(defineTool({name,description,parameters,execute,output:{schema:{type:'json'},render:(_a,v)=>[{type:'text',text:JSON.stringify(v)}],presentationMeta:(_a,v:any)=>v as never}}));
+ const planning=async(id:string,exec:ToolRunContext)=>{const p=await ctx.snowTrip.getPlanning(id);if(!p||p.sessionId!==owner(exec))throw new PlanningError('technical','planningId：当前会话不存在该规划');if(!p.confirmedByCard)throw new PlanningError('technical','此规划缺少卡片确认记录，请调用 snow_prepare_plan 由用户确认；不能直接核算或保存');if(p.supersededBy)throw new PlanningError('business',`条件已更新，请使用规划 ${p.supersededBy}`);return p;};
+ const currentResult=async(id:string,exec:ToolRunContext)=>{const r=await ctx.snowTrip.getCalculation(id);if(!r||r.sessionId!==owner(exec))throw new PlanningError('technical','resultId：当前会话不存在该核算结果');await planning(r.planningId,exec);for(const item of r.plan.packages){const p=await ctx.snowTrip.getPackage(item.id);if(!p||p.revision!==item.revision||p.completeness!=='complete')throw new PlanningError('business','套餐版本或资料状态变化，请重新核算');}return r;};
+ const resultView=(r:Calculation)=>({...r.plan,resultId:r.id,end:dateAfter(r.plan.start!,r.plan.nights!),allocation:r.plan.allocation?[r.plan.allocation]:[],checks:r.checks,switches:r.switches,estimated:r.estimated,daily:r.plan.daily.map(d=>({...d,hotel:r.plan.packages.find(p=>p.id===d.packageId)?.snapshot.hotels?.join('、')}))});
+ add('snow_prepare_plan','合并确认条件与共同费用并创建规划 ID。金额统一为整数分。首次创建及条件变更必须由用户点击卡片生成方案；模型不能跳过。更改条件时创建新规划，旧结果保留但不再用于新规划。',{conditions:{type:'object',properties:conditionParameters,additionalProperties:false,required:true},needsConfirmation:{type:'boolean',description:'兼容旧参数；无论 true/false 都必须由用户点击确认卡'},userEvidence:{type:'string',description:'用户提供的条件依据，不能代替卡片确认'}},async(args,exec)=>{
+  const input=validate(z.strictObject({conditions,needsConfirmation:z.boolean().optional(),userEvidence:z.string().trim().min(1).optional()}),args);
+  let value=input.conditions;
+  const all=(await ctx.snowTrip.listPackages()).filter(p=>p.completeness==='complete'&&!p.voided);
+  if(value.budget===0)throw new PlanningError('technical','conditions.budget：预算上限须大于 0；不限预算请省略 budget，不得传 0。修正参数后重试。');
+  const current=await ctx.snowTrip.currentPlanning(owner(exec));
+  const resolved={...value,packageIds:value.packageIds.length?value.packageIds:all.map(p=>p.id)};
+  if(current?.confirmedByCard&&isDeepStrictEqual({...current.conditions,packageIds:[...current.conditions.packageIds].sort()},{...resolved,packageIds:[...resolved.packageIds].sort()}))return {status:'prepared',confirmedByCard:true,reused:true,planningId:current.id,amountUnit:'分',conditions:current.conditions,message:'条件与费用已经确认，沿用此 planningId 核算；技术错误修正 items/script 后重试，不要重新确认。'};
+  {
+   const key=exec.callId;
+   const answer=await ctx.userQuestions.ask({agent:exec.agent!,signal:exec.signal,questions:[{id:`snow-plan-confirm-${key}`,header:'确认这次出行',question:'核对出行条件与费用，确认后生成方案。',detail:JSON.stringify({stage:'confirm',key,planning:true,input:{...value,budget:value.budget===null?null:value.budget/100},ids:value.packageIds,packages:all,fees:value.fees,estimates:value.fees.map(f=>({label:f.label,amount:Math.round(f.quantity*f.unitPrice),basis:f.basis}))})}]});
+   exec.signal.throwIfAborted();const item=answer.answers[0];
+   if(answer.answers.length!==1||item?.id!==`snow-plan-confirm-${key}`)throw new PlanningError('technical','确认卡回答与当前请求不匹配');
+   if(item.selected?.length!==1||item.selected[0]!=='生成方案'){
+    const custom=item.selected?.includes('取消本次操作')?undefined:item.custom?.trim();
+    if(custom)return {status:'adjusting',custom,conditions:value,packages:all.filter(pkg=>value.packageIds.includes(pkg.id)||!value.packageIds.length).map(pkg=>({id:pkg.id,name:pkg.name})),interaction:{stage:'confirm',action:'supplement',custom,conditions:value},message:'用户已提交补充说明，请根据补充继续处理并重新展示确认卡；当前条件与费用尚未确认，不得直接核算。'};
+    exec.concludeTurn();return {status:'adjusting',custom:null,conditions:value,packages:all.filter(pkg=>value.packageIds.includes(pkg.id)||!value.packageIds.length).map(pkg=>({id:pkg.id,name:pkg.name})),interaction:{stage:'confirm',action:'cancel',conditions:value},message:'条件未确认，请等待用户补充'};
+   }
+   let edit;try{edit=JSON.parse(item.custom??'');}catch{throw new PlanningError('technical','确认卡未返回有效表单');}
+   value=validate(conditions,{...value,...edit.values,budget:edit.values.budget==null||String(edit.values.budget).trim()===''?null:toCents(Number(edit.values.budget)),nights:Number(edit.values.nights),rooms:Number(edit.values.rooms),...(edit.values.people!==undefined?{people:Number(edit.values.people)}:{}),...(edit.values.skiDays!==undefined?{skiDays:Number(edit.values.skiDays)}:{}),packageIds:edit.ids,fees:edit.fees});
+  }
+  if(!value.packageIds.length)value={...value,packageIds:all.map(p=>p.id)};
+  if(!value.packageIds.length||value.packageIds.some(id=>!all.some(p=>p.id===id)))throw new PlanningError('business','没有可用套餐，或指定套餐资料未完整');
+  const p:Planning={id:randomUUID(),createdAt:new Date().toISOString(),sessionId:owner(exec),conditions:value,confirmedByCard:true,supersededBy:null,status:'running'};
+  await ctx.snowTrip.createPlanning(p);return {status:'prepared',confirmedByCard:true,planningId:p.id,amountUnit:'分',conditions:p.conditions,packages:all.filter(pkg=>value.packageIds.includes(pkg.id)).map(pkg=>({id:pkg.id,name:pkg.name,revision:pkg.revision}))};
+ });
+ add('snow_evaluate','核算一份完整候选。只接收规划 ID、按日期排序的住宿段和脚本；已确认条件由工具读取。脚本接收 conditions/items/packages（金额均为分），返回 {daily:[{date,packageId,surcharge,basis}],coverage:[{feeId,quantity,basis}],total}；surcharge 为该夜新增补款，coverage 为套餐覆盖的已确认费用数量，total 须含套餐分摊成本。工具验证全程覆盖、版本、有效期、禁用日期、剩余间夜、不可拆分、费用加总和预算。技术错误只修正 items/script 并沿用同一 planningId 重试，不限次数，不再调用 snow_prepare_plan；业务不合格淘汰，不擅改预算。',{planningId:str,title:str,reason:str,items:{type:'array',items:{type:'object',additionalProperties:false,properties:itemParameters},required:true},script:{...str,description:'JavaScript 函数体，最多 50000 字符；只使用 conditions/items/packages 和标准内建；禁止 IO'}},async(args,exec)=>{
+  const a=validate(z.strictObject({planningId:z.uuid(),title:z.string().trim().min(1).max(200),reason:z.string().trim().min(1).max(4000),items:z.array(segment).min(1).max(20),script:z.string().trim().min(1).max(50000)}),args);
+  const p=await planning(a.planningId,exec);
+  await ctx.snowTrip.setPlanningStatus(p.id,'running');
+  const packages=[];for(const id of new Set(a.items.map(i=>i.packageId))){const pkg=await ctx.snowTrip.getPackage(id);if(pkg)packages.push(pkg);}
+  validateSegments(p,a.items,packages);
+  try{
+   const output=await runScript(a.script,{conditions:p.conditions,items:a.items,packages},exec.signal);exec.signal.throwIfAborted();
+   const r=calculate(p,a.items,packages,output,a.title,a.reason);await ctx.snowTrip.putCalculation(r);
+   return {status:'computed',planningId:p.id,resultId:r.id,amountUnit:'分',passed:(await ctx.snowTrip.listCalculations(p.id)).length,message:'候选通过核算，完成比较后统一展示'};
+  }catch(e){if(exec.signal.aborted)await ctx.snowTrip.setPlanningStatus(p.id,'stopped');throw e;}
+ });
+ add('snow_plan_results','读取已通过核算的结果；完成比较时传 complete=true。停止后仍可读取和保存已有结果，但不得声称完成全部比较。',{planningId:str,complete:{type:'boolean'}},async(args,exec)=>{
+  const a=validate(z.strictObject({planningId:z.uuid(),complete:z.boolean().optional()}),args),p=await planning(a.planningId,exec);
+  if(a.complete)await ctx.snowTrip.setPlanningStatus(p.id,'complete');
+  const results=await ctx.snowTrip.listCalculations(p.id);
+  return {status:a.complete?'complete':p.status,planningId:p.id,comparisonComplete:a.complete||p.status==='complete',passed:results.length,results:results.sort((a,b)=>a.plan.total!-b.plan.total!||a.switches-b.switches).map(resultView)};
+ });
+ add('snow_plan_stage','展示核算结果、讨论或已存快照，并等待用户操作后才返回。返回 save_results 表示用户已提交保存，逐项按 items.status 报告成功或失败，不得再说等待选择或提示点击保存，不得重复保存。返回补充则处理 custom；取消则停止。结果/讨论只接收 resultIds；不得填写金额或行程。确认条件使用 snow_prepare_plan。',{stage:{type:'string',enum:['results','discussion','review','status'],required:true},key:str,planningId:{type:'string'},resultIds:{type:'array',items:{type:'string'}},planId:{type:'string'},message:{type:'string'}},async(args,exec)=>{
+  const a=validate(z.strictObject({stage:z.enum(['results','discussion','review','status']),key:z.string().min(1).max(80),planningId:z.uuid().optional(),resultIds:z.array(z.uuid()).max(100).optional(),planId:z.uuid().optional(),message:z.string().max(4000).optional()}),args);
+  let detail:any={stage:a.stage,key:a.key};let results:Calculation[]=[];
+  if(a.stage==='results'||a.stage==='discussion'){
+   if(!a.planningId)throw new PlanningError('technical','planningId：必填');const p=await planning(a.planningId,exec);
+   const ids=a.resultIds??(await ctx.snowTrip.listCalculations(p.id)).map(r=>r.id);
+   for(const id of ids){const r=await currentResult(id,exec);if(r.planningId!==p.id)throw new PlanningError('technical','resultIds：不能混用不同规划');results.push(r);}
+   results.sort((a,b)=>a.plan.total!-b.plan.total!||a.switches-b.switches);
+   detail={...detail,results:results.map(resultView),selected:a.stage==='discussion'?results.map((_,i)=>i):[],message:a.message,comparisonComplete:p.status==='complete'};
+   if(!results.length)detail={stage:'status',key:a.key,notice:{title:'暂无通过核算的方案',text:'请查看核算失败原因，调整条件后重新生成。',actions:[{label:'调整条件',value:'adjust'}]}};
+  }else if(a.stage==='review'){
+   if(!a.planId)throw new PlanningError('technical','planId：必填');const plan=await ctx.snowTrip.getPlan(a.planId);if(!plan)throw new PlanningError('technical','planId：方案不存在');detail.plan={...plan,allocation:plan.allocation?[plan.allocation]:[]};
+  }else detail.notice={title:'规划状态',text:a.message??'可调整条件后继续规划。',actions:[{label:'调整条件',value:'adjust'}]};
+  const card=JSON.parse(JSON.stringify(validate(planQuestionSchema,detail)));
+  const questionId=`snow-plan-${detail.stage}-${a.key}`;
+  const answer=await ctx.userQuestions.ask({agent:exec.agent!,signal:exec.signal,questions:[{id:questionId,header:'雪季方案',question:'查看方案或继续调整。',detail:JSON.stringify(card)}]});
+  exec.signal.throwIfAborted();const item=answer.answers[0];
+  if(answer.answers.length===1&&item?.id===questionId&&item.selected?.includes('取消本次操作')){exec.concludeTurn();return {status:'cancelled',interaction:{stage:detail.stage,action:'cancel',card},message:'用户已取消，等待新的指示，不得自动核算或保存。'};}
+  if(answer.answers.length===1&&item?.id===questionId&&item?.selected?.length===1&&item.selected[0]==='保存所选'){
+   const payload=validate(z.strictObject({stage:z.literal('results'),selected:z.array(z.number().int().nonnegative()).min(1)}),JSON.parse(item.custom??'{}'));
+   const saved=[];for(const index of new Set(payload.selected)){try{if(!results[index])throw new Error('所选方案不存在');const r=await currentResult(results[index].id,exec);await ctx.snowTrip.savePlan(r.plan);saved.push({resultId:r.id,status:'saved',planId:r.id,title:r.plan.title,plan:r.plan});}catch(e){saved.push({resultId:results[index]?.id,status:'failed',error:String(e)});}}
+   return {status:'save_results',message:'用户已完成选择并提交保存。按 items 中每项 status 简短说明实际结果；saved 才表示保存成功，failed 需说明失败原因。前端已保留只读选择记录并展示保存结果，不要再提示点击保存，不重复展示完整对比，不重复调用保存。',items:saved,interaction:{stage:detail.stage,action:'save',card,selected:item.selected,custom:null,items:saved}};
+  }
+  return {status:'answered',selected:item?.selected??[],custom:item?.custom??null,interaction:{stage:detail.stage,action:item?.selected?.length?'action':item?.custom?.trim()?'supplement':'cancel',card,selected:item?.selected??[],custom:item?.custom??null}};
+ });
+ add('snow_save_plan','按核算结果 ID 保存用户明确选择的方案；等待用户在确认卡操作并完成保存后才返回。返回 saved 时简短告知已保存及可在已存方案查看，不再要求点击保存；取消或补充按实际操作回应。失败不自动重试，不接受模型填写金额或行程。',{resultId:str},async(args,exec)=>{
+  const {resultId}=validate(z.strictObject({resultId:z.uuid()}),args),r=await currentResult(resultId,exec);
+  const key=exec.callId,questionId=`snow-plan-results-${key}`;
+  const answer=await ctx.userQuestions.ask({agent:exec.agent!,signal:exec.signal,questions:[{id:questionId,header:'保存方案',question:'选择并保存这份方案。',detail:JSON.stringify({stage:'results',key,results:[resultView(r)],selected:[0]})}]});
+  exec.signal.throwIfAborted();const item=answer.answers[0];
+  if(answer.answers.length===1&&item?.id===questionId&&item.selected?.includes('取消本次操作')){exec.concludeTurn();return {status:'cancelled',interaction:{stage:'results',action:'cancel',card:JSON.parse(JSON.stringify({results:[resultView(r)]}))},message:'用户取消保存，等待新的指示。'};}
+  if(answer.answers.length!==1||item?.id!==questionId||item.selected?.length!==1||item.selected[0]!=='保存所选')return {status:'cancelled',interaction:{stage:'results',action:item?.custom?.trim()?'supplement':'cancel',custom:item?.custom??null,card:{results:[resultView(r)]}}};
+  const payload=validate(z.strictObject({stage:z.literal('results'),selected:z.tuple([z.literal(0)])}),JSON.parse(item.custom??'{}'));
+  await currentResult(resultId,exec);await ctx.snowTrip.savePlan(r.plan);return {version:1,status:'saved',plan:r.plan,interaction:{stage:'results',action:'save',card:{results:[resultView(r)]},items:[{title:r.plan.title,status:'saved',planId:r.id}]}};
+ });
+}

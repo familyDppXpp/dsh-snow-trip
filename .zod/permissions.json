@@ -1,0 +1,484 @@
+{
+  "rules": [
+    {
+      "tool": "run_in_background",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sleep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "cp*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "grep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "grep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "grep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "grep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sed*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "launchctl*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "echo*",
+      "action": "allow"
+    },
+    {
+      "tool": "edit_file",
+      "pattern": "/Users/liuyunxia/Documents/dsh/huaxue/.local/dsh-home/*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "cat*",
+      "action": "allow"
+    },
+    {
+      "tool": "run_in_background",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sleep*",
+      "action": "allow"
+    },
+    {
+      "tool": "run_in_background",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "kill*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "ls*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "python3*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "grep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "git*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "for*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "env*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "zsh*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "python*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "ls*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sed*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "odc*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "eval*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "source*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pip*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "/usr/libexec/java_home*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "which*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "mvn*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "find*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "ls*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "python3*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "grep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "git*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "for*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "env*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "zsh*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "python*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sed*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "odc*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "eval*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "source*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pip*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "/usr/libexec/java_home*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "which*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "mvn*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "find*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sleep*",
+      "action": "allow"
+    },
+    {
+      "tool": "run_in_background",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "kill*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "ls*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "python3*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "grep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "git*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "for*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "env*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "zsh*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "python*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sed*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "odc*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "eval*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "source*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pip*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "/usr/libexec/java_home*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "which*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "mvn*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "find*",
+      "action": "allow"
+    },
+    {
+      "tool": "run_in_background",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sleep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "kill*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pnpm*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "ls*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "python3*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "grep*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "git*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "for*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "env*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "zsh*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "python*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "sed*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "odc*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "eval*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "source*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "pip*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "/usr/libexec/java_home*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "which*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "mvn*",
+      "action": "allow"
+    },
+    {
+      "tool": "execute",
+      "pattern": "find*",
+      "action": "allow"
+    }
+  ]
+}

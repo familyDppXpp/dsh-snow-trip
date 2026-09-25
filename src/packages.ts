@@ -87,7 +87,7 @@ export function packageSummary(p: ReturnType<typeof normalizePackage>) {
 }
 
 export const savePreviewSchema=z.object({callId:z.string(),previous:packageRecord.nullable(),preview:normalized});
-const saveMetaSchema=z.object({version:z.literal(2),status:z.enum(['saved','adjusting']),previous:packageRecord.nullable(),preview:normalized,record:packageRecord.nullable()}).refine(v=>v.status!=='saved'||v.record!==null);
+const saveMetaSchema=z.object({version:z.literal(2),status:z.enum(['saved','adjusting','cancelled']),custom:z.string().nullable().optional(),previous:packageRecord.nullable(),preview:normalized,record:packageRecord.nullable()}).refine(v=>v.status!=='saved'||v.record!==null);
 export function saveMetadata(value:unknown) {
   const result=saveMetaSchema.safeParse(value);
   return result.success?result.data:null;

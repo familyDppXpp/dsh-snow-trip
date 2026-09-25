@@ -48,18 +48,31 @@ test('跨轮回放停止的修改卡片保留旧值与新值，不退化为套�
  assert.equal(prior.drafts.draft,undefined);
 });
 
-test('方案核算与保存进入轮次卡片，失败保留原因，不影响套餐确认流程',()=>{
+test('无需交互的核算过程不进入消息卡片',()=>{
  let state=saves.start(null,{event:{data:{turn:1}}});
- const apply=event=>{state=saves.update({state},{event});};
- apply({type:'tool/call',data:{name:'snow_evaluate',callId:'eval',arguments:'{}'}});
- apply({type:'tool/call',data:{name:'snow_save_plan',callId:'save',arguments:'{}'}});
- apply({type:'tool/call',data:{name:'snow_query',callId:'query'}});
- assert.deepEqual(state.items.map(i=>[i.kind,i.done]),[['snow_evaluate',undefined],['snow_save_plan',undefined]]);
- apply({type:'tool/result',data:{message:{source:{callId:'eval'},content:[{isError:true,content:[{type:'text',text:'核算脚本执行失败：ReferenceError: x is not defined'}]}]}}});
- apply({type:'tool/result',data:{meta:{version:1,status:'saved',plan:{id:'p'}},message:{source:{callId:'save'},content:[{content:[{type:'text',text:'{"status":"saved"}'}]}]}}});
- const [evaluation,plan]=state.items;
- assert.equal(evaluation.error,'核算脚本执行失败：ReferenceError: x is not defined');
- assert.equal(plan.error,null);
- assert.equal(plan.meta.plan.id,'p');
- assert.equal(state.items.length,2,'snow_query 不生成轮次卡片');
+ state=saves.update({state},{event:{type:'tool/call',data:{name:'snow_evaluate',callId:'eval'}}});
+ state=saves.update({state},{event:{type:'tool/result',data:{message:{source:{callId:'eval'},content:[{isError:true,content:[{type:'text',text:'参数错误'}]}]}}}});
+ assert.deepEqual(state.items,[]);
+});
+
+test('确认结果立即发布独立消息，无需 turn/end；取消不发布',async()=>{
+ const {confirmedPlanDefinition:d}=await import('../src/package-turns.js');
+ const meta={status:'prepared',conditions:{start:'2027-02-06'}};
+ const event={type:'tool/result',seq:45,surfaceOp:'append',data:{meta,message:{source:{callId:'prepare'}}}};
+ assert.deepEqual(d.match(event),{id:'prepare',role:'start'});
+ const location={kind:'step',turn:{turn:4},step:{step:1}};
+ const context={key:'confirmation',id:'prepare',start:{event,location},state:d.start(null,{event})};
+ const node=d.buildViewNode(context);
+ assert.deepEqual(node.location,{kind:'session'},'业务卡片不可进入宿主轮次过程折叠');assert.equal(node.target,'chat');assert.equal(node.anchorSeq,45);assert.equal(node.data,meta);assert.equal(node.visibility,'visible');
+ assert.equal(d.match({...event,data:{...event.data,meta:{status:'adjusting'}}}),null);
+});
+
+test('通用提问完成后发布独立回答卡，待回答和技术失败不伪造记录',async()=>{
+ const {questionAnswerDefinition:d}=await import('../src/package-turns.js');
+ const event={type:'tool/call',seq:1,data:{name:'ask_user_question',callId:'q',arguments:JSON.stringify({questions:[{id:'date',header:'出行日期',question:'哪天出发？'}]})}};
+ const context={key:'q',id:'q',state:d.start(null,{event})};
+ assert.equal(d.buildViewNode(context),null);
+ const result={type:'tool/result',seq:2,surfaceOp:'append',data:{message:{source:{callId:'q'},content:[{type:'tool-result',content:[{type:'text',text:JSON.stringify({answers:[{id:'date',selected:['2月6日'],custom:'住7晚'}]})}]}]}}};
+ assert.equal(d.match(result).id,'q');context.state=d.update(context,{event:result});
+ const node=d.buildViewNode(context);assert.deepEqual(node.location,{kind:'session'});assert.equal(node.data.questions[0].header,'出行日期');assert.equal(node.data.answers[0].custom,'住7晚');
 });
