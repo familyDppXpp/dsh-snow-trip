@@ -233,3 +233,16 @@ test('提问回答记录按题目 ID 展示选择、补充及跳过，不提供�
  const html=server.renderToStaticMarkup(React.createElement(QuestionAnswerCard,{data:{questions:[{id:'date',header:'出行日期',question:'哪天出发？',options:[{label:'2月6日',description:'春节出发'},{label:'2月13日',description:'节后出发'}]},{id:'people',header:'人数',question:'几人？'}],answers:[{id:'people',selected:[]},{id:'date',selected:['2月6日'],custom:'住7晚'}]}}));
  assert.match(html,/哪天出发？/);assert.match(html,/2月6日/);assert.match(html,/补充：住7晚/);assert.match(html,/已跳过/);assert.doesNotMatch(html,/<input|<textarea/);assert.match(html,/2月13日/);assert.match(html,/节后出发/);assert.match(html,/2月6日，已选择/);assert.match(html,/role="tab"/);assert.match(html,/<button disabled/);
 });
+
+
+test('讨论补充按原卡片回放，不将讨论上下文伪装成已选择方案',async()=>{
+ const {PlanInteractionCard}=await load('src/package-cards.jsx');
+ for(const action of ['supplement','cancel']){
+  const card={stage:'discussion',selected:[0],message:'请核对套餐补差是否已计入实付。',results:[{title:'讨论中的候选',total:389900}]};
+  const html=server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data:{interaction:{stage:'discussion',action,custom:'修正套餐数据',card}}}));
+  assert.match(html,/data-plan-stage="discussion"/);assert.match(html,/请核对套餐补差是否已计入实付/);assert.match(html,/修正套餐数据/);
+  assert.doesNotMatch(html,/已选择|可选方案|找到合适的搭配|<button|<input/);
+  const results=server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data:{interaction:{stage:'results',action,card:{...card,stage:'results'}}}}));
+  assert.doesNotMatch(results,/已选择/);assert.match(results,/未选择/);
+ }
+});

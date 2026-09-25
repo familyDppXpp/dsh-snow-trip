@@ -140,7 +140,10 @@ export function PlanInteractionCard({data}) {
   return item.status==='saved'&&planMetadata(meta)?<PlanSavedCard key={item.planId??i} block={{kind:'tool-result',meta}}/>:<article key={i} className="snow snow-plan-card"><h3>{item.title??'方案'} · {item.status==='saved'?'已保存':'保存失败'}</h3><p>{item.status==='saved'?'此条历史记录没有完整快照，请到已存方案查看。':item.error??'请重新检查'}</p></article>;
  })}</div></div>;
  }
- if(['cancel','supplement'].includes(record.action)&&record.card?.results?.length)return <PlanQuestionCard snapshot={{...record.card,stage:'results'}} outcome={record}/>;
+ if(['cancel','supplement'].includes(record.action)&&record.card){
+  const stage=record.card.stage??record.stage;
+  return <PlanQuestionCard snapshot={{...record.card,stage,...(stage==='results'?{selected:[]}: {})}} outcome={record}/>;
+ }
  const title=record.action==='save'?'方案保存结果':record.action==='supplement'?'已提交补充':record.action==='cancel'?'已取消本次操作':'已选择后续操作';
  const c=record.conditions,results=record.card?.results??[];
  return <article className="snow snow-plan-card snow-confirmed-plan" aria-label="规划交互记录"><header><span className="snow-confirmed-status">只读 · 操作记录</span><h3>{title}</h3></header>

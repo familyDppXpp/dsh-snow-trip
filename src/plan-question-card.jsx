@@ -31,7 +31,7 @@ export function PlanQuestionCard({pending,packages,snapshot,outcome}) {
       if(!collapsed)requestAnimationFrame(()=>records.at(-1)?.scrollIntoView({block:'start'}));
     }}>{collapsed?'展开方案':'查看确认条件'}</button>}<Badge>{stageTitles[data.stage]}</Badge>{data.notice?<h3>{data.notice.title}</h3>:data.stage==='review'&&data.plan?.title?<h3>{data.plan.title}</h3>:<h3>{data.stage==='results'?`可选方案 · ${data.results?.length??0} 份`:data.stage==='estimate'?'确认共同费用':data.questionText||'请确认'}</h3>}{!readOnly&&data.stage==='results'&&<p className="snow-plan-intro">查看整趟成本与每日安排，勾选后保存；也可以先比较或调整。</p>}{data.stage==='estimate'&&<p className="snow-plan-intro">逐项核对金额与依据，可以直接修改后再确认。</p>}</header>
     {data.notice?.text&&<p>{data.notice.text}</p>}
-    {data.notice?.actions&&<footer className="snow-plan-actions">{cancel}{data.notice.actions.map((action,i)=><button key={i} className={i===0?'primary':''} disabled={busy} onClick={()=>answer({selected:[action.label]})}>{action.label}</button>)}</footer>}
+    {!readOnly&&data.notice?.actions&&<footer className="snow-plan-actions">{cancel}{data.notice.actions.map((action,i)=><button key={i} className={i===0?'primary':''} disabled={busy} onClick={()=>answer({selected:[action.label]})}>{action.label}</button>)}</footer>}
     {Editable&&<Editable data={data} packages={packages??data.packages} busy={busy} error={error} onAnswer={answer} cancel={cancel} readOnly={readOnly}/>}
     {!Editable&&!data.notice?.actions&&<PlanOptionsBody data={data} busy={busy} error={error} onAnswer={answer} cancel={cancel} readOnly={readOnly}/>}
     {error&&!Editable&&<p role="alert">{error}</p>}
@@ -140,7 +140,7 @@ function PlanOptionsBody({data,busy,error,onAnswer,cancel,readOnly=false}) {
       {chosen.length>1&&<div className="table-scroll"><table aria-label="方案比较"><thead><tr><th>搭配</th><th>整趟总价</th><th>换酒店</th><th>推荐理由</th></tr></thead><tbody>{chosen.map((c,i)=><tr key={i}><td>候选 {(data.selected??[])[i]+1}</td><td>{yuan(c.total)}</td><td>{c.switches??'—'}</td><td>{c.reason??''}</td></tr>)}</tbody></table></div>}
       {chosen.length===1&&<p className="snow-plan-muted">基于候选 {(data.selected??[])[0]+1} 讨论；重新计算与保存会检查套餐版本。</p>}
       {!chosen.length&&<p className="snow-plan-muted">不用先选方案。可以直接调整偏好，再确认条件生成新的搭配。</p>}
-      <footer className="snow-plan-actions">{cancel}<button disabled={busy} onClick={()=>onAnswer({selected:['调整预算或日期']})}>调整预算或日期</button></footer>
+      {!readOnly&&<footer className="snow-plan-actions">{cancel}<button disabled={busy} onClick={()=>onAnswer({selected:['调整预算或日期']})}>调整预算或日期</button></footer>}
     </>;
   }
   if(data.stage==='review'){
@@ -153,7 +153,7 @@ function PlanOptionsBody({data,busy,error,onAnswer,cancel,readOnly=false}) {
         {plan.unknowns?.length>0&&<p className="snow-plan-muted">未知项：{plan.unknowns.join('、')}</p>}
       </>}
       <p className="snow-plan-muted">回顾不自动读取新价格；继续调整后，计算与保存都会检查最新套餐。</p>
-      <footer className="snow-plan-actions">{cancel}<button className="primary" disabled={busy} onClick={()=>onAnswer({selected:['继续调整']})}>继续调整这份方案</button></footer>
+      {!readOnly&&<footer className="snow-plan-actions">{cancel}<button className="primary" disabled={busy} onClick={()=>onAnswer({selected:['继续调整']})}>继续调整这份方案</button></footer>}
     </>;
   }
   return <><p className="snow-plan-muted">{data.questionText}</p><footer className="snow-plan-actions">{cancel}</footer></>;

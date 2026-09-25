@@ -15,15 +15,6 @@ import {DepartureHero} from './departure.jsx';
 export const inject=['slots','modules','sessions','remote','uiSession','uiConversation'];
 const uiPlugins=['ui-renderer','locale','shortcuts','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions','ui-input-trigger','ui-commands','ui-skill','ui-model-selection','ui-permission-presets'];
 
-function SnowConversation({useSession,useConversation,renderFactorySlot}) {
-  const session=useSession(value=>value),conversation=useConversation(value=>value);
-  const active=conversation.activeTargets.size>0||(!session.blank&&!session.awaitingFirstTurn)||session.running;
-  const hero=!active;
-  return renderFactorySlot('conversation.content',{variant:'embedded',phase:hero?'hero':'active',hero},{
-    slots:{views:({renderSlot})=>renderSlot('conversation.session',{view:'chat'})},
-  });
-}
-
 function Entry({wide, prepare}) {
   const dialog=useRef(null),container=useRef(null);
   const [opened,setOpened]=useState(()=>new URLSearchParams(window.location.search).get('app')==='snow-trip'),[error,setError]=useState('');
@@ -96,7 +87,7 @@ export async function apply(ctx) {
           view.uiConversation.events.register(questionAnswerDefinition);
           view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'snow-question-answer'},({node})=><QuestionAnswerCard data={node.data}/>));
           view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'system-prompt',priority:-1},()=>null));
-          view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'turn-process'},({node,turnProcess})=>node.location.turn?.status==='open'
+          view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'turn-process',priority:-1},({node,turnProcess})=>node.location.turn?.status==='open'
             ?<div className="snow-running" role="status"><span aria-hidden="true"/>正在处理…</div>
             :turnProcess?.foldable&&turnProcess.hasContent?<button type="button" className="snow-process-toggle" data-turn-process="" aria-expanded={turnProcess.open} onClick={()=>turnProcess.setOpen(!turnProcess.open)}>{turnProcess.open?'收起执行过程':'查看执行过程'}</button>:null));
 
@@ -163,8 +154,7 @@ export async function apply(ctx) {
             },
             open:id=>{openSnowSession(view.sessions,id,select);lastSession=id;},
           };
-          view.slots.register({name:'root',children:{main:{kind:'keyed',scope:'root'},'snow.conversation':{kind:'single',scope:'session'}},inject:()=>({actions})},App);
-          view.slots.register({name:'snow.conversation'},SnowConversation);
+          view.slots.register({name:'root',children:{main:{kind:'keyed',scope:'session-maybe'}},inject:()=>({actions})},App);
           mount=container=>{
             if(lastSession){try{actions.open(lastSession);}catch{lastSession=undefined;}}
             return view.uiRenderer.mount(container);
