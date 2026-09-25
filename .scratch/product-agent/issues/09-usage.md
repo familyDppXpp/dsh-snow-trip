@@ -1,13 +1,15 @@
 ---
 id: SNOW-09
-status: blocked
-blocked_by: [SNOW-03]
+status: cancelled
+blocked_by: []
 stories: [16, 21, 25]
 ---
 
 # SNOW-09 · 通过助理记录使用间夜和作废状态
 
-Blocked by: SNOW-03。
+## 当前决策
+
+用户明确取消本任务，不再实施使用间夜与作废状态记录，也不纳入后续发布验收。以下保留原始范围与验收清单，仅供历史追溯，不代表已完成。原依赖 SNOW-03 不再生效。
 
 ## 交付
 

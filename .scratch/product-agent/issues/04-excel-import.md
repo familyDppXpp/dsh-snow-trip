@@ -1,13 +1,15 @@
 ---
 id: SNOW-04
-status: blocked
-blocked_by: [SNOW-03]
+status: cancelled
+blocked_by: []
 stories: [5, 7, 8, 9, 10, 11, 14, 25]
 ---
 
 # SNOW-04 · Excel 进入会话并批量确认录入
 
-Blocked by: SNOW-03。
+## 当前决策
+
+用户明确取消本任务，不再实施 Excel 批量录入，也不纳入后续发布验收。以下保留原始范围与未执行的验收清单，仅供历史追溯，不代表已完成。原依赖 SNOW-03 不再生效。
 
 ## 交付
 
