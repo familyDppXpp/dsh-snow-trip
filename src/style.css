@@ -659,3 +659,10 @@
   .snow-content .filter-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .snow-content .filter-grid input,.snow-content .filter-grid select{font-size:12px;height:40px;padding:6px}
 }
+
+.snow .package-tag-filter{min-width:0;margin:0;padding:0;border:0}
+.snow .package-tag-filter legend{font-size:11px;color:var(--muted);margin-bottom:8px}
+.snow .package-tag-filter [role="group"]{display:flex;flex-wrap:wrap;gap:6px 10px;margin-bottom:6px}
+.snow .package-tag-filter label{display:inline-flex;align-items:center;gap:4px;font-size:11px;cursor:pointer}
+.snow .package-tag-filter input[type="checkbox"]{width:14px;height:14px;margin:0;padding:0;accent-color:var(--primary)}
+.snow .results-head select{width:auto;max-width:100%}

@@ -12,22 +12,29 @@ export function packageStats(rows) {
   };
 }
 export function packageCandidates(rows,filter,sort) {
-  return rows.filter(p=>(filter.region==='全部目的地'||p.region===null||p.region===filter.region)&&
-    [p.name,p.description,p.resort,...(p.hotels??[])].filter(Boolean).join(' ').toLowerCase().includes(filter.query.toLowerCase()))
-    .map(p=>{
-      const notes=[];
+  const matches=rows.filter(p=>{
+    if(filter.region!=='全部目的地'&&p.region!==filter.region)return false;
+    if(![p.name,p.description,p.resort,...(p.hotels??[])].filter(Boolean).join(' ').toLowerCase().includes(filter.query.toLowerCase()))return false;
+    if(filter.purchaseStatuses?.length&&!filter.purchaseStatuses.includes(p.purchaseStatus))return false;
+    if(filter.completeness?.length&&!filter.completeness.includes(p.completeness))return false;
+    if(filter.start||filter.nights){
       const nights=filter.nights?Number(filter.nights):p.nights;
-      if(p.voided)notes.push('已作废，不可用于出行');
-      if(p.purchaseStatus!=='purchased')notes.push('尚未确认购买，使用权益前需核实');
-      if(p.region===null)notes.push('目的地待确认');
-      if(!p.validFrom||!p.validTo||!nights)notes.push('有效期或住宿晚数待确认，暂不能核对完整行程');
-      const last=nights?new Date(Date.parse(filter.start+'T00:00:00Z')+(nights-1)*86400000).toISOString().slice(0,10):filter.start;
-      if((p.validFrom&&filter.start<p.validFrom)||(p.validTo&&last>p.validTo))notes.push('所选日期超出有效期');
-      if(p.unavailableDates?.some(d=>d>=filter.start&&d<=last))notes.push('所选行程含不可用日期');
-      if(p.nights!==null&&nights>p.nights)notes.push('所选住宿晚数超出套餐总间夜');
-      if(p.nights!==null&&p.usedNights!==null&&nights>p.nights-p.usedNights)notes.push('剩余间夜不足');
-      notes.push('逐晚补款及使用条件待核对，暂不计算出行总价');
-      if(filter.budget!=='')notes.push('补款未知，保留候选；尚不能确认符合预算');
-      return {record:p,notes};
-    }).sort((a,b)=>sort==='nights'?(b.record.nights??-1)-(a.record.nights??-1):0);
+      if(!Number.isInteger(nights)||nights<1||p.nights==null||p.usedNights==null||nights>p.nights-p.usedNights)return false;
+      if(filter.start){
+        const lastDate=new Date(Date.parse(filter.start+'T00:00:00Z')+(nights-1)*86400000);
+        if(!Number.isFinite(lastDate.getTime()))return false;
+        const last=lastDate.toISOString().slice(0,10);
+        if(!p.validFrom||!p.validTo||filter.start<p.validFrom||last>p.validTo||p.unavailableDates==null)return false;
+        if(p.unavailableDates.some(d=>d>=filter.start&&d<=last))return false;
+      }
+    }
+    return true;
+  });
+  const key=sort==='paid'?'paid':'nights';
+  return matches.sort((a,b)=>{
+    const av=a[key],bv=b[key];
+    if(av==null&&bv!=null)return 1;
+    if(av!=null&&bv==null)return -1;
+    return (av==null?0:sort==='paid'?av-bv:bv-av)||a.id.localeCompare(b.id);
+  }).map(record=>({record}));
 }
