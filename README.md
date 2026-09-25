@@ -24,7 +24,7 @@
 
 ## 本地安装
 
-需要 Node.js >=22.19、pnpm 与带 Web 客户端的 DSH。本目录先安装依赖构建：
+目标版本为 DSH `0.1.7-rc.2`（Cordis `4.0.4`），需要 Node.js >=22.19、pnpm 与 Web 客户端。旧版 `0.1.5` 不再作为兼容目标。本目录先安装依赖构建：
 
 ```sh
 pnpm install
@@ -85,7 +85,7 @@ SNOW_TEST_WORKBOOK=/绝对路径/2627雪季套餐台账.xlsx pnpm test
 SNOW_DSH_URL='宿主显示的登录地址' SNOW_REAL_MODEL=1 node test/session-entry.integration.mjs
 ```
 
-需要本机可用的 Playwright；可用 `SNOW_PLAYWRIGHT` 指定其模块路径，`SNOW_CHROME` 指定 Chrome。`SNOW_HOST_LOG` 可替代登录地址，脚本不打印登录凭据。可选 `SNOW_PRESET_FILE` 指向隔离安装包的 `presets/snow-trip/agent.cordis.yml`，测试会临时改名并在 finally 恢复，验证真实预设失败。测试插件不进入分发包。
+需要本机可用的 Playwright；可用 `SNOW_PLAYWRIGHT` 指定其模块路径，`SNOW_CHROME` 指定 Chrome。`SNOW_HOST_LOG` 可替代登录地址，脚本不打印登录凭据。测试插件不进入分发包。
 
 ## 预设技能扩展
 
@@ -93,7 +93,7 @@ SNOW_DSH_URL='宿主显示的登录地址' SNOW_REAL_MODEL=1 node test/session-e
 
 雪季预设设置 `includeDefaultRoots: false`，仅扫描随预设分发的技能目录，不扫描用户级或工作区内的默认技能目录。工作台新建会话使用宿主用户目录下的 `dsh-snow-trip` 工作区，多个会话共享该目录；重新打开历史会话保留原工作区。
 
-雪季技能位于 `presets/snow-trip/skills/<技能名>/SKILL.md`，使用 `name` 和 `description` YAML 元信息。预设的 `agent.cordis.yml` 与官方 Cordis 预设一样装配 `@deepseek-ai/dsh-skill-filesystem` 和 `@deepseek-ai/dsh-tool-skill`，通过 `baseUrl` 解析当前预设的技能目录。新增技能只需新增目录与文件，不修改 `SnowTrip` 服务或维护逐个注册清单。`package.json` 的 `files` 已包含整个 `presets` 目录。
+雪季预设通过 bundle 中的 `presets/snow-trip/agent.cordis.yml` 声明 `@deepseek-ai/dsh-agent-preset`，保留宿主默认预设，不再替换旧版目录加载器。雪季技能位于 `presets/snow-trip/skills/<技能名>/SKILL.md`，使用 `name` 和 `description` YAML 元信息。预设的 `agent.cordis.yml` 与官方 Cordis 预设一样装配 `@deepseek-ai/dsh-skill-filesystem` 和 `@deepseek-ai/dsh-tool-skill`，通过插件 `package.json` 的实际安装位置解析技能目录。新增技能只需新增目录与文件，不修改 `SnowTrip` 服务或维护逐个注册清单。`package.json` 的 `files` 已包含整个 `presets` 目录。
 
 用安装环境中的官方扫描器验证可搬迁与多技能发现：
 

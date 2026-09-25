@@ -64,5 +64,5 @@ function PackageSaveCard({item,pending}) {
 }
 export function SaveCards({items,store,sessionId}) {
   const requests=useSyncExternalStore(store.subscribe,store.getSnapshot,store.getSnapshot);
-  return <div className="snow snow-save-cards">{(items??[]).map(item=><SaveCard key={item.callId} item={item} pending={[...requests.values()].find(p=>p.sessionId===sessionId&&saveQuestion(p)?.callId===item.callId)}/>)}</div>;
+  return <div className="snow snow-save-cards">{(items??[]).map(item=><SaveCard key={item.callId} item={item} pending={[requests.get(sessionId)?.pendingInteraction].find(p=>saveQuestion(p)?.callId===item.callId)}/>)}</div>;
 }

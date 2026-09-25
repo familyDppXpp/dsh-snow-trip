@@ -2,8 +2,8 @@ import React,{useEffect,useRef,useState,useSyncExternalStore} from 'react';
 
 const placeholder='想去哪座山？也可以贴上套餐，或输入 @ 引用已有资料';
 
-export function DepartureHero({useSessions,inputFor,chooseSkill}) {
-  const sessionId=useSessions(state=>state.current),root=useRef(null);
+export function DepartureHero({selection,inputFor,chooseSkill}) {
+  const sessionId=useSyncExternalStore(selection.subscribe,selection.getSnapshot)?.sessionId,root=useRef(null);
   const input=inputFor(sessionId);
   const draft=useSyncExternalStore(listener=>input.state.subscribe(listener),()=>input.state.getSnapshot().draft);
   const [error,setError]=useState('');

@@ -1,5 +1,28 @@
 # SNOW-01 验证记录
 
+## DSH 0.1.7-rc.2 兼容验证（2026-09-25）
+
+当前插件适配官方 DSH `0.1.7-rc.2`、Cordis `4.0.4`。本地宿主已合入官方 `477b4f420553e8a52c2fbccc464d7561b239c443` 并完成 Host、Client、Web 构建。下面较早日期的记录仅描述当时版本。
+
+- SDK 和 peers 固定到新版；声明式 `dsh-agent-preset` 替代已删除的目录加载器，保留宿主默认预设。技能通过插件包位置解析，可搬迁安装。
+- 工作台使用 `sessions.retain/using`、`SessionProvider` 和 `conversation.content` 工厂；会话选择由工作台持有，运行状态和待确认问题读取 `uiSession.sessionStatus`。快捷键服务在工作台隔离，避免重复注册。
+- 删除依赖本地宿主定制的 `turnNavigationHideWidth` 补丁；插件不再要求修改官方宿主。
+- 独立临时目录安装公开依赖并运行 `prepare` 成功；插件构建、类型检查、65 项测试中 63 项通过，2 项私有 Excel 素材测试按条件跳过。
+- 分发包清单包含 Host/Client/Remote 入口、全部被引用的类型声明和两项技能，排除测试数据与凭据；tarball 经 DSH CLI 安装并重启后，基础浏览器及已保存套餐读取检查通过。
+- 在 `.local/dsh-017-compat` 隔离 Web profile 实测预设、认证 Remote 读取、新建会话、两个技能的斜杠菜单、关闭重开后的草稿保留。
+- 按用户指定从 `.local/session-entry-home/settings.yaml` 取 `minimax-cn / MiniMax-M3` 配置，仅复制该提供商的凭据引用。真实模型完成技能调用、套餐草稿和保存确认；确认前记录数不变，确认后新增记录的报价为 129900 分、购买状态为 `unpurchased`、revision 为 1。清除日期筛选后首页显示，刷新 Remote 仍读到同一 ID/revision。
+- 没有使用其他模型，没有迁移原 DSH_HOME 的会话或套餐数据。当前完整方案计算/保存逻辑经过自动测试；本次真实模型验证覆盖套餐录入保存，未重跑图片识别和完整出行规划。
+
+可复现浏览器检查（需在隔离 profile 安装 `test/integration-host`，配置上述模型并启动宿主）：
+
+```sh
+SNOW_HOST_LOG=/绝对路径/宿主日志 SNOW_REAL_MODEL=1 \
+SNOW_PLAYWRIGHT=/绝对路径/playwright/index.mjs \
+SNOW_CHROME=/绝对路径/Chrome node test/host-compat.browser.mjs
+```
+
+不设置 `SNOW_REAL_MODEL` 时只验证不发送消息的基础交互。已有真实模型记录可用 `SNOW_VERIFY_SAVED=<套餐ID>` 单独复验首页和刷新读取，不再调用模型。
+
 ## 本地 Excel 回归素材（2026-09-23）
 
 完整原件位于 `.local/2627雪季套餐台账.xlsx`，与用户提供的原件逐字节一致。小样本位于 `outputs/excel-regression-20260923/2627雪季套餐台账-小样本.xlsx`，只保留 003、007、008 三个套餐及选定规则，移除截图并压紧行号；共 9 晚，含额外补款实付 7344 元。小样本用于回归，不代表完整可用日期规则；两份 Excel 均由 Git 忽略。

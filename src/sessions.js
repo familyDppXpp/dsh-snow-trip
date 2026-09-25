@@ -23,31 +23,32 @@ export function snowSessions(state) {
   return (state.ids||Object.keys(state.byId)).map(id=>state.byId[id]).filter(row=>row?.projectionValues?.agentPreset===SNOW_PRESET);
 }
 
-export function openSnowSession(sessions, id) {
+export function openSnowSession(sessions, id, open) {
   if (sessions.list.getSnapshot().byId[id]?.projectionValues?.agentPreset!==SNOW_PRESET) {
     throw new Error('该会话不是雪季助理会话，请刷新后重试。');
   }
-  sessions.open(id);
+  open(id);
 }
 
 export async function renameSnowSession(sessions,id,title) {
   const value=title.trim();
   if(!value)throw new Error('请输入会话标题。');
   if(sessions.list.getSnapshot().byId[id]?.projectionValues?.agentPreset!==SNOW_PRESET)throw new Error('该会话不是雪季助理会话。');
-  const session=sessions.binding(id)?.session;
-  if(!session)throw new Error('会话不存在，请刷新后重试。');
-  const result=await session.rename(value);
+  const result=await sessions.using(id,{source:'snowTrip'},async reference=>{
+    await reference.ready;
+    return reference.binding.session.rename(value);
+  });
   if(!result.ok)throw new Error(result.error.message);
   await sessions.refresh();
 }
 
-export async function createSnowSession(sessions, presets, input, workspaceId, draft='') {
+export async function createSnowSession(sessions, presets, input, workspaceId, draft='', open) {
   if (!workspaceId) throw new Error('请先选择工作区。');
   const id = await sessions.create({workspaceId});
   const selected = await presets.select(id, SNOW_PRESET);
   if (!selected.ok) throw new Error(`雪季预设选择失败：${selected.error.message}`);
   await sessions.refresh();
-  openSnowSession(sessions, id);
+  openSnowSession(sessions, id, open);
   const scope = sessions.scope(id);
   if (!scope) throw new Error('会话尚未就绪，请从历史列表重新打开。');
   if (draft) input.for(scope).setDraft(draft);
@@ -60,8 +61,8 @@ export function mirrorQuestions(source, target) {
   const mirrored=new Map();
   const sync=()=>{
     const next=source.getSnapshot();
-    for(const [id,item] of mirrored)if(next.get(id)!==item.pending){item.remove();mirrored.delete(id);}
-    for(const [id,pending] of next)if(['question','plan-review'].includes(pending.kind)&&!mirrored.has(id))mirrored.set(id,{pending,remove:publish(pending,async()=>{})});
+    for(const [id,item] of mirrored)if(next.get(id)?.pendingInteraction!==item.pending){item.remove();mirrored.delete(id);}
+    for(const [id,{pendingInteraction:pending}] of next)if(pending&&['question','plan-review'].includes(pending.kind)&&!mirrored.has(id))mirrored.set(id,{pending,remove:publish(pending,async()=>{})});
   };
   const unsubscribe=source.subscribe(sync);sync();
   return()=>{unsubscribe();for(const item of mirrored.values())item.remove();};
@@ -74,10 +75,10 @@ export function packagesForSession(packages,sessionId) {
 export function continuationPrompt(record,kind) {
   return JSON.stringify({type:kind,id:record.id});
 }
-export async function continueSnowSession(sessions,input,archivedIds,id,prompt,record) {
+export async function continueSnowSession(sessions,input,archivedIds,id,prompt,record,open) {
   await sessions.refresh();
   if(archivedIds.includes(id)||sessions.list.getSnapshot().byId[id]?.projectionValues?.agentPreset!==SNOW_PRESET)return false;
-  openSnowSession(sessions,id);
+  openSnowSession(sessions,id,open);
   const scope=sessions.scope(id);
   if(!scope)throw new Error('会话尚未就绪，请重试。');
   appendRecordPrompt(input.for(scope),prompt,record);

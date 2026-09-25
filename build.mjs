@@ -18,8 +18,6 @@ try {
     await cp(path, join(pkg, path), { recursive: true });
   }
   const manifest = JSON.parse(await readFile('package.json', 'utf8'));
-  // preset-roots 是纯装配入口，不贡献 Remote 类型。
-  delete manifest.exports['./preset-roots'];
   delete manifest.exports['./tools'];
   await writeFile(join(pkg, 'package.json'), JSON.stringify(manifest));
   // SDK 按项目身份识别装饰器；把已安装的公开声明也纳入临时项目图。

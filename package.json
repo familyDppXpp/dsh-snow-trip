@@ -12,7 +12,6 @@
     },
     "./client": "./lib/client.js",
     "./package.json": "./package.json",
-    "./preset-roots": "./src/preset-roots.js",
     "./tools": "./lib/tools.js",
     "./typert": {
       "types": "./lib/typert.host.d.ts",
@@ -34,7 +33,6 @@
     "lib/client.js",
     "cordis.patch.yml",
     "VERIFICATION.md",
-    "src/preset-roots.js",
     "lib/service.js",
     "lib/tools.js",
     "lib/types/service.d.ts",
@@ -43,14 +41,19 @@
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
     "lib/typert.remote-client.d.ts",
-    "lib/types/packages.d.ts"
+    "lib/types/packages.d.ts",
+    "lib/types/plans.d.ts",
+    "lib/types/planning.d.ts"
   ],
   "engines": {
     "node": ">=22.19.0"
   },
   "dsh": {
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": [
+        "./cordis.patch.yml",
+        "./presets/snow-trip/agent.cordis.yml"
+      ]
     },
     "client": {
       "inject": [
@@ -70,7 +73,8 @@
         "@deepseek-ai/dsh-client-ui-commands",
         "@deepseek-ai/dsh-client-ui-skill",
         "@deepseek-ai/dsh-client-ui-model-selection",
-        "@deepseek-ai/dsh-client-ui-permission-presets"
+        "@deepseek-ai/dsh-client-ui-permission-presets",
+        "@deepseek-ai/dsh-client-shortcuts"
       ],
       "platform": "web"
     }
@@ -82,18 +86,18 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-scope": "0.1.5-rc.3",
-    "@deepseek-ai/dsh-skill": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-storage": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-storage-domain": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-storage-json": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-system-prompt": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-tools": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-typert-generator": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-user-questions": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-workspace": "0.1.5-alpha.1",
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-scope": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-skill": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-storage": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-storage-domain": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-storage-json": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-tools": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-typert-generator": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-user-questions": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-workspace": "0.1.7-rc.2",
     "@types/node": "^22.20.4",
     "esbuild": "0.25.12",
     "react": "18.3.1",
@@ -104,12 +108,12 @@
     "zod": "4.4.3"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-skill": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-storage-domain": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-tools": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-user-questions": "0.1.5-alpha.1",
-    "@deepseek-ai/dsh-workspace": "0.1.5-alpha.1"
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-skill": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-storage-domain": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-tools": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-user-questions": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-workspace": "0.1.7-rc.2"
   }
 }

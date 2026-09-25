@@ -193,7 +193,7 @@ function Comparison({results,filter,onClose}) {
   return <Modal title="对比出行方案" onClose={onClose} wide><p className="muted">{filter.start} 出发 · 输入本次仍需支付的费用（整单 / 元）。原有已付款不重复计入新增支出。空白表示未知，填 0 才表示无需额外支出。</p><div className="comparison-grid" style={{'--count':results.length}}>{results.map(r=>{const p=r.pkg,c=costs[p.id]||{},n=numbers(r),complete=Object.values(n).every(v=>v!==null);return <section className="compare-card" key={p.id}><span className="eyebrow">套餐 {p.id} / {p.region}</span><h3>{p.hotel}</h3><p>{r.start} → {r.end} · {r.nights} 晚</p><p className="muted">原订单已付 {yuan(p.paidExtra===null?null:p.paid+p.paidExtra)}{p.split?'（含本次之外间夜）':''}</p><div className="notice small">台账补款{r.complete?'合计':'已知部分'} {yuan(r.known)}{r.needsHotel?' · 指定酒店示例':''}；需核对适用条件。</div>{[['supplement','本次房间补款'],['transport','往返交通'],['other','餐饮 / 雪票 / 其他']].map(([key,label])=><Field key={key} label={label+'（手动估算）'}><input type="number" min="0" step="0.01" placeholder="待确认" value={c[key]??''} onChange={e=>setCosts({...costs,[p.id]:{...c,[key]:e.target.value}})}/></Field>)}<div className="compare-total"><span>预计新增支出</span><strong>{complete?yuan(n.supplement+n.transport+n.other):'费用未完整'}</strong></div>{r.reasons.map(x=><p className="error small" key={x}>{x}</p>)}<p className="muted small">机酒实时库存未接入；手动金额不代表商家报价。</p></section>;})}</div><div className="modal-actions"><button onClick={onClose}>返回调整</button></div></Modal>;
 }
 
-export function App({useSessions, renderSlot, actions}) {
+export function App({useSessions, useSessionStatus, renderSlot, SessionProvider, actions}) {
   const [railSize,setRailSize]=useState(()=>({width:window.innerWidth<=1150?260:320,viewport:window.innerWidth}));
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const mobile=railSize.viewport<=760;
@@ -208,12 +208,15 @@ export function App({useSessions, renderSlot, actions}) {
     return()=>window.removeEventListener('resize',resize);
   },[]);
   const sessions=useSessions(state=>state);
+  const statuses=useSessionStatus(state=>state);
+  const reference=useSyncExternalStore(actions.selection.subscribe,actions.selection.getSnapshot);
+  const currentId=reference?.sessionId;
   const [sessionBusy,setSessionBusy]=useState(false),[sessionError,setSessionError]=useState('');
   const [imagePreview,setImagePreview]=useState(null);
   const [packageSidebarOpen,setPackageSidebarOpen]=useState(()=>!mobile);
   const [inspectedPackage,setInspectedPackage]=useState(null);
   const [clickedReference,setClickedReference]=useState(null);
-  useEffect(()=>setClickedReference(null),[sessions.current]);
+  useEffect(()=>setClickedReference(null),[currentId]);
   const [packageSidebarWidth,setPackageSidebarWidth]=useState(340);
   const [packageDrawerWidth,setPackageDrawerWidth]=useState(560);
   const [pendingDelete,setPendingDelete]=useState(null),[deleteBusy,setDeleteBusy]=useState(false),[deleteError,setDeleteError]=useState('');
@@ -221,7 +224,7 @@ export function App({useSessions, renderSlot, actions}) {
   const [pendingArchive,setPendingArchive]=useState(null),[sessionMenu,setSessionMenu]=useState(null);
   const workspaceState=useSyncExternalStore(actions.workspaceList.subscribe,actions.workspaceList.getSnapshot);
   const [pendingRename,setPendingRename]=useState(null),[renameError,setRenameError]=useState('');
-  const rows=snowSessions(sessions).filter(row=>!workspaceState.archivedSessionIds.includes(row.id)),current=rows.find(row=>row.id===sessions.current);
+  const rows=snowSessions(sessions).map(row=>({...row,running:statuses.get(row.id)?.running??false})).filter(row=>!workspaceState.archivedSessionIds.includes(row.id)),current=rows.find(row=>row.id===currentId);
   const planSessionVersion=rows.map(row=>`${row.id}:${row.updatedAt}:${row.running}`).join('|');
   const conversation=useRef(null),sessionList=useRef(null);
   const [sessionQuery,setSessionQuery]=useState('');
@@ -271,7 +274,7 @@ export function App({useSessions, renderSlot, actions}) {
     setSessionBusy(true);setSessionError('');
     try {
       await actions.archive(id);setPendingArchive(null);
-      if(view==='conversation'&&sessions.current===id)setView('explore');
+      if(view==='conversation'&&currentId===id)setView('explore');
     } catch(error){setSessionError('归档失败：'+error.message);}
     finally{setSessionBusy(false);}
   }
@@ -369,7 +372,7 @@ export function App({useSessions, renderSlot, actions}) {
     // 宿主图片灯箱使用 body portal，会被工作台原生 dialog 遮挡；复用宿主图片 URL 在内层 dialog 预览。
     const image=event.target.closest('button')?.querySelector('img');
     if(image){event.preventDefault();event.stopPropagation();setImagePreview({src:image.currentSrc||image.src,alt:image.alt});}
-  }}>{renderSlot('conversation',{})}</div>{packageSidebarOpen&&(clickedReference||sessionPackages.length>0||sessionPlans.length>0)&&<PackageSidebar key={current.id+(clickedReference?.type??'')+(clickedReference?.id??'')} onBack={clickedReference?()=>setClickedReference(null):undefined} missing={!!clickedReference} width={packageSidebarWidth} onWidth={setPackageSidebarWidth} onAdd={(record,kind)=>actions.addReference(current.id,record,kind)} records={panelPackages} plans={panelPlans} allPackages={host.rows} error={host.error||plansError} loading={host.loading} onRetry={()=>{host.retry();setPlansRefresh(n=>n+1);}} onClose={()=>setPackageSidebarOpen(false)}/>}</div></main>}
+  }}><SessionProvider session={reference}>{renderSlot('snow.conversation',{})}</SessionProvider></div>{packageSidebarOpen&&(clickedReference||sessionPackages.length>0||sessionPlans.length>0)&&<PackageSidebar key={current.id+(clickedReference?.type??'')+(clickedReference?.id??'')} onBack={clickedReference?()=>setClickedReference(null):undefined} missing={!!clickedReference} width={packageSidebarWidth} onWidth={setPackageSidebarWidth} onAdd={(record,kind)=>actions.addReference(current.id,record,kind)} records={panelPackages} plans={panelPlans} allPackages={host.rows} error={host.error||plansError} loading={host.loading} onRetry={()=>{host.retry();setPlansRefresh(n=>n+1);}} onClose={()=>setPackageSidebarOpen(false)}/>}</div></main>}
   {unavailable&&<Modal title="原会话不可用" dismissible={!sessionBusy} onClose={()=>setUnavailable(null)}><p>原会话已归档或不存在。可新建会话继续，原资料保留。</p>{sessionError&&<p role="alert">{sessionError}</p>}<div className="modal-actions"><button disabled={sessionBusy} onClick={()=>setUnavailable(null)}>取消</button><button className="primary" disabled={sessionBusy} onClick={async()=>{if(sessionBusy)return;setSessionBusy(true);setSessionError('');try{await actions.create(unavailable.prompt,unavailable.record);setUnavailable(null);setView('conversation');}catch(e){setSessionError(e.message);}finally{setSessionBusy(false);}}}>新建会话继续</button></div></Modal>}
   {imagePreview&&<Modal title="截图预览" onClose={()=>setImagePreview(null)} wide><img src={imagePreview.src} alt={imagePreview.alt} style={{display:'block',maxWidth:'100%',maxHeight:'70vh',margin:'auto'}}/></Modal>}
   {pendingPlanDelete&&<Modal title="删除方案" dismissible={!deleteBusy} onClose={()=>setPendingPlanDelete(null)}>

@@ -18,12 +18,12 @@ test('新建先选预设，草稿不发送，历史只打开雪季会话；失�
     return {ok:true,value:null};
   }};
   const input={for:scope=>({setDraft:text=>calls.push(['draft',scope.id,text]),submit:()=>assert.fail('不得自动发送')})};
-  assert.equal(await createSnowSession(sessions,presets,input,'workspace','可编辑草稿'),'snow');
+  assert.equal(await createSnowSession(sessions,presets,input,'workspace','可编辑草稿',sessions.open),'snow');
   assert.deepEqual(calls,[['create',{workspaceId:'workspace'}],['select','snow','snow-trip'],['refresh'],['open','snow'],['draft','snow','可编辑草稿']]);
   assert.deepEqual(snowSessions(state).map(row=>row.id),['snow']);
-  openSnowSession(sessions,'snow');
+  openSnowSession(sessions,'snow',sessions.open);
   assert.deepEqual(calls.at(-1),['open','snow']);
-  assert.throws(()=>openSnowSession(sessions,'normal'),/不是雪季/);
+  assert.throws(()=>openSnowSession(sessions,'normal',sessions.open),/不是雪季/);
   calls.length=0;
   await assert.rejects(createSnowSession(sessions,{select:async()=>({ok:false,error:{message:'预设不存在'}})},input,'workspace','禁止发送'),/预设不存在/);
   assert.deepEqual(calls,[['create',{workspaceId:'workspace'}]]);
@@ -54,6 +54,7 @@ test('会话标题、套餐分类与搜索使用真实关联，不显示空白�
 test('编辑标题写入指定宿主会话，空标题和非雪季会话被拒绝，失败不伪装成功',async()=>{
   const calls=[];
   const sessions={list:{getSnapshot:()=>({byId:{snow:{projectionValues:{agentPreset:'snow-trip'}},normal:{projectionValues:{agentPreset:'standard'}}}})},binding:id=>({session:{rename:async title=>{calls.push([id,title]);return {ok:true};}}}),refresh:async()=>calls.push('refresh')};
+  sessions.using=async(id,options,operation)=>operation({ready:Promise.resolve(),binding:sessions.binding(id)});
   await renameSnowSession(sessions,'snow','  长白山行程  ');
   assert.deepEqual(calls,[['snow','长白山行程'],'refresh']);calls.length=0;
   await assert.rejects(renameSnowSession(sessions,'snow','   '),/请输入/);
@@ -70,15 +71,15 @@ test('宿主确认同步到嵌入视图，移除与卸载镜像不回答原问�
   const source={getSnapshot:()=>snapshot,subscribe:fn=>{listener=fn;return()=>{listener=null;};}};
   const target={registerPendingInteraction:()=>pending=>{published.push(pending);return()=>removed++;}};
   const stop=mirrorQuestions(source,target);
-  const pending={kind:'question',key:'a'};snapshot=new Map([['session',pending]]);listener();listener();
+  const pending={kind:'question',key:'a'};snapshot=new Map([['session',{running:false,pendingInteraction:pending}]]);listener();listener();
   assert.deepEqual(published,[pending]);snapshot=new Map();listener();assert.equal(removed,1);
-  snapshot=new Map([['session',pending]]);listener();stop();assert.equal(removed,2);assert.equal(listener,null);
+  snapshot=new Map([['session',{running:false,pendingInteraction:pending}]]);listener();stop();assert.equal(removed,2);assert.equal(listener,null);
 });
 
 test('打开补全会话只导航，不访问输入框；执行中的会话也可查看',()=>{
  const calls=[];
  const sessions={list:{getSnapshot:()=>({byId:{s:{running:true,projectionValues:{agentPreset:'snow-trip'}}}})},open:id=>calls.push(id),scope:()=>assert.fail('导航不应访问输入框')};
- openSnowSession(sessions,'s');
+ openSnowSession(sessions,'s',sessions.open);
  assert.deepEqual(calls,['s']);
 });
 
@@ -104,8 +105,8 @@ test('方案关联优先分类，预填保留草稿并去重，归档和缺失�
   for(const kind of ['plan','package']){
     const prompt=continuationPrompt(record,kind);
     assert.ok(prompt.includes(record.id));
-    assert.equal(await continueSnowSession(sessions,input,[],'s',prompt,record),true);
-    const once=draft;await continueSnowSession(sessions,input,[],'s',prompt,record);assert.equal(draft,once);
+    assert.equal(await continueSnowSession(sessions,input,[],'s',prompt,record,sessions.open),true);
+    const once=draft;await continueSnowSession(sessions,input,[],'s',prompt,record,sessions.open);assert.equal(draft,once);
   }
   assert.ok(draft.startsWith('我已经写好的要求'));
   assert.ok(!draft.includes('继续调整'));
