@@ -17,6 +17,17 @@ function PackageDrawer({children,onClose}) {
   useEffect(()=>{dialog.current.showModal();},[]);
   return <dialog className="snow-package-drawer" ref={dialog} aria-label="套餐详情" onCancel={event=>{event.preventDefault();onClose();}} onClick={event=>{if(event.target===event.currentTarget)onClose();}}>{children}</dialog>;
 }
+function SessionRail({mobile,open,onClose,width,children}) {
+  const dialog=useRef(null);
+  useEffect(()=>{
+    if(!mobile)return;
+    if(open)dialog.current.showModal();else dialog.current.close();
+  },[mobile,open]);
+  if(!mobile)return <div className="snow snow-rail" style={{width}}>{children}</div>;
+  return <dialog ref={dialog} className="snow snow-rail snow-mobile-rail" aria-label="雪季导航" onCancel={event=>{event.preventDefault();onClose();}} onClick={event=>{if(event.target===event.currentTarget)onClose();}}>
+    <button className="snow-rail-close" aria-label="关闭菜单" onClick={onClose}><Icon name="close"/></button>{children}
+  </dialog>;
+}
 function PackageFacts({record,fields}) {
   return <dl className="snow-detail-facts">{fields.map(key=>{
     const value=record[key];
@@ -153,19 +164,23 @@ function Comparison({results,filter,onClose}) {
 }
 
 export function App({useSessions, renderSlot, actions}) {
-  const [railSize,setRailSize]=useState(()=>({width:window.innerWidth<=760?145:window.innerWidth<=1150?260:320,viewport:window.innerWidth}));
+  const [railSize,setRailSize]=useState(()=>({width:window.innerWidth<=1150?260:320,viewport:window.innerWidth}));
+  const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
+  const mobile=railSize.viewport<=760;
+  const compactRail=mobile||railSize.width<=280;
+  useEffect(()=>{setMobileMenuOpen(false);},[mobile]);
   const railMax=Math.max(145,Math.min(420,Math.floor(railSize.viewport/2)));
   const drag=useRef(null);
   const resizeRail=width=>setRailSize(size=>({...size,width:Math.max(145,Math.min(railMax,width))}));
   useEffect(()=>{
-    const resize=()=>setRailSize(size=>({viewport:window.innerWidth,width:Math.min(size.width,Math.max(145,Math.min(420,Math.floor(window.innerWidth/2))))}));
+    const resize=()=>setRailSize(size=>({viewport:window.innerWidth,width:window.innerWidth<=760?size.width:Math.min(size.width,Math.max(145,Math.min(420,Math.floor(window.innerWidth/2))))}));
     window.addEventListener('resize',resize);
     return()=>window.removeEventListener('resize',resize);
   },[]);
   const sessions=useSessions(state=>state);
   const [sessionBusy,setSessionBusy]=useState(false),[sessionError,setSessionError]=useState('');
   const [imagePreview,setImagePreview]=useState(null);
-  const [packageSidebarOpen,setPackageSidebarOpen]=useState(true);
+  const [packageSidebarOpen,setPackageSidebarOpen]=useState(()=>!mobile);
   const [inspectedPackage,setInspectedPackage]=useState(null);
   const [clickedReference,setClickedReference]=useState(null);
   useEffect(()=>setClickedReference(null),[sessions.current]);
@@ -183,7 +198,7 @@ export function App({useSessions, renderSlot, actions}) {
   const [collapsedGroups,setCollapsedGroups]=useState({});
   async function startSession() {
     setSessionError('');setSessionQuery('');setSessionBusy(true);setView('explore');
-    try {await actions.create();setView('conversation');}
+    try {await actions.create();setView('conversation');setMobileMenuOpen(false);}
     catch(error){setSessionError(error.message);}
     finally{setSessionBusy(false);}
   }
@@ -193,6 +208,9 @@ export function App({useSessions, renderSlot, actions}) {
   const [view,setView]=useState(()=>actions.lastSession()?'conversation':'explore'),[form,setForm]=useState(initial),[filter,setFilter]=useState(initial),[selection,setSelection]=useState([]),[sort,setSort]=useState('source');
   useEffect(()=>{let active=true;setPlansError('');actions.listPlans().then(rows=>{if(active){setHostSaved(rows.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)));setPlansLoaded(true);}}).catch(e=>{if(active)setPlansError(e.message);});return()=>{active=false;};},[view,plansRefresh,planSessionVersion]);
   const [detail,setDetail]=useState(null),[comparing,setComparing]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState(''),[formError,setFormError]=useState('');
+  useEffect(()=>{
+    if(mobile)setPackageSidebarOpen(false);
+  },[mobile,view,current?.id]);
   useEffect(()=>{
     if(view==='conversation')sessionList.current?.querySelector('[aria-current="page"]')?.scrollIntoView({block:'nearest'});
   },[view,current?.id]);
@@ -250,7 +268,7 @@ export function App({useSessions, renderSlot, actions}) {
     setSessionBusy(true);setSessionError('');
     const prompt=continuationPrompt(record,kind);
     try {
-      if(await actions.continueRecord(record,prompt)){setSessionQuery('');setPackageSidebarOpen(true);setView('conversation');}
+      if(await actions.continueRecord(record,prompt)){setSessionQuery('');setPackageSidebarOpen(!mobile);setView('conversation');}
       else setUnavailable({prompt,record});
     }catch(e){setSessionError(e.message);}
     finally{setSessionBusy(false);}
@@ -264,7 +282,7 @@ export function App({useSessions, renderSlot, actions}) {
   function toggle(id){if(selection.includes(id))setSelection(selection.filter(x=>x!==id));else if(selection.length<3)setSelection([...selection,id]);else setNotice('最多对比 3 个方案，请先移除一个。');}
   function search(e){e.preventDefault();if(!date(form.start)||form.nights!==''&&(!Number.isInteger(Number(form.nights))||Number(form.nights)<1||Number(form.nights)>366)||form.budget!==''&&money(form.budget)===null){setFormError('请填写有效入住日期、1–366 晚和非负补款预算。');startInput.current.focus();return;}setFormError('');setFilter({...form,query:form.query.trim()});setNotice('已按当前条件更新候选方案。');}
   const tabs=[['explore','grid','已录套餐'],['saved','save','已存方案']];
-  return <PackageSidebarContext.Provider value={{available:!!clickedReference||sessionPackages.length>0||sessionPlans.length>0,open:packageSidebarOpen,toggle:()=>setPackageSidebarOpen(open=>!open)}}><div className="snow-workbench"><div className="snow snow-rail" style={{width:railSize.width}}><aside className="rail" id="snow-sidebar"><div className="brand"><div className="brand-mark"><Icon size={27}/></div><div><b>雪季出行</b><small>我的山野计划</small></div></div><div className="season-label">26 / 27 雪季</div><nav aria-label="工作台导航">{tabs.map(([id,icon,label])=><button key={id} className={view===id?'active':''} aria-current={view===id?'page':undefined} onClick={()=>setView(id)}><Icon name={icon}/><span>{label}</span>{id==='explore'&&<em>{host.rows.length}</em>}{id==='saved'&&(hostSaved.length)>0&&<em>{hostSaved.length}</em>}</button>)}</nav>
+  return <PackageSidebarContext.Provider value={{available:!!clickedReference||sessionPackages.length>0||sessionPlans.length>0,open:packageSidebarOpen,toggle:()=>setPackageSidebarOpen(open=>!open)}}><div className="snow-workbench">{mobile&&<header className="snow snow-mobile-topbar"><button aria-label="打开菜单" aria-expanded={mobileMenuOpen} aria-controls="snow-sidebar" onClick={()=>setMobileMenuOpen(true)}>☰ <span>菜单</span></button><span>雪季出行</span></header>}<SessionRail mobile={mobile} open={mobileMenuOpen} onClose={()=>{setMobileMenuOpen(false);setSessionMenu(null);}} width={railSize.width}><aside className="rail" id="snow-sidebar"><div className="brand"><div className="brand-mark"><Icon size={27}/></div><div><b>雪季出行</b><small>我的山野计划</small></div></div><div className="season-label">26 / 27 雪季</div><nav aria-label="工作台导航">{tabs.map(([id,icon,label])=><button key={id} className={view===id?'active':''} aria-current={view===id?'page':undefined} onClick={()=>{setView(id);setMobileMenuOpen(false);}}><Icon name={icon}/><span>{label}</span>{id==='explore'&&<em>{host.rows.length}</em>}{id==='saved'&&(hostSaved.length)>0&&<em>{hostSaved.length}</em>}</button>)}</nav>
     <section className="snow-session-controls" aria-label="助理会话">
       <button className="snow-session-new" disabled={sessionBusy} onClick={startSession}><span aria-hidden="true">＋</span>{sessionBusy?'正在准备…':'出发去山野'}</button>
       {sessionError&&<p className="error" role="alert">{sessionError}</p>}
@@ -273,8 +291,8 @@ export function App({useSessions, renderSlot, actions}) {
         {(host.error||plansError)?<div className="snow-session-empty" role="alert">会话分类加载失败<button onClick={()=>{host.retry();setPlansRefresh(n=>n+1);}}>重试</button></div>:host.loading&&!host.rows.length?<div className="snow-session-empty" role="status">正在加载会话分类…</div>:!sessionGroups.length?<div className="snow-session-empty"><p>{sessionQuery?'没有匹配的会话':'还没有会话'}</p><small>{sessionQuery?'换个关键词，或清空搜索。':'点击“出发去山野”，一起安排这次出行。'}</small></div>:sessionGroups.map(group=><section className="snow-session-group" key={group.label} aria-label={group.label}><h3><button className="snow-group-toggle" aria-expanded={!!sessionQuery.trim()||!collapsedGroups[group.label]} onClick={()=>setCollapsedGroups({...collapsedGroups,[group.label]:!collapsedGroups[group.label]})}><span aria-hidden="true">{!sessionQuery.trim()&&collapsedGroups[group.label]?'▸':'▾'}</span>{group.label}<span className="snow-group-count">{group.items.length}</span></button></h3>{(sessionQuery.trim()||!collapsedGroups[group.label])&&group.items.map(row=>{
           const title=sessionTitle(row),selected=view==='conversation'&&row.id===current?.id;
           return <div className={`snow-session-row${selected?' is-current':''}`} key={row.id} data-session-id={row.id}>
-            <button className="snow-session-open" title={title} aria-current={selected?'page':undefined} disabled={sessionBusy} onClick={()=>{try{actions.open(row.id);setView('conversation');setSessionError('');}catch(error){setSessionError(error.message);}}}>
-              <span className="snow-session-heading"><strong>{title}</strong>{row.packageStatus&&<span className="snow-session-tag">{row.packageStatus}</span>}</span><span className="snow-session-meta"><span className={row.running?'is-running':''}>{row.running?'正在执行':row.completed?'已完成':row.blank?'尚未开始':'可继续'}</span>{!!row.updatedAt&&<time dateTime={new Date(row.updatedAt).toISOString()} title={new Date(row.updatedAt).toLocaleString('zh-CN')}>{new Date(row.updatedAt).toLocaleString('zh-CN',new Date(row.updatedAt).toDateString()!==new Date().toDateString()?{month:'numeric',day:'numeric'}:{hour:'2-digit',minute:'2-digit'})}</time>}</span>
+            <button className="snow-session-open" title={title} aria-current={selected?'page':undefined} disabled={sessionBusy} onClick={()=>{try{actions.open(row.id);if(mobile)setPackageSidebarOpen(false);setView('conversation');setMobileMenuOpen(false);setSessionError('');}catch(error){setSessionError(error.message);}}}>
+              <span className="snow-session-heading"><strong>{title}</strong>{row.packageStatus&&!compactRail&&<span className="snow-session-tag">{row.packageStatus}</span>}</span><span className="snow-session-meta">{row.packageStatus&&compactRail&&<span className="snow-session-tag snow-session-compact-tag">{row.packageStatus}</span>}<span className={row.running?'is-running':!row.completed&&!row.blank?'snow-session-idle':''}>{row.running?'正在执行':row.completed?'已完成':row.blank?'尚未开始':'可继续'}</span>{!!row.updatedAt&&<time dateTime={new Date(row.updatedAt).toISOString()} title={new Date(row.updatedAt).toLocaleString('zh-CN')}>{new Date(row.updatedAt).toLocaleString('zh-CN',new Date(row.updatedAt).toDateString()!==new Date().toDateString()?{month:'numeric',day:'numeric'}:{hour:'2-digit',minute:'2-digit'})}</time>}</span>
             </button>
             <div className="snow-session-actions">
             <button aria-label={`会话操作：${title}`} title="会话操作" disabled={sessionBusy} aria-haspopup="menu" aria-expanded={sessionMenu?.row.id===row.id} onClick={event=>setSessionMenu({row,anchor:event.currentTarget})}>···</button></div>
@@ -290,7 +308,12 @@ export function App({useSessions, renderSlot, actions}) {
       onPointerCancel={()=>{drag.current=null;}} onLostPointerCapture={()=>{drag.current=null;}}
       onKeyDown={event=>{const next={ArrowLeft:railSize.width-10,ArrowRight:railSize.width+10,Home:145,End:railMax}[event.key];if(next!==undefined){event.preventDefault();resizeRail(next);}}}
     />
-  </div>
+  {sessionMenu&&<SessionMenu anchor={sessionMenu.anchor} onClose={()=>setSessionMenu(null)}>
+      <button role="menuitem" onClick={()=>{setRenameError('');setPendingRename({id:sessionMenu.row.id,title:sessionTitle(sessionMenu.row)});setSessionMenu(null);}}><Icon name="edit"/>重命名</button>
+      <button role="menuitem" onClick={async()=>{const id=sessionMenu.row.id;setSessionMenu(null);setSessionBusy(true);setSessionError('');try{await actions.fork(id);setSessionQuery('');setView('conversation');setMobileMenuOpen(false);}catch(error){setSessionError('分叉失败：'+error.message);}finally{setSessionBusy(false);}}}><Icon name="fork"/>分叉会话</button>
+      {!host.loading&&!host.error&&plansLoaded&&!plansError&&!host.rows.some(record=>record.sessionId===sessionMenu.row.id)&&!hostSaved.some(plan=>plan.sessionId===sessionMenu.row.id)&&<button role="menuitem" onClick={()=>{setSessionError('');setPendingArchive(sessionMenu.row);setSessionMenu(null);}}><Icon name="archive"/>归档会话</button>}
+  </SessionMenu>}
+  </SessionRail>
   <div className="snow snow-content" hidden={view==='conversation'&&!!current}><main className="workspace"><header className="topbar"><div><span className="crumb">我的雪季</span><span className="separator">/</span>{tabs.find(t=>t[0]===view)?.[2]}</div><button onClick={startSession} disabled={sessionBusy}><Icon name="edit"/>{sessionBusy?'正在准备…':'开始录入'}</button></header>
   <div className="page"><div aria-live="polite" className={`feedback ${notice?'visible':''}`}>{notice}</div>{error&&<div role="alert" className="notice error">{error}</div>}
   {view==='explore'&&<><section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="green-dot"/> 雪季计划进行中</div><h1>下一站，<br/>去山里过冬。</h1><p>从已购套餐出发，找到时间和预算都合适的那一程。</p><div className="hero-tags"><span>套餐权益</span><span>逐晚补款</span><span>方案对比</span></div></div><Mountain/><div className="mountain-caption">这个雪季，把好时光留给山野。</div></section>
@@ -353,11 +376,7 @@ export function App({useSessions, renderSlot, actions}) {
       <div className="modal-actions"><button type="button" disabled={sessionBusy} onClick={()=>setPendingRename(null)}>取消</button><button type="submit" className="primary" disabled={sessionBusy}>{sessionBusy?'正在保存…':'保存标题'}</button></div>
     </form>
   </Modal>}
-  {sessionMenu&&<SessionMenu anchor={sessionMenu.anchor} onClose={()=>setSessionMenu(null)}>
-      <button role="menuitem" onClick={()=>{setRenameError('');setPendingRename({id:sessionMenu.row.id,title:sessionTitle(sessionMenu.row)});setSessionMenu(null);}}><Icon name="edit"/>重命名</button>
-      <button role="menuitem" onClick={async()=>{const id=sessionMenu.row.id;setSessionMenu(null);setSessionBusy(true);setSessionError('');try{await actions.fork(id);setSessionQuery('');setView('conversation');}catch(error){setSessionError('分叉失败：'+error.message);}finally{setSessionBusy(false);}}}><Icon name="fork"/>分叉会话</button>
-      {!host.loading&&!host.error&&plansLoaded&&!plansError&&!host.rows.some(record=>record.sessionId===sessionMenu.row.id)&&!hostSaved.some(plan=>plan.sessionId===sessionMenu.row.id)&&<button role="menuitem" onClick={()=>{setSessionError('');setPendingArchive(sessionMenu.row);setSessionMenu(null);}}><Icon name="archive"/>归档会话</button>}
-  </SessionMenu>}
+
   {pendingArchive&&<Modal title="归档会话" dismissible={!sessionBusy} onClose={()=>setPendingArchive(null)}>
     <p>确定归档“{sessionTitle(pendingArchive)}”吗？</p>
     <p className="muted">归档后，会话将从列表中收起，聊天记录保留。正在执行的任务不受影响。</p>

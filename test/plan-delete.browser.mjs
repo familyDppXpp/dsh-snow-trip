@@ -79,8 +79,12 @@ try{
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.evaluate(()=>window.check.fail=false);await card.getByRole('button',{name:'删除方案'}).click();await dialog.getByRole('button',{name:'确认删除'}).click();await dialog.waitFor({state:'detached'});await card.waitFor({state:'detached'});
  assert.match(await page.locator('h1').innerText(),/0 份/);await page.getByText('还没有保存的方案',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'打开菜单',exact:true}).click();
  await page.getByRole('button',{name:/^已录套餐/}).click();await page.locator('.snow-package-card').waitFor();assert.deepEqual(errors,[]);
  await page.evaluate(()=>{window.check.missing=false;window.check.packages=[];window.check.plans=[window.check.template,{...window.check.template,id:'22222222-2222-4222-8222-222222222222',title:'另一份出行方案'}];});
+ await page.getByRole('button',{name:'打开菜单',exact:true}).click();
+ await page.getByRole('button',{name:/^已存方案/}).click();await page.locator('.snow-saved-entry').first().getByRole('button',{name:'继续规划'}).click();
+ await page.setViewportSize({width:1061,height:863});
  await page.getByRole('button',{name:/^已存方案/}).click();await page.locator('.snow-saved-entry').first().getByRole('button',{name:'继续规划'}).click();
  panel=page.getByRole('complementary',{name:'关联详情'});
  const plans=panel.locator('.snow-detail-plan');await plans.nth(1).waitFor();

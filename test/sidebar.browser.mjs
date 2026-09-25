@@ -1,0 +1,44 @@
+// 连接含会话的测试实例，只切换导航与菜单，不发送消息或修改记录。
+import assert from 'node:assert/strict';
+const {chromium}=await import(process.env.SNOW_PLAYWRIGHT||'playwright');
+assert.ok(process.env.SNOW_URL,'请通过 SNOW_URL 提供测试实例入口');
+const browser=await chromium.launch({headless:true,executablePath:process.env.SNOW_CHROME});
+try{
+  const page=await browser.newPage({viewport:{width:1512,height:863}}),errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(process.env.SNOW_URL,{waitUntil:'domcontentloaded'});
+  await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});
+  const menu=page.getByRole('dialog',{name:'雪季导航',exact:true});
+  assert.equal(await menu.isVisible(),false);
+  await page.getByRole('button',{name:'打开菜单',exact:true}).click();await menu.waitFor();
+  assert.equal((await menu.boundingBox()).width,390);
+  await menu.getByRole('button',{name:/已存方案/}).click();
+  await menu.waitFor({state:'hidden'});
+  assert.equal(await page.locator('.snow-workbench').evaluate(el=>el.scrollWidth>el.clientWidth),false);
+  await page.getByRole('button',{name:'打开菜单',exact:true}).click();
+  await page.keyboard.press('Escape');await menu.waitFor({state:'hidden'});
+  assert.equal(await page.getByRole('button',{name:'打开菜单',exact:true}).evaluate(el=>el===document.activeElement),true);
+  await page.getByRole('button',{name:'打开菜单',exact:true}).click();
+  const first=menu.locator('.snow-session-open').first();await first.waitFor();
+  await menu.locator('.snow-session-actions button').first().click();
+  await page.getByRole('menuitem',{name:'重命名',exact:true}).waitFor();
+  await page.keyboard.press('Escape');
+  await first.click();await menu.waitFor({state:'hidden'});
+  assert.equal(await page.locator('#snow-package-sidebar').count(),0);
+  await page.getByRole('button',{name:'展开套餐详情',exact:true}).click();
+  await page.locator('#snow-package-sidebar').waitFor();
+  assert.equal((await page.locator('#snow-package-sidebar').boundingBox()).width,390);
+  await page.getByRole('button',{name:'打开菜单',exact:true}).click();
+  await page.screenshot({path:'.local/sidebar-mobile.png'});
+  await page.setViewportSize({width:1512,height:863});
+  await page.getByRole('button',{name:'打开菜单',exact:true}).waitFor({state:'hidden'});
+  const handle=page.getByRole('separator',{name:'调整侧边栏宽度',exact:true});
+  await handle.focus();await page.keyboard.press('Home');
+  assert.equal(await handle.getAttribute('aria-valuenow'),'145');
+  assert.equal(await page.locator('.snow-session-heading strong').first().evaluate(el=>getComputedStyle(el).whiteSpace),'normal');
+  await page.keyboard.press('End');
+  assert.equal(await handle.getAttribute('aria-valuenow'),'420');
+  assert.deepEqual(errors,[]);
+  console.log('通过：窄屏菜单默认收起、导航/会话选择后关闭、Esc 焦点归还、操作菜单与宽屏调宽。');
+}finally{await browser.close();}
