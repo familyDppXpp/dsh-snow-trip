@@ -33,6 +33,10 @@ export function registerPlanningTools(ctx:Context){
  const planning=async(id:string,exec:ToolRunContext)=>{const p=await ctx.snowTrip.getPlanning(id);if(!p||p.sessionId!==owner(exec))throw new PlanningError('technical','planningId：当前会话不存在该规划');if(!p.confirmedByCard)throw new PlanningError('technical','此规划缺少卡片确认记录，请调用 snow_prepare_plan 由用户确认；不能直接核算或保存');if(p.supersededBy)throw new PlanningError('business',`条件已更新，请使用规划 ${p.supersededBy}`);return p;};
  const currentResult=async(id:string,exec:ToolRunContext)=>{const r=await ctx.snowTrip.getCalculation(id);if(!r||r.sessionId!==owner(exec))throw new PlanningError('technical','resultId：当前会话不存在该核算结果');await planning(r.planningId,exec);for(const item of r.plan.packages){const p=await ctx.snowTrip.getPackage(item.id);if(!p||p.revision!==item.revision||p.completeness!=='complete')throw new PlanningError('business','套餐版本或资料状态变化，请重新核算');}return r;};
  const resultView=(r:Calculation)=>({...r.plan,resultId:r.id,end:dateAfter(r.plan.start!,r.plan.nights!),allocation:r.plan.allocation?[r.plan.allocation]:[],checks:r.checks,switches:r.switches,estimated:r.estimated,daily:r.plan.daily.map(d=>({...d,hotel:r.plan.packages.find(p=>p.id===d.packageId)?.snapshot.hotels?.join('、')}))});
+ add('snow_list_plans','只读列出全部已存出行方案，不包含未保存的核算结果，不显示确认卡。金额为整数分。套餐快照属于方案保存时版本；需要最新套餐资料时用 snow_query 按套餐 ID 查询。',{},async args=>{
+  validate(z.strictObject({}),args);
+  return {plans:await ctx.snowTrip.listPlans(),amountUnit:'分'};
+ });
  add('snow_query_plan','按方案 ID 只读查询已存方案，不显示确认卡。金额为整数分。套餐快照属于方案保存时版本；需要最新套餐资料时用 snow_query 按套餐 ID 查询。',{id:str},async args=>{
   const {id}=validate(z.strictObject({id:z.uuid()}),args);
   const plan=await ctx.snowTrip.getPlan(id);

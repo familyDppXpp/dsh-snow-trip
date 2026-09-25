@@ -117,7 +117,10 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
       assert.equal(feedback.action,'supplement');assert.equal(feedback.custom,'先比较两份方案的雪票费用');assert.equal(feedback.card.results[0].resultId,computed.resultId);assert.notEqual(response.concludesTurn,true);
     }
     assert.deepEqual(await ctx.snowTrip.listPlans(),[]);answer=saveAnswer;
+    assert.deepEqual(JSON.parse((await ok('snow_list_plans',{})).content[0].text),{plans:[],amountUnit:'分'},'未保存的核算结果不应出现在已存方案列表');
+    assert.equal((await execute('snow_list_plans',{id:computed.resultId})).isError,true);
     const saved=JSON.parse((await ok('snow_save_plan',{resultId:computed.resultId})).content[0].text);
+    assert.deepEqual(JSON.parse((await ok('snow_list_plans',{})).content[0].text),{plans:[saved.plan],amountUnit:'分'});
     const queried=JSON.parse((await ok('snow_query_plan',{id:saved.plan.id})).content[0].text);
     assert.deepEqual(queried.plan,saved.plan);assert.equal(queried.amountUnit,'分');
     assert.equal((await execute('snow_query_plan',{id:'invalid'})).isError,true);
