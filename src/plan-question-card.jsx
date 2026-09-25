@@ -47,8 +47,8 @@ function PlanEditableBody({data,packages,busy,error,onAnswer,cancel}) {
   const [ids,setIds]=useState(()=>[...(data.ids??[])]);
   const [estimates,setEstimates]=useState(()=>(data.estimates??[]).map(e=>({...e,amount:e.amount!=null?String(e.amount/100):''})));
   const usable=(packages??[]).filter(p=>p.completeness==='complete');
-  const recommended=usable.filter(p=>(data.ids??[]).includes(p.id));
-  const rest=usable.filter(p=>!(data.ids??[]).includes(p.id));
+  const selectedPackages=usable.filter(p=>ids.includes(p.id));
+  const rest=usable.filter(p=>!ids.includes(p.id));
   const submit=()=>{try{
     if(data.planning){if(!values.start||!Number.isInteger(Number(values.nights))||Number(values.nights)<1||Number(values.nights)>366)throw new Error('请确认具体入住日期和住宿晚数');if(!Number.isInteger(Number(values.rooms))||Number(values.rooms)<1)throw new Error('请确认房间数');}
     const amounts=estimates.map(e=>{const amount=e.amount.trim();if(amount&&!/^\d+(\.\d{1,2})?$/.test(amount))throw new Error('费用请填写非负金额，最多两位小数');return {...e,amount:amount?toCents(Number(amount)):null};});
@@ -68,7 +68,7 @@ function PlanEditableBody({data,packages,busy,error,onAnswer,cancel}) {
       {Array.isArray(data.suggestions)&&<ul className="snow-plan-note">{data.suggestions.map((text,i)=><li key={i}>{text}</li>)}</ul>}
       <section aria-label="参与搭配的套餐"><h4>参与搭配的套餐</h4>
         <p className="snow-plan-muted">可指定套餐范围；全不选则从全部资料完整的套餐中筛选。</p>
-        {recommended.map(p=><PlanPackageRow key={p.id} record={p} checked={ids.includes(p.id)} onToggle={()=>setIds(ids.includes(p.id)?ids.filter(x=>x!==p.id):[...ids,p.id])} recommended/>)}
+        {selectedPackages.map(p=><PlanPackageRow key={p.id} record={p} checked={ids.includes(p.id)} onToggle={()=>setIds(ids.includes(p.id)?ids.filter(x=>x!==p.id):[...ids,p.id])} recommended={(data.ids??[]).includes(p.id)}/>)}
         {rest.length>0&&<details className="snow-plan-more"><summary>更多套餐（{rest.length}）</summary>{rest.map(p=><PlanPackageRow key={p.id} record={p} checked={ids.includes(p.id)} onToggle={()=>setIds(ids.includes(p.id)?ids.filter(x=>x!==p.id):[...ids,p.id])}/>)}</details>}
         {!data.planning&&<details className="snow-plan-estimates"><summary>补充已知的交通与餐饮费用（可留空）</summary>
           {['交通','餐饮'].map(label=>{
