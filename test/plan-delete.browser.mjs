@@ -20,6 +20,14 @@ try{
  const page=await browser.newPage({viewport:{width:1061,height:863}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(5000);
  await page.route('http://snow.test/',route=>route.fulfill({body:'<meta charset="utf-8"><div id="root"></div>',contentType:'text/html'}));
  await page.goto('http://snow.test/');await page.addStyleTag({content:await readFile('src/style.css','utf8')});await page.addScriptTag({type:'module',content:script.outputFiles[0].text});
+ await page.getByRole('button',{name:'查看套餐详情：最新套餐名称',exact:true}).click();
+ const explorePanel=page.getByRole('complementary',{name:'关联详情'});
+ await explorePanel.getByRole('heading',{name:'套餐详情',exact:true}).waitFor();
+ assert.equal(await page.locator('.package-more').count(),0);
+ assert.equal(await page.locator('.package-candidates .package-trip-notes').count(),0);
+ await explorePanel.getByRole('complementary',{name:'本次出行核对提示'}).waitFor();
+ assert.equal(await explorePanel.locator('.snow-detail-section').first().getAttribute('open'),'');
+ await explorePanel.getByRole('button',{name:'收起套餐详情',exact:true}).click();
  await page.getByRole('button',{name:'删除套餐',exact:true}).waitFor();
  await page.getByRole('button',{name:'删除套餐',exact:true}).click();
  const packageDialog=page.getByRole('dialog',{name:'删除套餐',exact:true});

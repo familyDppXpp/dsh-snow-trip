@@ -6,14 +6,13 @@ const money=n=>n===null?'待确认':`${(n/100).toFixed(2)} 元`;
 export function savedPackage(block) {
   return block&&'kind' in block&&!block.isError&&!block.parentCallId?packageMetadata(block.meta):null;
 }
-export function PackageCard({record:p,onOpen,onDelete,saved=false}) {
-  return <article className="snow trip-card snow-package-card" data-package-id={p.id} data-revision={p.revision}><div className="card-body">
+export function PackageCard({record:p,onOpen,onDelete,onInspect,saved=false}) {
+  return <article className="snow trip-card snow-package-card" data-package-id={p.id} data-revision={p.revision} onClick={event=>{if(!event.target.closest('button'))onInspect?.(p);}}><div className="card-body">
     <div className="card-meta"><span className="package-status">{saved?'已保存 · ':''}{purchaseLabels[p.purchaseStatus]}</span><span>{p.completeness==='incomplete'?'待补全':'资料完整'}</span></div>
-    <h3>{p.name}</h3>
-    {p.description&&<p className="package-description">{p.description}</p>}
-    <div className="package-facts"><p>购买平台：{p.purchasePlatform??'待确认'}</p><p>适用酒店：{p.hotels===null?'待确认':p.hotels.join('、')||'已确认无'}</p><p>住宿 {p.nights??'待确认'} 间夜 <span>· 已用 {p.usedNights??'待确认'}</span></p><p>有效期：{p.validFrom??'待确认'} — {p.validTo??'待确认'}</p></div>
-    <PackageBenefits record={p}/>
-    <dl className="package-prices"><dt>报价</dt><dd>{money(p.quote)}</dd><dt>实付</dt><dd>{money(p.paid)}</dd><dt>已付额外补款</dt><dd>{money(p.paidExtra)}</dd></dl>
+    <header className="package-heading"><h3>{onInspect?<button className="package-inspect" onClick={()=>onInspect(p)} aria-label={`查看套餐详情：${p.name}`}>{p.name}</button>:p.name}</h3><p>{p.hotels===null?'适用酒店待确认':p.hotels.join('、')||'已确认无适用酒店'}</p></header>
+    <div className="package-stay-overview"><div><span>住宿间夜</span><strong>{p.nights??'待确认'}{p.nights!==null&&<small> 间夜</small>}</strong></div><div><span>已使用</span><strong>{p.usedNights??'待确认'}{p.usedNights!==null&&<small> 间夜</small>}</strong></div></div>
+    <div className="package-validity"><span>有效期</span><p>{p.validFrom??'待确认'} 至 {p.validTo??'待确认'}</p></div>
+    <div className="package-cost-overview"><div className="package-paid"><span>实付金额</span><strong>{money(p.paid)}</strong></div><dl><div><dt>套餐报价</dt><dd>{money(p.quote)}</dd></div><div><dt>已付额外补款</dt><dd>{money(p.paidExtra)}</dd></div></dl></div>
     {p.unknowns.length>0&&<p className="package-missing"><span>待补全</span>{p.unknowns.join('、')}</p>}
     {saved&&<small>保存时快照</small>}
     {(onOpen||onDelete)&&<div className="package-actions">
