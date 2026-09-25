@@ -9,6 +9,14 @@ try{
   await page.goto(process.env.SNOW_URL,{waitUntil:'domcontentloaded'});
   await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
   await page.setViewportSize({width:390,height:844});
+  const filters=page.locator('#snow-explore-filters');
+  await page.getByRole('button',{name:/筛选出行/}).waitFor();
+  assert.equal(await filters.isVisible(),false);
+  await page.getByRole('button',{name:/筛选出行/}).click();
+  await filters.getByLabel('入住日期',{exact:true}).fill('2027-02-06');
+  await filters.getByRole('button',{name:'查找方案',exact:true}).click();
+  await filters.waitFor({state:'hidden'});
+  assert.match(await page.getByRole('button',{name:/筛选出行/}).innerText(),/2027-02-06/);
   const menu=page.getByRole('dialog',{name:'雪季导航',exact:true});
   assert.equal(await menu.isVisible(),false);
   await page.getByRole('button',{name:'打开菜单',exact:true}).click();await menu.waitFor();
