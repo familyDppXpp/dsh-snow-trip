@@ -24,7 +24,7 @@ function PackageFacts({record,fields}) {
     return <div key={key}><dt>{fieldLabels[key]}</dt><dd className={value===null?'is-unknown':undefined}>{shown}</dd></div>;
   })}</dl>;
 }
-function PackageSidebar({records,plans=[],allPackages=records,onBack,missing=false,expanded=false,notes=[],onAdd,onClose,error,loading,onRetry,width,onWidth}) {
+function PackageSidebar({records,plans=[],allPackages=records,onBack,missing=false,expanded=false,onAdd,onClose,error,loading,onRetry,width,onWidth}) {
   const [tab,setTab]=useState(plans.length?'plans':'packages'),[reference,setReference]=useState(null),[latest,setLatest]=useState(false);
   const activeTab=tab==='plans'?(plans.length?'plans':'packages'):(records.length?'packages':'plans');
   const categories=[['packages','套餐',records.length],['plans','方案',plans.length]].filter(([, ,count])=>count>0);
@@ -33,6 +33,8 @@ function PackageSidebar({records,plans=[],allPackages=records,onBack,missing=fal
   const currentPackage=reference&&allPackages.find(p=>p.id===reference.entry.id);
   const shown=reference?[latest&&currentPackage?currentPackage:reference.entry.snapshot]:activeTab==='packages'?records:[];
   const openReference=(entry,plan)=>{setReference({entry,plan});setLatest(false);};
+  const PackageContainer=expanded?'article':'details',PackageHeading=expanded?'header':'summary';
+  const DetailSection=expanded?'section':'details',DetailHeading=expanded?'h3':'summary';
   const panel=useRef(null),drag=useRef(null);
   const [maxWidth,setMaxWidth]=useState(600);
   useEffect(()=>{
@@ -53,7 +55,7 @@ function PackageSidebar({records,plans=[],allPackages=records,onBack,missing=fal
       onKeyDown={event=>{const next={ArrowLeft:shownWidth+10,ArrowRight:shownWidth-10,Home:minWidth,End:maxWidth}[event.key];if(next!==undefined){event.preventDefault();resize(next);}}}
     />
     <div className="snow-package-sidebar-head"><h2>{reference||expanded?'套餐详情':'关联详情'}</h2><button className="icon-button snow-header-button" title="收起套餐详情" aria-label="收起套餐详情" onClick={onClose}><Icon name="close"/></button></div>
-    <div className="snow-package-sidebar-body">{onBack&&<button className="snow-reference-back" onClick={onBack}>← 返回关联资料</button>}{error&&<p className="error" role="alert">详情刷新失败，以下为上次读取的内容。<button onClick={onRetry}>重试</button></p>}{loading&&<p role="status">正在刷新…</p>}{!reference&&categories.length>0&&<div className="snow-detail-tabs" aria-label="详情分类">{categories.map(([id,label,count])=>categories.length===1?<span className="snow-detail-category" key={id}>{label} <span className="snow-detail-count">{count}</span></span>:<button key={id} aria-pressed={activeTab===id} onClick={()=>setTab(id)}>{label} <span className="snow-detail-count">{count}</span></button>)}</div>}
+    <div className="snow-package-sidebar-body">{onBack&&<button className="snow-reference-back" onClick={onBack}>← 返回关联资料</button>}{error&&<p className="error" role="alert">详情刷新失败，以下为上次读取的内容。<button onClick={onRetry}>重试</button></p>}{loading&&<p role="status">正在刷新…</p>}{!expanded&&!reference&&categories.length>0&&<div className="snow-detail-tabs" aria-label="详情分类">{categories.map(([id,label,count])=>categories.length===1?<span className="snow-detail-category" key={id}>{label} <span className="snow-detail-count">{count}</span></span>:<button key={id} aria-pressed={activeTab===id} onClick={()=>setTab(id)}>{label} <span className="snow-detail-count">{count}</span></button>)}</div>}
     {reference&&<div className="snow-reference-nav">
       <button className="snow-reference-back" onClick={()=>{setReference(null);setTab('plans');}}><span aria-hidden="true">←</span>返回方案</button>
       <div className="snow-reference-meta"><p>{latest&&currentPackage?'最新资料':'方案保存时快照'} · 第 {(latest&&currentPackage?currentPackage:reference.entry.snapshot).revision} 版</p>
@@ -66,18 +68,17 @@ function PackageSidebar({records,plans=[],allPackages=records,onBack,missing=fal
       <PlanSavedCard block={{kind:'tool-result',meta:{version:1,status:'saved',plan}}} onPackage={openReference} hideTitle/>
     </details>)}
     {!reference&&!plans.length&&!records.length&&<p role="status">{missing?'该资料已删除或暂不可用。':'该会话暂无关联资料。'}</p>}
-    {shown.map((record,index)=><details className="snow-detail-package" key={record.id} open={index===0?true:undefined}>
-      <summary><span><strong>{record.name}</strong><small className="snow-detail-meta"><span>{purchaseLabels[record.purchaseStatus]}</span><span className="snow-session-tag">{record.completeness==='incomplete'?'待补全':'资料完整'}</span></small></span>{menuButton(reference?(currentPackage??record):record,'package')}</summary>
+    {shown.map((record,index)=><PackageContainer className="snow-detail-package" key={record.id} open={!expanded&&index===0?true:undefined}>
+      <PackageHeading><span><strong>{record.name}</strong><small className="snow-detail-meta"><span>{purchaseLabels[record.purchaseStatus]}</span><span className="snow-session-tag">{record.completeness==='incomplete'?'待补全':'资料完整'}</span></small></span>{menuButton(reference?(currentPackage??record):record,'package')}</PackageHeading>
       <div className="snow-package-detail">
-        {notes.length>0&&<aside className="package-trip-notes" aria-label="本次出行核对提示"><strong>本次出行需核对</strong><ul>{notes.map(note=><li key={note}>{note}</li>)}</ul></aside>}
         <div className="snow-detail-highlights"><div><span>报价</span><strong>{record.quote===null?'待确认':yuan(record.quote/100)}</strong></div><div><span>住宿间夜</span><strong>{record.nights??'待确认'}{record.nights!==null&&<small> 间夜</small>}</strong></div></div>
         <section><h3>住宿信息</h3><PackageFacts record={record} fields={['hotels','roomType','resort','region','description']}/></section>
         <PackageBenefits record={record}/>
         <section><h3>购买与使用</h3><PackageFacts record={record} fields={['purchasePlatform','paid','paidExtra','validFrom','validTo','usedNights','voided']}/></section>
-        <details className="snow-detail-section" open={expanded||undefined}><summary>使用规则</summary><PackageFacts record={record} fields={['surchargeRules','unavailableDates']}/></details>
-        {record.unknowns.length>0&&<details className="snow-detail-section snow-detail-pending" open={expanded||undefined}><summary>待补全 <span>{record.unknowns.length} 项</span></summary><ul>{record.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></details>}
+        <DetailSection className="snow-detail-section"><DetailHeading>使用规则</DetailHeading><PackageFacts record={record} fields={['surchargeRules','unavailableDates']}/></DetailSection>
+        {record.unknowns.length>0&&<DetailSection className="snow-detail-section snow-detail-pending"><DetailHeading>待补全 <span>{record.unknowns.length} 项</span></DetailHeading><ul>{record.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></DetailSection>}
       </div>
-    </details>)}</div>
+    </PackageContainer>)}</div>
     {referenceNotice&&<p className="snow-reference-feedback" role="status">{referenceNotice}</p>}
     {referenceError&&<p className="snow-reference-feedback error" role="alert">{referenceError}</p>}
     {recordMenu&&<SessionMenu anchor={recordMenu.anchor} label="资料操作" compact onClose={()=>setRecordMenu(null)}><button role="menuitem" onClick={()=>{
@@ -169,6 +170,7 @@ export function App({useSessions, renderSlot, actions}) {
   const [clickedReference,setClickedReference]=useState(null);
   useEffect(()=>setClickedReference(null),[sessions.current]);
   const [packageSidebarWidth,setPackageSidebarWidth]=useState(340);
+  const [packageDrawerWidth,setPackageDrawerWidth]=useState(560);
   const [pendingDelete,setPendingDelete]=useState(null),[deleteBusy,setDeleteBusy]=useState(false),[deleteError,setDeleteError]=useState('');
   const [pendingPlanDelete,setPendingPlanDelete]=useState(null),[unavailable,setUnavailable]=useState(null);
   const [pendingArchive,setPendingArchive]=useState(null),[sessionMenu,setSessionMenu]=useState(null);
@@ -303,7 +305,7 @@ export function App({useSessions, renderSlot, actions}) {
     {!hostSaved.length&&!plansError&&<div className="empty"><Icon name="save" size={36}/><h3>还没有保存的方案</h3><p>已录入套餐可在“已录套餐”中核对。</p><button onClick={()=>setView('explore')}>查看已录套餐</button></div>}</>}
   <footer className="page-footer"><span>雪季出行工作台</span><span>{ledger?'来源：'+ledger.fileName:'文字录入 · 核对后保存'}</span></footer></div>
   {selection.length>0&&view==='explore'&&<div className="compare-bar"><div><Icon name="compare"/><b>已选 {selection.length} / 3</b><span>{chosen.map(r=>r.pkg.hotel.split('（')[0]).join(' · ')}</span></div><button className="text-button" onClick={()=>setSelection([])}>清空</button><button className="primary" onClick={()=>setComparing(true)}>对比与规划 <Icon name="arrow" size={17}/></button></div>}</main></div>
-  {view==='explore'&&inspectedPackage&&host.rows.some(record=>record.id===inspectedPackage)&&<PackageDrawer onClose={closeInspectedPackage}><PackageSidebar key={inspectedPackage} expanded notes={candidates.find(item=>item.record.id===inspectedPackage)?.notes??[]} records={host.rows.filter(record=>record.id===inspectedPackage)} width={packageSidebarWidth} onWidth={setPackageSidebarWidth} error={host.error} loading={host.loading} onRetry={host.retry} onClose={closeInspectedPackage}/></PackageDrawer>}
+  {view==='explore'&&inspectedPackage&&host.rows.some(record=>record.id===inspectedPackage)&&<PackageDrawer onClose={closeInspectedPackage}><PackageSidebar key={inspectedPackage} expanded records={host.rows.filter(record=>record.id===inspectedPackage)} width={packageDrawerWidth} onWidth={setPackageDrawerWidth} error={host.error} loading={host.loading} onRetry={host.retry} onClose={closeInspectedPackage}/></PackageDrawer>}
   {view==='conversation'&&current&&<main className="snow-session-main"><div className="snow">{actions.sessionState(current.id)&&<SessionFeedback state={actions.sessionState(current.id)}/>}</div><div className="snow-session-layout"><div className="snow-conversation" ref={conversation} onKeyDownCapture={event=>{
     if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-composer-chip="snow-record"]'))openClickedReference(event);
   }} onClickCapture={event=>{

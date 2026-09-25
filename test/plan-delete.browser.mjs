@@ -25,8 +25,9 @@ try{
  await explorePanel.getByRole('heading',{name:'套餐详情',exact:true}).waitFor();
  assert.equal(await page.locator('.package-more').count(),0);
  assert.equal(await page.locator('.package-candidates .package-trip-notes').count(),0);
- await explorePanel.getByRole('complementary',{name:'本次出行核对提示'}).waitFor();
- assert.equal(await explorePanel.locator('.snow-detail-section').first().getAttribute('open'),'');
+ assert.equal(await explorePanel.locator('.package-trip-notes, .snow-detail-tabs, details').count(),0);
+ await explorePanel.getByRole('heading',{name:'使用规则',exact:true}).waitFor();
+ assert.equal(Math.round((await explorePanel.boundingBox()).width),560);
  await explorePanel.getByRole('button',{name:'收起套餐详情',exact:true}).click();
  await page.getByRole('button',{name:'删除套餐',exact:true}).waitFor();
  await page.getByRole('button',{name:'删除套餐',exact:true}).click();
