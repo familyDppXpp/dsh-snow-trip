@@ -17,16 +17,17 @@ const uiPlugins=['ui-renderer','locale','ui-session','ui-workspace','ui-conversa
 
 function Entry({wide, prepare}) {
   const dialog=useRef(null),container=useRef(null);
-  const [opened,setOpened]=useState(false),[error,setError]=useState('');
+  const [opened,setOpened]=useState(()=>new URLSearchParams(window.location.search).get('app')==='snow-trip'),[error,setError]=useState('');
   useEffect(()=>{
     if(!opened)return;
+    dialog.current.showModal();
     let active=true,unmount;
     prepare(()=>dialog.current.close()).then(mount=>{
       if(active)unmount=mount(container.current);
     }).catch(error=>{if(active)setError(`工作台加载失败：${error.message}`);});
     return()=>{active=false;unmount?.();};
   },[opened,prepare]);
-  return <><button className="snow-entry" aria-label="打开雪季出行工作台" title="雪季出行工作台" onClick={()=>{setError('');setOpened(true);dialog.current.showModal();}}>△{wide&&' 雪季出行'}</button>
+  return <><button className="snow-entry" aria-label="打开雪季出行工作台" title="雪季出行工作台" onClick={()=>{setError('');setOpened(true);}}>△{wide&&' 雪季出行'}</button>
     <dialog className="snow-shell" ref={dialog} aria-label="雪季出行工作台" onClose={event=>{if(event.target===dialog.current)setOpened(false);}}>
       {error&&<div className="snow" role="alert">{error}<button onClick={()=>dialog.current.close()}>返回 DSH</button></div>}
       <div ref={container} className="snow-mount"/>

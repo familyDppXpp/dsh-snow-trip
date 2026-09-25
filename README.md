@@ -41,6 +41,8 @@ cd /Users/liuyunxia/Documents/ai/deepseek-harness
 DSH_HOME=/Users/liuyunxia/Documents/dsh/huaxue/.local/session-entry-home pnpm dsh --profile web --host 127.0.0.1 --port 4330
 ```
 
+在宿主地址添加 `?app=snow-trip` 可自动打开工作台，例如 `http://127.0.0.1:4330/?app=snow-trip`；刷新后仍会自动打开，关闭工作台可返回 DSH。
+
 以上绝对路径仅供本机运行，插件源码和独立构建不依赖这些路径。隔离验证环境的临时凭据在验证后清理，使用前需配置有效模型；私人文件和订单数据不在分发包内。
 
 ## Git 分发
