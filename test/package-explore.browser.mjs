@@ -31,17 +31,21 @@ try{
  await cards.first().waitFor();assert.deepEqual(await ids(),['b','a','c']);
  assert.equal(await page.getByLabel('房间补款上限（元）',{exact:true}).count(),0);
  assert.equal(await page.getByRole('option',{name:'录入顺序',exact:true}).count(),0);
- await page.getByLabel('排序',{exact:true}).selectOption('paid');assert.deepEqual(await ids(),['b','a','c']);
+ await page.getByRole('button',{name:/^排序：/}).click();await page.getByRole('radio',{name:'实付金额从低到高',exact:true}).click();assert.deepEqual(await ids(),['b','a','c']);
+ const tags=page.getByRole('button',{name:/^套餐标签：/});
+ assert.equal(await page.getByRole('checkbox',{name:'已购买',exact:true}).isVisible(),false);
+ await tags.focus();await page.keyboard.press('Enter');
  await page.getByRole('checkbox',{name:'已购买',exact:true}).focus();await page.keyboard.press('Space');
  await page.getByRole('button',{name:'查找方案',exact:true}).click();assert.deepEqual(await ids(),['a']);
- await page.getByRole('checkbox',{name:'未购买',exact:true}).check();
+ assert.match(await tags.innerText(),/已购买/);
+ await tags.click();await page.getByRole('checkbox',{name:'未购买',exact:true}).check();
  await page.getByRole('checkbox',{name:'资料完整',exact:true}).check();
  await page.getByRole('button',{name:'查找方案',exact:true}).click();assert.deepEqual(await ids(),['b']);
  await page.getByRole('button',{name:'重置筛选',exact:true}).click();assert.deepEqual(await ids(),['b','a','c']);
  await page.getByLabel('入住日期',{exact:true}).fill('');
- await page.getByRole('checkbox',{name:'待补全',exact:true}).check();
+ await tags.click();await page.getByRole('checkbox',{name:'待补全',exact:true}).check();
  await page.getByRole('button',{name:'查找方案',exact:true}).click();assert.deepEqual(await ids(),['a','d','c']);
- await page.getByLabel('目的地区域',{exact:true}).selectOption('吉林');
+ await page.getByRole('button',{name:/^目的地区域：/}).click();await page.getByRole('radio',{name:'吉林',exact:true}).click();
  await page.getByRole('button',{name:'查找方案',exact:true}).click();assert.deepEqual(await ids(),['a','d']);
  await page.getByLabel('搜索套餐或酒店',{exact:true}).fill('不存在');
  await page.getByRole('button',{name:'查找方案',exact:true}).click();assert.equal(await cards.count(),0);
@@ -49,18 +53,41 @@ try{
  for(const present of [true,false]){
    await page.evaluate(present=>window.setLegacy(present),present);await page.reload();await cards.first().waitFor();
    assert.deepEqual(await ids(),['b','a','c']);
-   assert.equal(await page.getByLabel('目的地区域',{exact:true}).getByRole('option',{name:'旧地区'}).count(),0);
+   assert.equal(await page.getByRole('radio',{name:'旧地区',exact:true}).count(),0);
  }
+ for(const width of [1440,681,390]){
+   await page.setViewportSize({width,height:900});
+   if(width<=760&&await page.getByRole('button',{name:/筛选出行/}).getAttribute('aria-expanded')==='false')await page.getByRole('button',{name:/筛选出行/}).click();
+   const styles=await page.locator('.filter-grid .field>select,.filter-grid .package-tag-trigger').evaluateAll(nodes=>nodes.map(node=>{
+     const style=getComputedStyle(node);return ['height','borderRadius','paddingLeft','paddingRight','fontSize','fontWeight','backgroundImage','backgroundPosition'].map(key=>style[key]);
+   }));
+   assert.equal(styles.length,3);assert.deepEqual(styles[0],styles[1]);assert.deepEqual(styles[1],styles[2]);
+ }
+ await page.getByRole('button',{name:/筛选出行/}).click();
  await page.setViewportSize({width:390,height:844});
  const toggle=page.getByRole('button',{name:/筛选出行/});await toggle.click();
- await page.getByRole('checkbox',{name:'待确认',exact:true}).check();
+ await tags.click();await page.getByRole('checkbox',{name:'待确认',exact:true}).check();
  await page.getByRole('button',{name:'查找方案',exact:true}).click();assert.deepEqual(await ids(),['c']);
  assert.equal(await toggle.getAttribute('aria-expanded'),'false');
- await toggle.click();await page.getByRole('checkbox',{name:'待确认',exact:true}).focus();await page.keyboard.press('Space');
+ await toggle.click();await tags.click();await page.getByRole('checkbox',{name:'待确认',exact:true}).focus();await page.keyboard.press('Space');
  assert.equal(await page.getByRole('checkbox',{name:'待确认',exact:true}).isChecked(),false);
+ await page.keyboard.press('Escape');
+ assert.equal(await tags.evaluate(el=>document.activeElement===el),true);
+ assert.equal(await page.getByRole('checkbox',{name:'待确认',exact:true}).isVisible(),false);
+ await tags.click();
+ const bounds=await page.locator('.package-tag-options:popover-open').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390);
  assert.equal(await page.locator('.snow-content').evaluate(el=>el.scrollWidth>el.clientWidth),false);
+ await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:/^住宿晚数：/}).click();
+ await page.getByRole('radio',{name:'2 晚',exact:true}).click();
+ assert.equal(await page.locator('.package-tag-options:popover-open').count(),0);
+ assert.match(await page.getByRole('button',{name:/^住宿晚数：/}).innerText(),/2 晚/);
+ await page.getByRole('button',{name:/^住宿晚数：/}).click();
+ assert.equal(await page.getByRole('radiogroup',{name:'住宿晚数',exact:true}).locator('input:checked').count(),1);
+ const optionStyles=await page.locator('.package-tag-options label').evaluateAll(nodes=>nodes.map(n=>{const s=getComputedStyle(n);return [s.minHeight,s.padding,s.fontSize];}));
+ assert.ok(optionStyles.every(style=>JSON.stringify(style)===JSON.stringify(optionStyles[0])));
  await mkdir('.local/snow-10',{recursive:true});
- await page.screenshot({path:'.local/snow-10/mobile.png',fullPage:true});
+ await page.screenshot({path:'.local/snow-10/mobile.png'});
  assert.deepEqual(errors,[]);
  console.log('通过：真实工作台组件筛选、标签组合、排序、重置、旧台账隔离、键盘和 390px 窄屏；未连接真实宿主。');
 }finally{try{await browser?.close();}finally{await new Promise(resolve=>server.close(resolve));}}
