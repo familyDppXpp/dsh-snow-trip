@@ -10,6 +10,7 @@ import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
 import {referenceSource,appendRecordPrompt,recordReferenceSource,addRecordReference,restoreDraftReferences} from './references.js';
 import {registerReferenceMessages} from './reference-message.jsx';
+import {DepartureHero} from './departure.jsx';
 
 export const inject=['slots','modules','sessions','remote','uiSession','uiConversation'];
 const uiPlugins=['ui-renderer','locale','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions','ui-input-trigger','ui-commands','ui-skill','ui-model-selection','ui-permission-presets'];
@@ -57,6 +58,15 @@ export async function apply(ctx) {
       await local.plugin({
         name:'snow-trip-session-entry',inject:['uiConversation','slots','uiRenderer','uiSession','sessions','workspaces','conversation','inputTriggers','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
+          view.slots.inject('conversation.hero.brand.mark',()=>view.slots.register({name:'conversation.hero.brand.mark',inject:()=>({
+            inputFor:id=>view.conversation.input.for(view.sessions.scope(id)),
+            chooseSkill:(id,skill)=>{
+              const scope=view.sessions.scope(id),input=view.conversation.input.for(scope),state=input.state.getSnapshot();
+              if(state.phase!=='plain')throw new Error('请先完成当前输入操作。');
+              const leading=state.draft.match(/^\/(?:snow-import|snow-plan)(?:\s+|$)/)?.[0]??'';
+              if(!input.insertText(`/${skill} `,{start:0,end:leading.length,draftRev:state.draftRev}))throw new Error('选择技能失败，请重试。');
+            },
+          })},DepartureHero));
           view.uiConversation.events.register(saveTurnDefinition);
           registerConfirmedPlan(view);
           registerReferenceMessages(view);

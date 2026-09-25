@@ -570,3 +570,37 @@
 .snow-package-drawer .snow-detail-package>header{padding:4px 0 24px}
 .snow-package-drawer .snow-detail-package>header strong{display:block;font-size:20px;line-height:1.5;overflow-wrap:anywhere}
 .snow-package-drawer .snow-detail-meta{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--muted)}
+
+/* 出发页复用宿主编辑器与技能选择，只收起通用工作区外观。 */
+.snow-departure{background:#f6f7f2;color:#203d35;--dsh-composer-side-clearance:24px;--dsh-composer-card-max-width:720px}
+.snow-departure [data-slot="conversation.hero.brand.mark"]{display:block;width:100%}
+.snow-departure span:has(>[data-slot="conversation.hero.brand.mark"]){display:block;width:100%}
+.snow-departure span:has(>[data-slot="conversation.hero.brand.mark"])+span{display:none}
+.snow-departure div:has(>[data-slot="conversation.hero.workspace"]){display:none}
+.snow.snow-departure-welcome{position:relative;width:100%;max-width:none;margin:auto;padding:0 0 16px;text-align:left}
+.snow-departure-welcome .snow-departure-season{display:inline-flex;align-items:center;gap:10px;font-size:10px;line-height:20px;letter-spacing:2px;color:#748477}
+.snow-departure-season::before{content:'';width:18px;height:1px;background:#8ca38f}
+.snow-departure-welcome h1{position:relative;margin:22px 0 20px;font-size:clamp(32px,3.6vw,46px);line-height:1.35;letter-spacing:-1px;font-weight:500;color:#203d35}
+.snow-departure-welcome h1>span{display:block;margin-bottom:6px;font-size:23px;letter-spacing:0;color:#6b8072;font-weight:400}
+.snow-departure-welcome p{position:relative;font-size:13px;line-height:1.9;color:#738176;font-weight:400}
+.snow-departure-shortcuts{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.snow .snow-departure-shortcuts button{display:flex;align-items:center;gap:12px;justify-content:flex-start;padding:12px 14px;background:#ffffff70;text-align:left;border:1px solid #dce3d8;border-radius:10px;color:#294d40;white-space:normal;box-shadow:none}
+.snow-shortcut-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:8px;background:#eaf0e6;color:#577860}
+.snow-shortcut-copy{display:grid;gap:4px}
+.snow-shortcut-copy strong{font-size:13px;line-height:1.4;font-weight:500}
+.snow-shortcut-copy small{font-size:12px;line-height:1.5;color:#7b887f;font-weight:400}
+.snow-shortcut-check{visibility:hidden;font-size:13px;margin-left:4px}
+.snow .snow-departure-shortcuts button:hover{background:#f0f4ec;border-color:#b2c2af}
+.snow .snow-departure-shortcuts button[aria-pressed="true"]{background:#e8efe3;border-color:#9ab194;color:#234b32}
+.snow-departure-shortcuts button[aria-pressed="true"] .snow-shortcut-check{visibility:visible}
+.snow-departure [data-composer-card]{background:#fff;border:1px solid #d7e0d5;border-radius:16px;box-shadow:0 6px 24px #203d3506;transition:border-color .15s,box-shadow .15s}
+.snow-departure [data-composer-card]:focus-within{border-color:#94ae99;box-shadow:0 6px 24px #203d3509}
+.snow-conversation [data-composer-card] button[aria-label^="访问模式"],.snow-conversation [data-composer-card] button[aria-label^="Access mode"]{display:none}
+.snow-departure-shortcuts button:focus-visible{outline:2px solid #375f4f;outline-offset:3px}
+.snow-departure-mountains{position:absolute;right:0;top:30px;width:34%;height:190px;color:#9eafa0;opacity:.6;pointer-events:none}
+@media(max-width:600px){.snow-departure{--dsh-composer-side-clearance:24px}.snow-departure-shortcuts{gap:10px;margin-top:24px}.snow .snow-departure-shortcuts button{flex:1 1 210px;min-width:0}.snow-shortcut-check{margin-left:auto}.snow-departure-shortcuts small{line-height:1.6}.snow-departure-welcome h1{font-size:32px}.snow-departure-welcome h1>span{font-size:20px}.snow-departure-mountains{width:40%;height:140px;top:50px;opacity:.3}}
+@media(prefers-reduced-motion:reduce){.snow-departure [data-composer-card]{transition:none}}
+.snow-conversation [data-composer-text-ref]{background:#e9eee7;border-radius:4px;padding:2px 5px;color:#375f4f}
+
+.snow-departure [data-composer-card] button[aria-label="发送消息"]{background:#375f4f}
+.snow-departure [data-composer-card] button[aria-label="发送消息"]:disabled{background:#aebfb1}
