@@ -17,7 +17,7 @@ const uiPlugins=['ui-renderer','locale','shortcuts','ui-session','ui-workspace',
 
 function Entry({wide, prepare}) {
   const dialog=useRef(null),container=useRef(null);
-  const [opened,setOpened]=useState(()=>new URLSearchParams(window.location.search).get('app')==='snow-trip'),[error,setError]=useState('');
+  const [opened,setOpened]=useState(()=>[window.location.search,window.location.hash.slice(1)].some(part=>new URLSearchParams(part).get('app')==='snow-trip')),[error,setError]=useState('');
   useEffect(()=>{
     if(!opened)return;
     dialog.current.showModal();
