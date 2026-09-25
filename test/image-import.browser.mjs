@@ -15,7 +15,7 @@ try{
   await page.goto(url,{waitUntil:'networkidle'});await page.waitForFunction(()=>window.snowSessionCheck);
   await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
   const panel=page.getByRole('dialog',{name:'雪季出行工作台',exact:true});
-  await panel.getByRole('button',{name:'新增会话',exact:true}).click();
+  await panel.getByRole('button',{name:'出发去山野',exact:true}).click();
   const setupEditor=panel.locator('[contenteditable=true]');await setupEditor.fill('/model');await setupEditor.press('Enter');
   await panel.getByRole('option',{name:/雪季确定性集成检查/}).click();
   await page.waitForFunction(()=>document.querySelector('.snow-conversation [contenteditable=true]')?.textContent==='');
@@ -23,7 +23,7 @@ try{
   assert.equal(await panel.getByRole('button',{name:'套餐与来源',exact:true}).count(),0);
   assert.equal(await panel.getByRole('button',{name:'导入截图',exact:true}).count(),0);
   const before=(await page.evaluate(()=>window.snowSessionCheck.listPackages())).value.length;
-  await panel.getByRole('button',{name:'新增会话',exact:true}).click();
+  await panel.getByRole('button',{name:'出发去山野',exact:true}).click();
   await panel.locator('input[type=file]').setInputFiles({name:'合成套餐.png',mimeType:'image/png',buffer:png});
   const editor=panel.locator('[contenteditable=true]');await editor.waitFor();
   assert.equal(await editor.innerText(),'');
@@ -52,7 +52,7 @@ try{
   const id=await card.getAttribute('data-package-id');assert.equal(await card.getByText('资料来源',{exact:true}).count(),0);
   await panel.getByRole('button',{name:'找出行方案',exact:true}).click();await panel.locator(`.snow-content [data-package-id="${id}"]`).waitFor();
   // 独立文字模型拒绝图片；宿主 /model 提供恢复入口，错误不新增记录。
-  await panel.getByRole('button',{name:'新增会话',exact:true}).click();
+  await panel.getByRole('button',{name:'出发去山野',exact:true}).click();
   await panel.locator('input[type=file]').setInputFiles({name:'合成套餐.png',mimeType:'image/png',buffer:png});
   await editor.fill('/model');await editor.press('Enter');
   await panel.getByRole('option',{name:/仅文字测试模型/}).click();

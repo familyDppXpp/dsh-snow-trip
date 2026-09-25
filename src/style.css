@@ -339,11 +339,14 @@
 .snow.snow-save-composer .snow-plan-card[data-plan-stage=results]>.snow-plan-message>summary{min-height:28px;padding:2px 0;font-size:12px}
 
 /* 已存方案：紧凑页头、突出整趟成本，完整展开费用依据。 */
-.snow .snow-saved-title{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:0 0 24px}
-.snow .snow-saved-title h1{font-weight:600;line-height:1.4;font-family:inherit;font-size:26px;margin:0 0 8px}
-.snow .snow-saved-title h1 span{font-size:13px;font-weight:400;color:var(--muted);margin-left:10px}
-.snow .snow-saved-title p{line-height:1.7}
-.snow .snow-saved-title>button{flex-shrink:0}
+.snow .snow-saved-title{display:flex;align-items:center;min-height:200px;gap:24px;margin:0 0 28px;padding:32px 36px;border-radius:12px}
+.snow .snow-saved-title .hero-copy{width:60%}
+.snow .snow-saved-title h1{display:flex;align-items:center;flex-wrap:wrap;gap:14px;font-weight:600;line-height:1.35;font-family:inherit;font-size:34px;letter-spacing:0;margin:0 0 16px}
+.snow .snow-saved-title h1 span{font-size:13px;line-height:24px;font-weight:500;color:var(--primary);padding:0 8px;border:1px solid #bccdc1;border-radius:4px;letter-spacing:0}
+.snow .snow-saved-title p{font-size:13px;line-height:1.9;margin:0;color:#52665a;max-width:none}
+.snow .snow-saved-title .mountain-art{width:49%;height:100%;right:0;pointer-events:none}
+@media(max-width:760px){.snow .snow-saved-title{min-height:180px;padding:24px;margin-bottom:20px}.snow .snow-saved-title .hero-copy{width:100%}.snow .snow-saved-title h1{font-size:27px;gap:10px;margin-bottom:12px}.snow .snow-saved-title .mountain-art{width:72%;opacity:.18;right:0}.snow .snow-saved-title p{font-size:12px}}
+
 .snow .snow-saved-entry{border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:24px;overflow:hidden}
 .snow .snow-saved-entry>.snow-saved-card{border:0;margin:0;border-radius:0;box-shadow:none}
 .snow .snow-saved-card{padding:24px;background:#fff}

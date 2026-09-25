@@ -47,7 +47,7 @@ try {
     await page.screenshot({path:'.local/session-entry-homepage.png'});
   });
   assert.equal(await dialog.getByLabel('会话工作区',{exact:true}).count(),0);
-  await dialog.getByRole('button',{name:'新增会话',exact:true}).click();
+  await dialog.getByRole('button',{name:'出发去山野',exact:true}).click();
   const editor=dialog.locator('[contenteditable=true]');
   await editor.waitFor();
   const first=await page.evaluate(()=>window.snowSessionCheck.state().current);
@@ -90,7 +90,7 @@ try {
     });
   } else {report['真实模型响应']='未验证（需 SNOW_REAL_MODEL=1）';}
   await dialog.getByRole('button',{name:'找出行方案',exact:true}).click();
-  await dialog.getByRole('button',{name:'新增会话',exact:true}).click();
+  await dialog.getByRole('button',{name:'出发去山野',exact:true}).click();
   await editor.waitFor();
   const second=await page.evaluate(()=>window.snowSessionCheck.state().current);
   await check('草稿可修改、真实附件选择、不自动发送',async()=>{
@@ -119,7 +119,7 @@ try {
       const file=resolve(process.env.SNOW_PRESET_FILE),backup=`${file}.test-disabled`;
       await rename(file,backup);
       try {
-        await dialog.getByRole('button',{name:'新增会话',exact:true}).click();
+        await dialog.getByRole('button',{name:'出发去山野',exact:true}).click();
         await dialog.getByRole('alert').filter({hasText:'雪季预设选择失败'}).waitFor();
         assert.equal(await editor.count(),0);
       } finally {await rename(backup,file);}
@@ -128,7 +128,7 @@ try {
   await check('手机视口可见导航与会话入口',async()=>{
     await page.setViewportSize({width:390,height:844});
     await dialog.getByRole('button',{name:'找出行方案',exact:true}).click();
-    assert.equal(await dialog.getByRole('button',{name:'新增会话',exact:true}).isVisible(),true);
+    assert.equal(await dialog.getByRole('button',{name:'出发去山野',exact:true}).isVisible(),true);
     const box=await dialog.boundingBox();assert.ok(box.width<=390);
     await page.screenshot({path:'.local/session-entry-mobile.png'});
   });

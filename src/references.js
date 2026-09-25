@@ -91,3 +91,8 @@ export function restoreDraftReferences(input,remote) {
   void restore();
   return()=>{disposed=true;unsubscribe();};
 }
+
+export function appendRecordPrompt(input,prompt,record) {
+  const {type}=reference.parse(JSON.parse(prompt));
+  return addRecordReference(input,record,type);
+}

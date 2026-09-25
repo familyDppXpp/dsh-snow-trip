@@ -1,3 +1,4 @@
+import {appendRecordPrompt} from './references.js';
 export const SNOW_PRESET = 'snow-trip';
 
 export function sessionTitle(row) {
@@ -9,7 +10,7 @@ export function groupSessions(rows, query='', packages=[], plans=[]) {
   for(const p of packages)status.set(p.sessionId,status.get(p.sessionId)==='待补全'||p.completeness==='incomplete'?'待补全':'资料完整');
   const counts=new Map();
   for(const plan of plans)counts.set(plan.sessionId,(counts.get(plan.sessionId)||0)+1);
-  const groups=new Map([['其他',[]],['套餐',[]],['出行方案',[]]]);
+  const groups=new Map([['出行方案',[]],['套餐',[]],['其他',[]]]);
   for(const row of [...rows].filter(row=>!row.blank&&sessionTitle(row).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))) {
     const packageStatus=status.get(row.id);
     const planCount=counts.get(row.id)||0;
@@ -71,15 +72,14 @@ export function packagesForSession(packages,sessionId) {
 }
 
 export function continuationPrompt(record,kind) {
-  return kind==='plan'?`请加载 snow-plan，回顾已存方案“${record.title}”（ID：${record.id}），在保留原方案的基础上继续调整。`:`请查询套餐“${record.name}”（ID：${record.id}）的最新资料，继续补充信息，修改后请让我确认再保存。`;
+  return JSON.stringify({type:kind,id:record.id});
 }
-export async function continueSnowSession(sessions,input,archivedIds,id,prompt) {
+export async function continueSnowSession(sessions,input,archivedIds,id,prompt,record) {
   await sessions.refresh();
   if(archivedIds.includes(id)||sessions.list.getSnapshot().byId[id]?.projectionValues?.agentPreset!==SNOW_PRESET)return false;
   openSnowSession(sessions,id);
   const scope=sessions.scope(id);
   if(!scope)throw new Error('会话尚未就绪，请重试。');
-  const target=input.for(scope),draft=target.state.getSnapshot().draft;
-  if(!draft.includes(prompt))target.setDraft(draft?`${draft}\n\n${prompt}`:prompt);
+  appendRecordPrompt(input.for(scope),prompt,record);
   return true;
 }

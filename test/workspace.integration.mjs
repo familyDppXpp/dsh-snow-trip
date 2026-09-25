@@ -15,7 +15,7 @@ try {
   const path=join(homedir(),'dsh-snow-trip');
   let workspaceId;
   for(let i=0;i<2;i++) {
-    await panel.getByRole('button',{name:'新增会话',exact:true}).click();
+    await panel.getByRole('button',{name:'出发去山野',exact:true}).click();
     await panel.locator('.snow-conversation [contenteditable=true]').waitFor();
     const state=await page.evaluate(()=>window.snowSessionCheck.state());
     assert.equal(state.byId[state.current].cwd,path);

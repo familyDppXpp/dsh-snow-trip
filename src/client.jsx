@@ -8,7 +8,7 @@ import {PlanQuestionCard,PlanStageFailure} from './plan-question-card.jsx';
 import {planQuestion} from './plan-question.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
-import {referenceSource,recordReferenceSource,addRecordReference,restoreDraftReferences} from './references.js';
+import {referenceSource,appendRecordPrompt,recordReferenceSource,addRecordReference,restoreDraftReferences} from './references.js';
 import {registerReferenceMessages} from './reference-message.jsx';
 
 export const inject=['slots','modules','sessions','remote','uiSession','uiConversation'];
@@ -113,15 +113,16 @@ export async function apply(ctx) {
             fork:async id=>{const child=await view.sessions.fork({sessionId:id,increaseTitle:true});await view.sessions.refresh();openSnowSession(view.sessions,child);lastSession=child;return child;},
             rename:(id,title)=>renameSnowSession(view.sessions,id,title),
             close:()=>close(),
-            create:async(draft)=>{
+            create:async(draft,record)=>{
               const result=await view.remote.snowTrip.ensureWorkspace();
               if(!result.ok)throw new Error(`准备工作区失败：${result.error.message}`);
               const workspace=await view.workspaces.create({path:result.value});
-              const id=await createSnowSession(view.sessions,view.remote.agentPresets,view.conversation.input,workspace.workspaceId,draft);
+              const id=await createSnowSession(view.sessions,view.remote.agentPresets,view.conversation.input,workspace.workspaceId,record?undefined:draft);
+              if(record)appendRecordPrompt(view.conversation.input.for(view.sessions.scope(id)),draft,record);
               lastSession=id;return id;
             },
             continueRecord:async(record,prompt)=>{
-              const opened=await continueSnowSession(view.sessions,view.conversation.input,view.workspaces.list.getSnapshot().archivedSessionIds,record.sessionId,prompt);
+              const opened=await continueSnowSession(view.sessions,view.conversation.input,view.workspaces.list.getSnapshot().archivedSessionIds,record.sessionId,prompt,record);
               if(opened)lastSession=record.sessionId;
               return opened;
             },

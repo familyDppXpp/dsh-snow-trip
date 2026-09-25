@@ -13,7 +13,7 @@ try {
   await search.waitFor();
   const existing=panel.locator('.snow-session-open[title="新会话"]');
   if(await existing.count())await existing.first().click();
-  else await panel.getByRole('button',{name:'新增会话',exact:true}).click();
+  else await panel.getByRole('button',{name:'出发去山野',exact:true}).click();
   await panel.locator('.snow-conversation [contenteditable=true]').waitFor();
   const active=panel.locator('.snow-session-open[aria-current=page]');
   assert.equal(await active.locator('strong').innerText(),'新会话');

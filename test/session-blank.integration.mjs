@@ -7,7 +7,7 @@ try{
   const page=await browser.newPage();await page.goto(url,{waitUntil:'networkidle'});
   await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
   const panel=page.getByRole('dialog',{name:'雪季出行工作台',exact:true});
-  await panel.getByRole('button',{name:'新增会话',exact:true}).click();
+  await panel.getByRole('button',{name:'出发去山野',exact:true}).click();
   await panel.locator('.snow-conversation [contenteditable=true]').waitFor();
   const id=await page.evaluate(()=>window.snowSessionCheck.state().current);
   assert.equal(await panel.locator(`.snow-session-row[data-session-id="${id}"]`).count(),0);

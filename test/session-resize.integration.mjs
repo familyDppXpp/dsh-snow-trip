@@ -30,7 +30,7 @@ try {
   await page.setViewportSize({width:390,height:844});
   await page.waitForFunction(()=>document.querySelector('.snow-rail').getBoundingClientRect().width<=195);
   assert.equal(await width(),195);
-  assert.equal(await page.getByRole('button',{name:'新增会话',exact:true}).isVisible(),true);
+  assert.equal(await page.getByRole('button',{name:'出发去山野',exact:true}).isVisible(),true);
   assert.deepEqual(errors,[]);
   console.log('通过：拖拽增宽、松手停止、键盘调整、上下限与手机宽度约束。');
 } finally {await browser.close();}

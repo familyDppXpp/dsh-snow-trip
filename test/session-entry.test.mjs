@@ -37,14 +37,14 @@ test('会话标题、套餐分类与搜索使用真实关联，不显示空白�
     {id:'yesterday',title:'长白山预算',updatedAt:+new Date(2026,8,22,23)},
     {id:'named',blank:true,title:'我的行程',updatedAt:+new Date(2026,8,23,11)},
   ];
-  assert.equal(groupSessions(rows,'',packages)[1].items[0].packageStatus,'待补全');
-  assert.equal(groupSessions(rows,'',packages.slice(0,1))[1].items[0].packageStatus,'资料完整');
+  assert.equal(groupSessions(rows,'',packages)[0].items[0].packageStatus,'待补全');
+  assert.equal(groupSessions(rows,'',packages.slice(0,1))[0].items[0].packageStatus,'资料完整');
   assert.equal(groupSessions(rows,'',[])[0].label,'其他');
   assert.deepEqual(groupSessions(rows,'',[])[0].items.map(r=>r.id),['yesterday','old']);
-  assert.equal(groupSessions(rows,'',packages)[0].items[0].packageStatus,undefined);
+  assert.equal(groupSessions(rows,'',packages)[1].items[0].packageStatus,undefined);
   assert.equal(sessionTitle(rows[1]),'新会话');
   assert.equal(sessionTitle(rows[3]),'我的行程');
-  assert.deepEqual(groupSessions(rows,'',packages).map(g=>[g.label,g.items.map(r=>r.id)]),[['其他',['yesterday']],['套餐',['old']]]);
+  assert.deepEqual(groupSessions(rows,'',packages).map(g=>[g.label,g.items.map(r=>r.id)]),[['套餐',['old']],['其他',['yesterday']]]);
   assert.deepEqual(groupSessions(rows,'  禾木  ',packages)[0].items.map(r=>r.id),['old']);
   assert.deepEqual(groupSessions(rows,'不存在',packages),[]);
   assert.deepEqual(groupSessions(rows,'我的行程',packages),[]);
@@ -91,21 +91,27 @@ test('详情侧栏只展示当前会话套餐，最近更新优先且不修改�
 
 test('方案关联优先分类，预填保留草稿并去重，归档和缺失会话不打开',async()=>{
   const {continueSnowSession,continuationPrompt}=await import('../src/sessions.js');
-  const record={id:'p',title:'春节方案',name:'测试套餐',sessionId:'s'};
+  const record={id:'11111111-1111-4111-8111-111111111111',title:'春节方案',name:'测试套餐',sessionId:'s'};
   const rows=[{id:'s',title:'混合会话'},{id:'t',title:'其他'}];
   const groups=groupSessions(rows,'',[{sessionId:'s',completeness:'complete'}],[record,{...record,id:'p2'}]);
-  assert.deepEqual(groups.map(g=>[g.label,g.items.map(r=>r.id)]),[['其他',['t']],['出行方案',['s']]]);
-  assert.equal(groups[1].items[0].packageStatus,'已存 2 份');
+  assert.deepEqual(groups.map(g=>[g.label,g.items.map(r=>r.id)]),[['出行方案',['s']],['其他',['t']]]);
+  assert.equal(groups[0].items[0].packageStatus,'已存 2 份');
   let draft='我已经写好的要求',opened=0;
   const sessions={refresh:async()=>{},list:{getSnapshot:()=>({byId:{s:{projectionValues:{agentPreset:'snow-trip'}}}})},open:()=>opened++,scope:id=>({id})};
-  const input={for:()=>({state:{getSnapshot:()=>({draft})},setDraft:value=>draft=value,submit:()=>assert.fail('不得自动发送')})};
+  const occurrences=[];let draftRev=1;
+  const target={state:{getSnapshot:()=>({draft,draftRev,occurrences})},insertText:(text)=>{draft+=text;draftRev++;return true;},insertReference:ref=>{occurrences.push({...ref,offset:draft.length,length:ref.clipboardText.length});draft+=ref.clipboardText+' ';draftRev++;return true;},submit:()=>assert.fail('不得自动发送')};
+  const input={for:()=>target};
   for(const kind of ['plan','package']){
     const prompt=continuationPrompt(record,kind);
     assert.ok(prompt.includes(record.id));
-    assert.equal(await continueSnowSession(sessions,input,[],'s',prompt),true);
-    const once=draft;await continueSnowSession(sessions,input,[],'s',prompt);assert.equal(draft,once);
+    assert.equal(await continueSnowSession(sessions,input,[],'s',prompt,record),true);
+    const once=draft;await continueSnowSession(sessions,input,[],'s',prompt,record);assert.equal(draft,once);
   }
-  assert.ok(draft.startsWith('我已经写好的要求\n\n'));
+  assert.ok(draft.startsWith('我已经写好的要求'));
+  assert.ok(!draft.includes('继续调整'));
+  assert.ok(!draft.includes('继续补充信息'));
+  assert.equal(occurrences.length,2);
+  assert.equal(occurrences[0].source,'snow-record');
   const before=opened;
   assert.equal(await continueSnowSession(sessions,input,['s'],'s','新提示'),false);
   assert.equal(await continueSnowSession(sessions,input,[],'missing','新提示'),false);
