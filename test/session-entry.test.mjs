@@ -88,3 +88,28 @@ test('详情侧栏只展示当前会话套餐，最近更新优先且不修改�
   assert.deepEqual(packagesForSession(rows,'none'),[]);
   assert.deepEqual(rows.map(p=>p.id),['old','other','new']);
 });
+
+test('方案关联优先分类，预填保留草稿并去重，归档和缺失会话不打开',async()=>{
+  const {continueSnowSession,continuationPrompt}=await import('../src/sessions.js');
+  const record={id:'p',title:'春节方案',name:'测试套餐',sessionId:'s'};
+  const rows=[{id:'s',title:'混合会话'},{id:'t',title:'其他'}];
+  const groups=groupSessions(rows,'',[{sessionId:'s',completeness:'complete'}],[record,{...record,id:'p2'}]);
+  assert.deepEqual(groups.map(g=>[g.label,g.items.map(r=>r.id)]),[['其他',['t']],['出行方案',['s']]]);
+  assert.equal(groups[1].items[0].packageStatus,'已存 2 份');
+  let draft='我已经写好的要求',opened=0;
+  const sessions={refresh:async()=>{},list:{getSnapshot:()=>({byId:{s:{projectionValues:{agentPreset:'snow-trip'}}}})},open:()=>opened++,scope:id=>({id})};
+  const input={for:()=>({state:{getSnapshot:()=>({draft})},setDraft:value=>draft=value,submit:()=>assert.fail('不得自动发送')})};
+  for(const kind of ['plan','package']){
+    const prompt=continuationPrompt(record,kind);
+    assert.ok(prompt.includes(record.id));
+    assert.equal(await continueSnowSession(sessions,input,[],'s',prompt),true);
+    const once=draft;await continueSnowSession(sessions,input,[],'s',prompt);assert.equal(draft,once);
+  }
+  assert.ok(draft.startsWith('我已经写好的要求\n\n'));
+  const before=opened;
+  assert.equal(await continueSnowSession(sessions,input,['s'],'s','新提示'),false);
+  assert.equal(await continueSnowSession(sessions,input,[],'missing','新提示'),false);
+  assert.equal(opened,before);
+  sessions.refresh=async()=>{throw new Error('读取失败');};
+  await assert.rejects(continueSnowSession(sessions,input,[],'s','提示'),/读取失败/);
+});

@@ -4,13 +4,16 @@ export function sessionTitle(row) {
   return row.title || (row.blank ? '新会话' : row.displayTitle) || '未命名会话';
 }
 
-export function groupSessions(rows, query='', packages=[]) {
+export function groupSessions(rows, query='', packages=[], plans=[]) {
   const status=new Map();
   for(const p of packages)status.set(p.sessionId,status.get(p.sessionId)==='待补全'||p.completeness==='incomplete'?'待补全':'资料完整');
+  const counts=new Map();
+  for(const plan of plans)counts.set(plan.sessionId,(counts.get(plan.sessionId)||0)+1);
   const groups=new Map([['其他',[]],['套餐',[]],['出行方案',[]]]);
   for(const row of [...rows].filter(row=>!row.blank&&sessionTitle(row).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))) {
     const packageStatus=status.get(row.id);
-    groups.get(packageStatus?'套餐':'其他').push({...row,packageStatus});
+    const planCount=counts.get(row.id)||0;
+    groups.get(planCount?'出行方案':packageStatus?'套餐':'其他').push({...row,packageStatus:planCount?`已存 ${planCount} 份`:packageStatus});
   }
   return [...groups].filter(([,items])=>items.length).map(([label,items])=>({label,items}));
 }
@@ -65,4 +68,18 @@ export function mirrorQuestions(source, target) {
 
 export function packagesForSession(packages,sessionId) {
   return packages.filter(p=>p.sessionId===sessionId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export function continuationPrompt(record,kind) {
+  return kind==='plan'?`请加载 snow-plan，回顾已存方案“${record.title}”（ID：${record.id}），在保留原方案的基础上继续调整。`:`请查询套餐“${record.name}”（ID：${record.id}）的最新资料，继续补充信息，修改后请让我确认再保存。`;
+}
+export async function continueSnowSession(sessions,input,archivedIds,id,prompt) {
+  await sessions.refresh();
+  if(archivedIds.includes(id)||sessions.list.getSnapshot().byId[id]?.projectionValues?.agentPreset!==SNOW_PRESET)return false;
+  openSnowSession(sessions,id);
+  const scope=sessions.scope(id);
+  if(!scope)throw new Error('会话尚未就绪，请重试。');
+  const target=input.for(scope),draft=target.state.getSnapshot().draft;
+  if(!draft.includes(prompt))target.setDraft(draft?`${draft}\n\n${prompt}`:prompt);
+  return true;
 }

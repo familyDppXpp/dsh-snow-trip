@@ -1,4 +1,4 @@
-// 本机 IndexedDB 持久化；替换台账与方案分别存储，失败时不覆盖当前内存数据。
+// 本机 IndexedDB 台账持久化，失败时不覆盖当前内存数据。
 export async function storage(key, value) {
   const db=await new Promise((resolve,reject)=>{
     const r=indexedDB.open('dsh-snow-trip',1);

@@ -85,28 +85,54 @@ export class SnowTrip extends TypertRemoteService {
     await this.ready;
     return [...this.domain.table('plans').entries()].map(([,p])=>structuredClone(p));
   }
+  @Remote('deletePlan')
+  async deletePlan(id: string): Promise<{sessionId:string|null;archiveError:string|null}> {
+    await this.ready;
+    return this.write(async()=>{
+      const key=z.uuid().parse(id),table=this.domain.table('plans'),record=table.get(key);
+      if(!record)return {sessionId:null,archiveError:null};
+      const last=![...table.entries()].some(([other,p])=>other!==key&&p.sessionId===record.sessionId)&&![...this.domain.table('packages').entries()].some(([,p])=>p.sessionId===record.sessionId);
+      await table.delete(key);
+      if(last){
+        try{await this.ctx.workspaceRegistry.archiveSession(record.sessionId as Parameters<WorkspaceRegistry['archiveSession']>[0]);}
+        catch(error){return {sessionId:null,archiveError:error instanceof Error?error.message:String(error)};}
+      }
+      return {sessionId:last?record.sessionId:null,archiveError:null};
+    });
+  }
   @Remote('getPlan')
   async getPlan(id: string): Promise<PlanRecord|null> {
     await this.ready;
     return structuredClone(this.domain.table('plans').get(z.uuid().parse(id))??null);
   }
   @Remote('deletePackage')
-  async deletePackage(id: string, revision: number, archiveSession: boolean): Promise<{sessionId:string|null;archiveError:string|null}> {
+  async deletePackage(id: string, revision: number, archiveSession: boolean, confirmedPlanIds?: string[]): Promise<{sessionId:string|null;archiveError:string|null}> {
     await this.ready;
     return this.write(async()=>{
       const key=z.uuid().parse(id);
       z.number().int().min(1).parse(revision);z.boolean().parse(archiveSession);
-      const table=this.domain.table('packages');
+      const confirmed=z.array(z.uuid()).parse(confirmedPlanIds??[]);
+      const table=this.domain.table('packages'),plans=this.domain.table('plans');
       const record=table.get(key);
       if(!record||record.revision!==revision)throw new Error('套餐已变更，请刷新后重新确认');
-      const last=![...table.entries()].some(([other,p])=>other!==key&&p.sessionId===record.sessionId);
+      const affected=[...plans.entries()].map(([,p])=>p).filter(p=>p.packages.some(entry=>entry.id===key));
+      if(confirmed.length!==affected.length||new Set(confirmed).size!==confirmed.length||affected.some(p=>!confirmed.includes(p.id)))throw new Error('受影响的方案已变更，请关闭确认框并重新删除，核对方案列表。');
+      const affectedIds=new Set(confirmed);
+      const last=![...table.entries()].some(([other,p])=>other!==key&&p.sessionId===record.sessionId)&&![...plans.entries()].some(([planId,p])=>!affectedIds.has(planId)&&p.sessionId===record.sessionId);
       if(last!==archiveSession)throw new Error('关联套餐已变更，请刷新后重新确认');
-      await table.delete(key);
-      if(last) {
-        try{await this.ctx.workspaceRegistry.archiveSession(record.sessionId as Parameters<WorkspaceRegistry['archiveSession']>[0]);}
-        catch(error){return {sessionId:null,archiveError:error instanceof Error?error.message:String(error)};}
+      // 存储没有跨记录事务：先删方案，最后删套餐，失败时保留套餐以便重新确认重试。
+      let deleted=0;
+      try{
+        for(const plan of affected){await plans.delete(plan.id);deleted++;}
+        await table.delete(key);
+      }catch(error){throw new Error(`删除未完成（已删除 ${deleted} 份关联方案），请刷新后重新核对：${error instanceof Error?error.message:String(error)}`);}
+      const errors:string[]=[];let sessionId:string|null=null;
+      for(const candidate of new Set([record.sessionId,...affected.map(p=>p.sessionId)])){
+        if([...table.entries()].some(([,p])=>p.sessionId===candidate)||[...plans.entries()].some(([,p])=>p.sessionId===candidate))continue;
+        try{await this.ctx.workspaceRegistry.archiveSession(candidate as Parameters<WorkspaceRegistry['archiveSession']>[0]);if(candidate===record.sessionId)sessionId=candidate;}
+        catch(error){errors.push(error instanceof Error?error.message:String(error));}
       }
-      return {sessionId:last?record.sessionId:null,archiveError:null};
+      return {sessionId,archiveError:errors.length?errors.join('；'):null};
     });
   }
   @Remote('archiveSession')
@@ -115,6 +141,7 @@ export class SnowTrip extends TypertRemoteService {
     return this.write(async()=>{
       const sessionId=z.string().trim().min(1).parse(id);
       if([...this.domain.table('packages').entries()].some(([,record])=>record.sessionId===sessionId))throw new Error('该会话有关联套餐，请在出行方案的套餐卡片中删除。');
+      if([...this.domain.table('plans').entries()].some(([,record])=>record.sessionId===sessionId))throw new Error('该会话有关联方案，请在已存方案页面删除。');
       await this.ctx.workspaceRegistry.archiveSession(sessionId as Parameters<WorkspaceRegistry['archiveSession']>[0]);
     });
   }

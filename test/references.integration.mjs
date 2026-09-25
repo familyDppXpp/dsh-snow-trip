@@ -1,0 +1,52 @@
+// 真实宿主输入框检查：只编辑独立浏览器草稿，不发送消息或改动套餐/方案。
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const {chromium}=await import(process.env.SNOW_PLAYWRIGHT||'playwright');
+const url=process.env.SNOW_DSH_URL||(await readFile(process.env.SNOW_HOST_LOG,'utf8')).match(/http:\/\/127\.0\.0\.1:\d+\/\?token=[^\s]+/)[0];
+const browser=await chromium.launch({headless:true,executablePath:process.env.SNOW_CHROME});
+try{
+ const page=await browser.newPage({viewport:{width:1512,height:863}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(15000);
+ await page.goto(url,{waitUntil:'domcontentloaded'});await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
+ await page.getByRole('region',{name:'出行方案',exact:true}).locator('.snow-session-open').first().click();
+ const panel=page.locator('#snow-package-sidebar'),editor=page.locator('.snow-conversation [contenteditable="true"]').first();await editor.waitFor();
+ assert.equal((await editor.innerText()).trim(),'','检查只使用空白草稿，避免覆盖已有输入');
+ await editor.fill('@');
+ await page.getByRole('option').first().waitFor();
+ const choices=page.getByRole('option');assert.ok(await choices.count()>1);
+ const firstName=await choices.first().innerText();
+ await choices.first().click();
+ await editor.locator('[data-composer-chip="snow-record"]').waitFor();
+ assert.ok((await editor.innerText()).includes(firstName.trim()));
+ await editor.press('End');await editor.press('Space');await editor.type('@春节');
+ await page.getByRole('option').first().waitFor();
+ for(const option of await page.getByRole('option').all())assert.match(await option.innerText(),/春节/);
+ await page.screenshot({path:'.local/reference-menu-live.png'});
+ await editor.press('Escape');await editor.click();await editor.press('Meta+A');await editor.press('Backspace');
+ await page.waitForFunction(()=>document.querySelector('.snow-conversation [contenteditable="true"]').textContent.trim()==='');
+ await editor.fill('请对比这些资料');
+ await page.waitForFunction(()=>document.querySelector('.snow-conversation [contenteditable="true"]').textContent==='请对比这些资料');
+ const plan=panel.locator('.snow-detail-plan').first();await plan.waitFor();
+ async function add(row){await row.locator('summary').first().hover();await row.locator('.snow-record-menu-button').first().click();await page.getByRole('menuitem',{name:'添加到会话',exact:true}).click();}
+ await add(plan);
+ const chips=editor.locator('[data-composer-chip="snow-record"]');await chips.first().waitFor();assert.equal(await chips.count(),1);assert.match(await editor.innerText(),/请对比这些资料/);
+ await add(plan);assert.equal(await chips.count(),1);
+ await plan.locator('.snow-plan-packages button').first().click();await add(panel.locator('.snow-detail-package').first());await page.waitForFunction(()=>document.querySelectorAll('.snow-conversation [data-composer-chip="snow-record"]').length===2);
+ assert.equal(await chips.count(),2);
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
+ await page.getByRole('region',{name:'出行方案',exact:true}).locator('.snow-session-open').first().click();
+ await page.waitForFunction(()=>document.querySelectorAll('.snow-conversation [data-composer-chip="snow-record"]').length===2);
+ assert.match(await editor.innerText(),/请对比这些资料/);
+ assert.ok(!(await editor.innerText()).includes('"type"'));
+ await chips.first().click();
+ await panel.getByRole('button',{name:'返回关联资料'}).waitFor();
+ assert.equal(await panel.locator('.snow-detail-plan').count(),1);
+ await chips.last().focus();await chips.last().press('Enter');
+ await page.waitForFunction(()=>document.querySelector('#snow-package-sidebar .snow-detail-package')&&!document.querySelector('#snow-package-sidebar .snow-detail-plan'));
+ assert.equal(await panel.locator('.snow-detail-package').count(),1);
+ await page.screenshot({path:'.local/references-live.png'});
+ await editor.click();await editor.press('End');await editor.press('Backspace');await editor.press('Backspace');
+ await page.waitForFunction(()=>document.querySelectorAll('.snow-conversation [data-composer-chip="snow-record"]').length<2);
+ await editor.press('Meta+A');await editor.press('Backspace');await page.waitForFunction(()=>document.querySelectorAll('.snow-conversation [data-composer-chip="snow-record"]').length===0);assert.deepEqual(errors,[]);
+ console.log('通过：原生套餐/方案标签、多项追加、草稿保留、刷新还原标签、去重、退格删除；未发送消息。');
+}finally{await browser.close();}

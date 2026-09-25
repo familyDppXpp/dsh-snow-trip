@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {SavedPackageCard,PlanInteractionCard,QuestionAnswerCard} from './package-cards.jsx';
 import { App, PackageSidebarToggle } from './workbench.jsx';
-import { createSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
+import { createSnowSession, continueSnowSession, openSnowSession, renameSnowSession, mirrorQuestions } from './sessions.js';
 import {saveTurnDefinition,confirmedPlanDefinition,questionAnswerDefinition} from './package-turns.js';
 import {SaveCard,SaveCards,saveQuestion} from './save-card.jsx';
 import {PlanQuestionCard,PlanStageFailure} from './plan-question-card.jsx';
 import {planQuestion} from './plan-question.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
+import {referenceSource,recordReferenceSource,addRecordReference,restoreDraftReferences} from './references.js';
+import {registerReferenceMessages} from './reference-message.jsx';
 
 export const inject=['slots','modules','sessions','remote','uiSession','uiConversation'];
 const uiPlugins=['ui-renderer','locale','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions','ui-input-trigger','ui-commands','ui-skill','ui-model-selection','ui-permission-presets'];
@@ -53,10 +55,11 @@ export async function apply(ctx) {
         await local.plugin({name:`snow-trip-${key}`,inject:plugin.inject,Config:plugin.Config,apply:plugin.apply});
       }
       await local.plugin({
-        name:'snow-trip-session-entry',inject:['uiConversation','slots','uiRenderer','uiSession','sessions','workspaces','conversation','remote','remote.agentPresets','remote.snowTrip'],
+        name:'snow-trip-session-entry',inject:['uiConversation','slots','uiRenderer','uiSession','sessions','workspaces','conversation','inputTriggers','remote','remote.agentPresets','remote.snowTrip'],
         apply(view){
           view.uiConversation.events.register(saveTurnDefinition);
           registerConfirmedPlan(view);
+          registerReferenceMessages(view);
           view.uiConversation.events.register(questionAnswerDefinition);
           view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'snow-question-answer'},({node})=><QuestionAnswerCard data={node.data}/>));
           view.slots.inject('conversation.chat.node',()=>view.slots.register({name:'conversation.chat.node',key:'system-prompt',priority:-1},()=>null));
@@ -72,15 +75,36 @@ export async function apply(ctx) {
           view.effect(()=>mirrorQuestions(ctx.uiSession.pendingInteractions,view.uiSession));
           view.slots.inject('tool.call.toolview',()=>view.slots.register({name:'tool.call.toolview',key:'snow_save_packages'},SavedPackageCard));
           view.slots.inject('conversation.session.header.utilities',()=>view.slots.register({name:'conversation.session.header.utilities',id:'snow-package-sidebar'},PackageSidebarToggle));
+          view.effect(()=>view.inputTriggers.registerSource(recordReferenceSource(view.remote.snowTrip,id=>{const scope=view.sessions.scope(id);return scope?view.conversation.input.for(scope):null;})));
           const actions={
+            referenceAt:(sessionId,index)=>{
+              const scope=view.sessions.scope(sessionId);
+              const item=scope&&view.conversation.input.for(scope).state.getSnapshot().occurrences[index];
+              return item?.source===referenceSource.name?JSON.parse(item.ref):null;
+            },
+            restoreReferences:sessionId=>{
+              const scope=view.sessions.scope(sessionId);
+              if(scope)return restoreDraftReferences(view.conversation.input.for(scope),view.remote.snowTrip);
+            },
+            addReference:(sessionId,record,type)=>{
+              const scope=view.sessions.scope(sessionId);
+              if(!scope)throw new Error('当前会话尚未就绪，请稍后重试。');
+              return addRecordReference(view.conversation.input.for(scope),record,type);
+            },
+            deletePlan:async id=>{
+              const result=await view.remote.snowTrip.deletePlan(id);if(!result.ok)throw new Error(result.error.message);
+              if(result.value.sessionId===lastSession)lastSession=undefined;
+              if(result.value.archiveError)return `方案已删除，但会话归档失败：${result.value.archiveError}。请从会话菜单重试归档。`;
+              return result.value.sessionId?'方案已删除，会话已归档。':'方案已删除。';
+            },
             listPlans:async()=>{const result=await view.remote.snowTrip.listPlans();if(!result.ok)throw new Error(result.error.message);return result.value;},
             listPackages:async()=>{const result=await view.remote.snowTrip.listPackages();if(!result.ok)throw new Error(result.error.message);return result.value;},
-            deletePackage:async(record,archive)=>{
-              const result=await view.remote.snowTrip.deletePackage(record.id,record.revision,archive);
+            deletePackage:async(record,archive,plans=[])=>{
+              const result=await view.remote.snowTrip.deletePackage(record.id,record.revision,archive,plans.map(plan=>plan.id));
               if(!result.ok)throw new Error(result.error.message);
-              if(result.value.sessionId===lastSession)lastSession=undefined;
-              if(result.value.archiveError)return `套餐已删除，但会话归档失败：${result.value.archiveError}。请从会话菜单重试归档。`;
-              return result.value.sessionId?'套餐已删除，会话已归档。':'套餐已删除。';
+              if(result.value.sessionId===lastSession||plans.some(plan=>plan.sessionId===lastSession))lastSession=undefined;
+              if(result.value.archiveError)return `套餐及关联方案已删除，但会话归档失败：${result.value.archiveError}。请从会话菜单重试归档。`;
+              return `套餐已删除${plans.length?`，已一并删除 ${plans.length} 份方案`:''}${result.value.sessionId?'，会话已归档':''}。`;
             },
             lastSession:()=>lastSession,
             sessionState:id=>view.sessions.binding(id)?.session,
@@ -96,7 +120,11 @@ export async function apply(ctx) {
               const id=await createSnowSession(view.sessions,view.remote.agentPresets,view.conversation.input,workspace.workspaceId,draft);
               lastSession=id;return id;
             },
-            continuePackage:record=>{openSnowSession(view.sessions,record.sessionId);lastSession=record.sessionId;},
+            continueRecord:async(record,prompt)=>{
+              const opened=await continueSnowSession(view.sessions,view.conversation.input,view.workspaces.list.getSnapshot().archivedSessionIds,record.sessionId,prompt);
+              if(opened)lastSession=record.sessionId;
+              return opened;
+            },
             open:id=>{openSnowSession(view.sessions,id);lastSession=id;},
           };
           view.slots.register({name:'root',children:{conversation:{kind:'single',scope:'session-maybe'}},inject:()=>({actions})},App);
@@ -112,6 +140,7 @@ export async function apply(ctx) {
   ctx.uiConversation.events.register(saveTurnDefinition);
   ctx.slots.inject('conversation.chat.turnTail',()=>ctx.slots.register({name:'conversation.chat.turnTail',id:'snow-stopped-main',priority:-1,select:({turn})=>{const items=turn.data.get('snowSaves')?.filter(item=>item.stopped);return items?.length?items:null;}},({matched,sessionId})=><SaveCards items={matched} store={ctx.uiSession.pendingInteractions} sessionId={sessionId}/>));
   registerConfirmedPlan(ctx);
+  registerReferenceMessages(ctx);
   // 主界面（工作台弹窗外）也渲染方案阶段卡片：DSH 主会话的 pendingInteraction
   // 由宿主通用 QuestionComposer 显示为选项列表；这里注册方案卡识别，优先级与
   // 工作台内一致（-1，先于宿主通用 composer，同 saveQuestion 的做法）。

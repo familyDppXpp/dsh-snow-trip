@@ -50,7 +50,7 @@ export function EvaluateCard({block}) {
   </article>;
 }
 // 方案保存卡片：读保存时的方案快照，不读当前套餐。
-export function PlanSavedCard({block}) {
+export function PlanSavedCard({block,children,onPackage,hideTitle=false}) {
   const meta=block&&'kind' in block&&!block.isError?planMetadata(block.meta):null;
   if(!meta)return <PlanFallback block={block} label="方案保存"/>;
   const yuan=n=>n==null?'待确认':`¥${(n/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -58,8 +58,10 @@ export function PlanSavedCard({block}) {
   const nightly=meta.daily.length&&meta.daily.every(row=>row.amount!=null)?meta.daily.reduce((sum,row)=>sum+row.amount,0):null;
   const shared=meta.sharedCosts.reduce((sum,row)=>sum+row.amount,0);
   return <article className="snow trip-card snow-plan-card snow-saved-card" aria-label="方案已保存" data-plan-id={meta.id}>
-    <header className="snow-saved-head"><div><span className="snow-saved-label">已保存 · {meta.items.length} 个套餐</span><h3>{meta.title}</h3>
-    {meta.start&&<p>{meta.start} 入住{meta.nights!==null?` · ${meta.nights} 晚`:''}</p>}</div>
+    <header className="snow-saved-head"><div>{!hideTitle&&<><span className="snow-saved-label">已保存 · {meta.items.length} 个套餐</span><h3>{meta.title}</h3>
+    {meta.start&&<p>{meta.start} 入住{meta.nights!==null?` · ${meta.nights} 晚`:''}</p>}</>}
+    {onPackage&&<section className="snow-plan-packages" aria-label="引用的套餐"><h4>引用的套餐</h4>{meta.packages.map(entry=><button key={entry.id} aria-label={`查看套餐：${entry.snapshot.name} · 第 ${entry.revision} 版`} onClick={()=>onPackage(entry,meta)}><span className="snow-plan-package-copy"><strong>{entry.snapshot.name}</strong><small>保存时资料 · 第 {entry.revision} 版</small></span><span className="snow-plan-package-arrow" aria-hidden="true">→</span></button>)}</section>}
+    </div>
     <div className="snow-saved-total"><span>整趟总成本</span><strong>{yuan(meta.total)}</strong></div></header>
     {meta.reason&&<p className="snow-saved-reason">{basis(meta.reason)}</p>}
     <section className="snow-saved-breakdown" aria-label="总成本组成"><h4>总成本组成</h4><dl>
@@ -71,6 +73,7 @@ export function PlanSavedCard({block}) {
     {meta.daily.length>0&&<div className="table-scroll snow-saved-daily"><table aria-label={`${meta.title} 每日费用`}><thead><tr><th scope="col">日期</th><th scope="col">当晚费用</th><th scope="col">计算依据</th></tr></thead><tbody>{meta.daily.map(row=><tr key={row.date+row.packageId}><td>{row.date}</td><td>{yuan(row.amount)}</td><td>{basis(row.basis)}</td></tr>)}</tbody></table></div>}
     {meta.unknowns.length>0&&<p className="package-missing"><span>未知项</span>{meta.unknowns.join('、')}</p>}
     <small className="snow-saved-footnote">费用与套餐资料均为保存时快照</small>
+    {children}
   </article>;
 }
 export function PlanFallback({block,label='工具结果'}) {

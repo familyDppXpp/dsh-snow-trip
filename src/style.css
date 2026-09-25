@@ -88,7 +88,7 @@
 .snow .snow-package-card dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
 .snow .snow-package-card .package-missing{font-size:12px;color:var(--muted);padding:12px 14px;background:var(--paper);border-radius:6px}
 .snow .package-missing>span{display:block;margin-bottom:4px;font-weight:600;color:var(--ink)}
-.snow .snow-package-card .package-open{align-self:flex-start;min-height:44px;gap:12px;padding:10px 18px;margin:0;font-size:13px;font-weight:500}
+.snow :is(.snow-package-card,.snow-saved-card) .package-open{align-self:flex-start;min-height:44px;gap:12px;padding:10px 18px;margin:0;font-size:13px;font-weight:500}
 .snow .snow-package-card small{color:var(--muted)}
 .snow .package-candidate{min-width:0}
 .snow .package-trip-notes{padding:14px 4px;color:var(--muted);font-size:12px;line-height:1.7}
@@ -97,10 +97,10 @@
 @media(max-width:760px){.snow .snow-package-card .card-body{padding:20px;gap:16px}.snow .snow-package-card h3{font-size:17px}}
 .snow-conversation header nav button:disabled{max-width:none;white-space:normal;overflow-wrap:anywhere;text-overflow:clip;text-align:left}
 
-.snow .snow-package-card .package-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin-top:auto;padding-top:2px}
-.snow .snow-package-card .package-delete{min-height:44px;padding:8px 4px;border-color:transparent;background:transparent;color:var(--muted);font-size:12px;box-shadow:none}
-.snow .snow-package-card .package-delete:hover{color:var(--danger);background:#faf0ed;border-color:transparent}
-.snow .snow-package-card .package-delete:focus-visible{outline:2px solid var(--danger);outline-offset:3px}
+.snow :is(.snow-package-card,.snow-saved-card) .package-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;margin-top:auto;padding-top:2px}
+.snow :is(.snow-package-card,.snow-saved-card) .package-delete{min-height:44px;padding:8px 4px;border-color:transparent;background:transparent;color:var(--muted);font-size:12px;box-shadow:none}
+.snow :is(.snow-package-card,.snow-saved-card) .package-delete:hover{color:var(--danger);background:#faf0ed;border-color:transparent}
+.snow :is(.snow-package-card,.snow-saved-card) .package-delete:focus-visible{outline:2px solid var(--danger);outline-offset:3px}
 
 .snow .snow-session-group h3{padding:4px 0;margin:0}
 .snow .snow-group-toggle{width:100%;justify-content:flex-start;gap:6px;padding:6px 8px;min-height:34px;border:0;background:transparent;color:var(--muted);font-size:12px}
@@ -361,8 +361,8 @@
 .snow .snow-saved-daily th:nth-child(2){width:22%}
 .snow .snow-saved-daily td,.snow .snow-saved-daily th{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.7;padding:12px 8px}
 .snow .snow-saved-daily td:nth-child(2){font-weight:600;font-variant-numeric:tabular-nums}
-.snow .snow-saved-entry>button{display:flex;margin:0 24px 20px auto;color:var(--primary)}
-@media(max-width:640px){.snow .snow-saved-head{flex-direction:column;gap:14px}.snow .snow-saved-total{text-align:left}.snow .snow-saved-card{padding:16px}.snow .snow-saved-title{align-items:flex-start}.snow .snow-saved-entry>button{margin-right:16px}}
+
+@media(max-width:640px){.snow .snow-saved-head{flex-direction:column;gap:14px}.snow .snow-saved-total{text-align:left}.snow .snow-saved-card{padding:16px}.snow .snow-saved-title{align-items:flex-start}}
 
 /* 仅底部套餐保存确认面板占八成屏高，历史卡片与方案卡片保持原样。 */
 .snow.snow-save-composer>.snow-save-card:is([data-save-state=confirm],[data-save-state=saving]){box-sizing:border-box;height:calc(80dvh - 16px);display:flex;flex-direction:column;overflow:hidden}
@@ -461,3 +461,71 @@
 .snow-plan-save-record .snow-plan-money strong{font-size:24px}
 .snow-plan-save-record>.snow-saved-results{margin-top:20px}
 .snow-plan-save-record>.snow-plan-card[data-readonly=true]>:not(.snow-result-panels){flex-shrink:0}
+
+.snow-workbench{position:relative}
+.snow .snow-detail-tabs{display:flex;align-items:center;gap:24px;min-height:56px;border-bottom:1px solid var(--line)}
+.snow .snow-detail-tabs button,.snow .snow-detail-category{display:inline-flex;align-items:center;gap:7px;min-height:56px;padding:0 2px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);font-size:13px}
+.snow .snow-detail-tabs button:hover{color:var(--primary);background:transparent}
+.snow .snow-detail-tabs button[aria-pressed="true"]{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.snow .snow-detail-category{color:var(--ink);font-weight:600}
+.snow .snow-detail-count{min-width:20px;padding:0 5px;border-radius:4px;background:var(--paper);text-align:center;font-size:11px;line-height:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.snow .snow-detail-tabs button[aria-pressed="true"] .snow-detail-count{background:var(--soft);color:var(--primary)}
+.snow .snow-reference-nav{display:grid;gap:8px;padding:12px 0 16px;border-bottom:1px solid var(--line)}
+.snow .snow-reference-back{justify-self:start;min-height:44px;margin-left:-8px;padding:8px;border:0;background:transparent;color:var(--primary);font-weight:500}
+.snow .snow-reference-back>span{font-size:18px;line-height:1}
+.snow .snow-reference-back:hover{background:var(--soft)}
+.snow .snow-reference-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;color:var(--muted);font-size:12px;line-height:20px}
+.snow .snow-reference-current{display:inline-flex;align-items:center;gap:4px;color:var(--primary);white-space:nowrap}
+.snow .snow-reference-switch{min-height:36px;padding:6px 0;border:0;border-radius:3px;background:transparent;color:var(--primary);font-size:12px}
+.snow .snow-reference-switch:hover{background:transparent;text-decoration:underline;text-underline-offset:4px}
+.snow .snow-reference-missing{font-size:12px;line-height:1.7;color:var(--muted)}
+.snow .snow-saved-head>div:first-child{min-width:0;flex:1}
+.snow .snow-plan-packages{margin:18px 0 0}
+.snow .snow-plan-packages h4{margin:0 0 8px;font-size:12px;font-weight:500;color:var(--muted)}
+.snow .snow-plan-packages button{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:64px;gap:16px;text-align:left;white-space:normal;margin:6px 0 0;padding:12px 14px;border:1px solid transparent;border-radius:6px;background:var(--paper);overflow-wrap:anywhere}
+.snow .snow-plan-packages button:hover{background:var(--soft);border-color:var(--line)}
+.snow .snow-plan-package-copy{display:grid;gap:4px;min-width:0}
+.snow .snow-plan-package-copy strong{font-size:13px;line-height:1.6;font-weight:500;color:var(--ink)}
+.snow .snow-plan-package-copy small{font-size:11px;line-height:1.5;color:var(--muted)}
+.snow .snow-plan-package-arrow{flex:none;color:var(--primary);font-size:18px;line-height:1}
+.snow .snow-package-sidebar-body .snow-saved-head>div:first-child{width:100%}
+.snow .snow-package-sidebar-body .snow-saved-card{padding:12px;margin:12px 0}
+.snow .snow-package-sidebar-body .snow-saved-head{flex-direction:column}
+.snow .snow-package-sidebar-body .snow-saved-total{text-align:left}
+
+.snow .snow-detail-plan>.snow-saved-card{padding:0;margin:0 0 20px;border:0;border-radius:0;box-shadow:none;background:transparent}
+.snow .snow-detail-plan .snow-plan-packages{margin-top:0}
+
+.snow .snow-record-menu-button{opacity:0;flex:none;min-width:32px;min-height:32px;padding:0 6px;border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1}
+.snow-detail-package>summary:hover .snow-record-menu-button,.snow-detail-package>summary:focus-within .snow-record-menu-button,.snow .snow-record-menu-button[aria-expanded="true"]{opacity:1}
+.snow .snow-record-menu-button:hover{background:var(--soft);color:var(--primary)}
+.snow .snow-reference-feedback{padding:10px 20px;border-top:1px solid var(--line);font-size:12px}
+@media(hover:none){.snow .snow-record-menu-button{opacity:1;min-width:44px;min-height:44px}}
+
+.snow .snow-detail-package>summary{gap:8px}
+.snow .snow-detail-package>summary small.snow-detail-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin-top:6px}
+.snow .snow-record-menu-button{border-radius:5px;letter-spacing:1px;font-size:18px}
+.snow .snow-record-menu-button[aria-expanded="true"]{background:var(--soft);color:var(--primary)}
+.snow.snow-record-menu{width:168px;padding:4px;border-radius:8px;box-shadow:0 4px 16px #233a3414,0 1px 3px #233a340a}
+.snow.snow-record-menu button{min-height:40px;padding:8px 10px;gap:8px;border-radius:4px;font-size:13px}
+.snow .snow-menu-add{font-size:17px;line-height:1;color:var(--primary)}
+@media(hover:none){.snow.snow-record-menu button{min-height:44px}}
+
+.snow-reference-message{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.snow-reference-message-stack{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:0;max-width:min(calc(var(--dsh-chat-content-width,748px)*.702),82%)}
+.snow-reference-bubble{max-width:100%;padding:10px 16px;border-radius:22px;background:var(--dsw-specific-bubble,#eef2f0);color:var(--dsw-alias-label-primary,#233a34);font-size:var(--dsh-content-font-size,14px);line-height:calc(22px + var(--dsh-content-font-delta,0px));white-space:pre-wrap;overflow-wrap:anywhere}
+.snow-message-ref{display:inline-flex;align-items:center;gap:3px;max-width:240px;padding:0 6px;border:0;border-radius:6px;vertical-align:bottom;line-height:22px;height:22px;background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-state-business-primary);font:inherit;line-height:22px;user-select:none;cursor:pointer}
+.snow-message-ref-marker{flex:none;font-weight:500}
+.snow-message-ref-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snow-conversation [data-composer-chip="snow-record"]>span{cursor:pointer}
+.snow-message-ref:focus-visible,.snow-conversation [data-composer-chip="snow-record"]:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
+.snow-reference-message-actions{display:flex;align-items:center;gap:10px;color:var(--dsw-alias-label-tertiary,#7c8580);font-size:12px;min-height:24px}
+.snow-reference-message-actions button{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer}
+.snow-reference-message-actions button:hover{background:#e8eee8;color:#31594b}
+.snow-reference-message-actions button:focus-visible{outline:2px solid #31594b;outline-offset:2px}
+.snow-reference-message-actions [role=status]:empty{display:none}
+.snow-reference-attachments{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;max-width:100%}
+.snow-reference-file{padding:8px 12px;border:1px solid #dce3dd;border-radius:8px;overflow-wrap:anywhere}
+
+/* 套餐/方案候选只有名称，不沿用宿主为右侧描述预留的 40% 宽度。 */
+[id^="dsh-slash-option-snow-record-"]>span:only-child{flex:1;min-width:0;max-width:100%;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}

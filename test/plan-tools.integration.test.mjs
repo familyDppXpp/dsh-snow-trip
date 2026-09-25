@@ -17,7 +17,7 @@ import {evaluateMetadata,planMetadata} from '../lib/types/plans.js';
 
 test('方案闭环：核算校验版本与完整状态，保存核查版本并逐份持久化',async()=>{
   const root=await mkdtemp(join(tmpdir(),'snow-plan-'));
-  let ctx,agent,presetScope,owner;
+  let ctx,agent,presetScope,owner,archiveFailure=false;const archived=[];
   const confirmAnswer=request=>{const c=JSON.parse(request.questions[0].detail);return {answers:[{id:request.questions[0].id,selected:['生成方案'],custom:JSON.stringify({values:{...c.input,budget:c.input.budget??''},ids:c.ids,fees:c.fees})}]};};
   let answer=async request=>request.questions[0].id.startsWith('snow-plan-confirm-')?confirmAnswer(request):({answers:[{id:request.questions[0].id,selected:['保存所选'],custom:JSON.stringify({stage:'results',selected:[0]})}]});
   async function boot(){
@@ -26,7 +26,7 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
     await ctx.plugin(SystemPrompt);await ctx.plugin(Tools);
     await ctx.plugin(Storage);await ctx.plugin(StorageJson,{root});await ctx.plugin(StorageDomain,{backend:'json'});
     ctx.provide('userQuestions',{ask:request=>answer(request)});
-    ctx.provide('workspaceRegistry',{archiveSession:async()=>{}});
+    ctx.provide('workspaceRegistry',{archiveSession:async id=>{if(archiveFailure)throw new Error('归档失败');archived.push(id);}});
     await ctx.plugin(SnowTrip);
     }});await owner;ctx=rootContext;
     await ctx.snowTrip.listPackages();
@@ -118,6 +118,10 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
     }
     assert.deepEqual(await ctx.snowTrip.listPlans(),[]);answer=saveAnswer;
     const saved=JSON.parse((await ok('snow_save_plan',{resultId:computed.resultId})).content[0].text);
+    const queried=JSON.parse((await ok('snow_query_plan',{id:saved.plan.id})).content[0].text);
+    assert.deepEqual(queried.plan,saved.plan);assert.equal(queried.amountUnit,'分');
+    assert.equal((await execute('snow_query_plan',{id:'invalid'})).isError,true);
+    assert.equal((await execute('snow_query_plan',{id:crypto.randomUUID()})).isError,true);
     assert.equal(saved.plan.total,65000);assert.equal((await ctx.snowTrip.listPlans()).length,1);
     await ok('snow_save_plan',{resultId:computed.resultId});assert.equal((await ctx.snowTrip.listPlans()).length,1);
     const second=JSON.parse((await ok('snow_evaluate',{...input,title:'第二候选'})).content[0].text);
@@ -148,5 +152,51 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
     await owner.dispose();await boot();
     assert.equal((await ctx.snowTrip.listPlans()).length,1);
     assert.equal((await ctx.snowTrip.getCalculation(computed.resultId)).plan.total,65000);
+    const packagesBefore=await ctx.snowTrip.listPackages();
+    await assert.rejects(ctx.snowTrip.deletePlan('invalid-id'));
+    assert.equal((await ctx.snowTrip.listPlans()).length,1);
+    // 写入失败不应丢失内存中的方案。
+    await rename(root,root+'-backup');
+    await (await import('node:fs/promises')).writeFile(root,'阻止写入');
+    try{await assert.rejects(ctx.snowTrip.deletePlan(computed.resultId));assert.ok(await ctx.snowTrip.getPlan(computed.resultId));}
+    finally{await rm(root);await rename(root+'-backup',root);}
+    await ctx.snowTrip.deletePlan(computed.resultId);
+    await ctx.snowTrip.deletePlan(computed.resultId);
+    assert.equal(await ctx.snowTrip.getPlan(computed.resultId),null);
+    assert.deepEqual(await ctx.snowTrip.listPackages(),packagesBefore);
+    assert.ok(await ctx.snowTrip.getCalculation(computed.resultId));
+    await owner.dispose();await boot();
+    assert.deepEqual(await ctx.snowTrip.listPlans(),[]);
+    assert.deepEqual(await ctx.snowTrip.listPackages(),packagesBefore);
+    await ctx.snowTrip.savePlan({...saved.plan,id:crypto.randomUUID(),packages:saved.plan.packages.map(entry=>{const record=packagesBefore.find(p=>p.id===entry.id);return {...entry,revision:record.revision,snapshot:record};}),items:saved.plan.items.map(item=>({...item,revision:packagesBefore.find(p=>p.id===item.packageId).revision}))});
+    const remaining=(await ctx.snowTrip.listPlans())[0];
+    await assert.rejects(ctx.snowTrip.archiveSession(remaining.sessionId),/关联/);
+    for(const record of packagesBefore)await ctx.snowTrip.savePackage(record);
+    const archivePlan={...remaining,id:crypto.randomUUID(),sessionId:'archive-plan-session'};
+    const siblingPlan={...archivePlan,id:crypto.randomUUID()};
+    await ctx.snowTrip.savePlan(archivePlan);await ctx.snowTrip.savePlan(siblingPlan);
+    const before=archived.length;
+    await assert.rejects(ctx.snowTrip.archiveSession(archivePlan.sessionId),/关联方案/);
+    assert.deepEqual(await ctx.snowTrip.deletePlan(archivePlan.id),{sessionId:null,archiveError:null});
+    assert.equal(archived.length,before);
+    assert.deepEqual(await ctx.snowTrip.deletePlan(siblingPlan.id),{sessionId:siblingPlan.sessionId,archiveError:null});
+    assert.equal(archived.at(-1),siblingPlan.sessionId);
+    await ctx.snowTrip.deletePlan(siblingPlan.id);assert.equal(archived.length,before+1);
+    const failed={...archivePlan,id:crypto.randomUUID()};await ctx.snowTrip.savePlan(failed);archiveFailure=true;
+    assert.deepEqual(await ctx.snowTrip.deletePlan(failed.id),{sessionId:null,archiveError:'归档失败'});
+    assert.equal(await ctx.snowTrip.getPlan(failed.id),null);
+    archiveFailure=false;await ctx.snowTrip.archiveSession(failed.sessionId);
+    const cascadePlan={...remaining,id:crypto.randomUUID(),sessionId:'cascade-plan-session'};await ctx.snowTrip.savePlan(cascadePlan);
+    const target=packagesBefore[0],otherPackages=packagesBefore.slice(1);
+    await assert.rejects(ctx.snowTrip.deletePackage(target.id,target.revision,false),/受影响的方案已变更/);
+    assert.ok(await ctx.snowTrip.getPackage(target.id));assert.ok(await ctx.snowTrip.getPlan(remaining.id));
+    await assert.rejects(ctx.snowTrip.deletePackage(target.id,target.revision,false,[remaining.id]),/受影响的方案已变更/);
+    assert.deepEqual(await ctx.snowTrip.deletePackage(target.id,target.revision,false,[remaining.id,cascadePlan.id]),{sessionId:null,archiveError:null});
+    assert.equal(await ctx.snowTrip.getPackage(target.id),null);assert.deepEqual(await ctx.snowTrip.listPlans(),[]);
+    assert.ok(archived.includes('cascade-plan-session'));
+    for(const record of otherPackages)assert.ok(await ctx.snowTrip.getPackage(record.id));
+    await owner.dispose();await boot();assert.equal(await ctx.snowTrip.getPackage(target.id),null);assert.deepEqual(await ctx.snowTrip.listPlans(),[]);
+
+
   }finally{await presetScope?.dispose();await owner?.dispose();await rm(root,{recursive:true,force:true});}
 });
