@@ -26,7 +26,8 @@
     },
     "./plan-types": {
       "types": "./lib/types/plans.d.ts"
-    }
+    },
+    "./permissions": "./src/permission-policy.js"
   },
   "files": [
     "src/index.js",
@@ -43,7 +44,8 @@
     "lib/typert.remote-client.d.ts",
     "lib/types/packages.d.ts",
     "lib/types/plans.d.ts",
-    "lib/types/planning.d.ts"
+    "lib/types/planning.d.ts",
+    "src/permission-policy.js"
   ],
   "engines": {
     "node": ">=22.19.0"

@@ -19,6 +19,7 @@ try {
   }
   const manifest = JSON.parse(await readFile('package.json', 'utf8'));
   delete manifest.exports['./tools'];
+  delete manifest.exports['./permissions'];
   await writeFile(join(pkg, 'package.json'), JSON.stringify(manifest));
   // SDK 按项目身份识别装饰器；把已安装的公开声明也纳入临时项目图。
   await cp('node_modules/@deepseek-ai/dsh-typert-protocol', join(stage, 'packages/protocol'), {recursive:true,dereference:true});

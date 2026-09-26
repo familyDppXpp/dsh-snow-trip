@@ -13,7 +13,7 @@ import {registerReferenceMessages} from './reference-message.jsx';
 import {DepartureHero} from './departure.jsx';
 
 export const inject=['slots','modules','sessions','remote','uiSession','uiConversation'];
-const uiPlugins=['ui-renderer','locale','shortcuts','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions','ui-input-trigger','ui-commands','ui-skill','ui-model-selection','ui-permission-presets'];
+const uiPlugins=['ui-renderer','locale','shortcuts','ui-session','ui-workspace','ui-conversation','ui-chat','ui-attachment','ui-tool','ui-user-questions','ui-input-trigger','ui-commands','ui-skill','ui-model-selection'];
 
 function Entry({wide, prepare}) {
   const dialog=useRef(null),container=useRef(null);
@@ -54,6 +54,17 @@ export async function apply(ctx) {
       for(const key of ['slots','uiRenderer','uiSession','uiConversation','conversation','locale','uiWorkspace','inputTriggers','commandUi','modelDirectories','shortcuts'])local=local.isolate(key);
       for(const key of uiPlugins){
         const plugin=await ctx.modules.import(`@deepseek-ai/dsh-client-${key}/client`);
+        if(key==='ui-commands')await local.plugin({
+          name:'snow-trip-command-menu',inject:['inputTriggers'],
+          apply(menu){
+            // 只过滤本工作台的菜单发现；宿主权限命令仍保留并拒绝切换。
+            const triggers=menu.inputTriggers,register=triggers.registerSource;
+            triggers.registerSource=function(source){
+              return register.call(this,source.name==='command'?{...source,candidates:async(...args)=>(await source.candidates(...args)).filter(item=>item.name!=='permission')}:source);
+            };
+            menu.effect(()=>()=>{triggers.registerSource=register;});
+          },
+        });
         try{await local.plugin(typeof plugin==='function'?plugin:{name:`snow-trip-${key}`,inject:plugin.inject,Config:plugin.Config,apply:plugin.apply});}catch(error){throw new Error(`加载 ${key} 失败：${error.message}`,{cause:error});}
       }
       await local.plugin({

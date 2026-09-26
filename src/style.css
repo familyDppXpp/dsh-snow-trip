@@ -678,3 +678,9 @@
 @media(prefers-reduced-motion:reduce){.snow-running>span{animation:none}}
 
 .snow-process-toggle{border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;padding:8px 0;cursor:pointer}
+
+/* 新会话不显示空标题栏；移动端欢迎内容紧接工作台菜单。 */
+.snow-conversation .snow-departure header{display:none}
+@media(max-width:760px){
+  .snow-conversation .snow-departure [data-conversation-scroll]{justify-content:flex-start;padding-top:24px}
+}
