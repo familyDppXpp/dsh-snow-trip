@@ -67,8 +67,8 @@ export const questionAnswerDefinition={
  start:(_context,{event})=>{try{return {questions:JSON.parse(event.data.arguments).questions,seq:event.seq};}catch{return {questions:[],seq:event.seq};}},
  update:({state},{event})=>{
   if(!state)return state;
-  const result=event.data.message.content.find(c=>c.type==='tool-result');
-  if(!result||result.isError)return state;
+  const result=event.data.message;
+  if(result.isError)return state;
   try{const value=JSON.parse(result.content.filter(c=>c.type==='text').map(c=>c.text).join(''));if(!Array.isArray(value.answers))return state;return {...state,seq:event.seq,answers:value.answers};}catch{return state;}
  },
  buildViewNode:context=>context.state?.answers?{key:context.key,id:context.id,kind:'snow-question-answer',target:'chat',anchorSeq:context.state.seq,location:{kind:'session'},visibility:'visible',data:context.state}:null,

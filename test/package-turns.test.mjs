@@ -72,7 +72,10 @@ test('通用提问完成后发布独立回答卡，待回答和技术失败不�
  const event={type:'tool/call',seq:1,data:{name:'ask_user_question',callId:'q',arguments:JSON.stringify({questions:[{id:'date',header:'出行日期',question:'哪天出发？'}]})}};
  const context={key:'q',id:'q',state:d.start(null,{event})};
  assert.equal(d.buildViewNode(context),null);
- const result={type:'tool/result',seq:2,surfaceOp:'append',data:{message:{source:{callId:'q'},content:[{type:'tool-result',content:[{type:'text',text:JSON.stringify({answers:[{id:'date',selected:['2月6日'],custom:'住7晚'}]})}]}]}}};
- assert.equal(d.match(result).id,'q');context.state=d.update(context,{event:result});
+ const result={type:'tool/result',seq:2,surfaceOp:'append',data:{message:{source:{callId:'q'},content:[{type:'text',text:JSON.stringify({answers:[{id:'date',selected:['2月6日'],custom:'住7晚'}]})}]}}};
+ assert.equal(d.match(result).id,'q');
+ const failed={...result,data:{message:{...result.data.message,isError:true}}};
+ assert.equal(d.buildViewNode({...context,state:d.update(context,{event:failed})}),null);
+ context.state=d.update(context,{event:result});
  const node=d.buildViewNode(context);assert.deepEqual(node.location,{kind:'session'});assert.equal(node.data.questions[0].header,'出行日期');assert.equal(node.data.answers[0].custom,'住7晚');
 });

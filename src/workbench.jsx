@@ -336,7 +336,7 @@ export function App({useSessions, useSessionStatus, renderSlot, SessionProvider,
         })}</section>)}
       </div>
     </section>
-    <div className="rail-bottom"><div className="local-dot"/><span>数据保存在本机</span><button className="return" aria-label="返回 DSH" onClick={actions.close}>← 返回 DSH</button></div></aside>
+    <div className="rail-bottom"><div className="local-dot"/><span>数据保存在本机</span></div></aside>
     <div className="snow-rail-resizer" role="separator" aria-label="调整侧边栏宽度" aria-orientation="vertical" aria-controls="snow-sidebar" aria-valuemin={145} aria-valuemax={railMax} aria-valuenow={railSize.width} tabIndex={0}
       onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();event.currentTarget.focus();drag.current={x:event.clientX,width:railSize.width};event.currentTarget.setPointerCapture(event.pointerId);}}
       onPointerMove={event=>{if(drag.current)resizeRail(drag.current.width+event.clientX-drag.current.x);}}
