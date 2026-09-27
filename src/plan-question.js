@@ -37,6 +37,7 @@ export const planQuestionSchema=z.preprocess(legacyEstimate,z.looseObject({
   notice:z.looseObject({title:z.string(),text:z.string(),tone:z.string().optional(),actions:list(z.looseObject({label:z.string(),value:z.string()})).optional()}).optional(),
   packages:list(packageSummary).optional(),plan:result.optional(),
   changes:list(z.strictObject({label:z.string(),before:z.string(),after:z.string(),detail:boolean})).optional(),
+  rename:boolean.optional(),copyTitle:z.string().optional(),
   resetTracking:boolean.optional(),costChange:z.string().optional(),previous:result.optional(),
 
 }).superRefine((value,ctx)=>{

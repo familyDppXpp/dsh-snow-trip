@@ -134,7 +134,10 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
     assert.equal((await execute('snow_query_plan',{id:'invalid'})).isError,true);
     assert.equal((await execute('snow_query_plan',{id:crypto.randomUUID()})).isError,true);
     assert.equal(saved.plan.total,65000);assert.equal((await ctx.snowTrip.listPlans()).length,1);
-    await ok('snow_save_plan',{resultId:computed.resultId});assert.equal((await ctx.snowTrip.listPlans()).length,1);
+    await ctx.snowTrip.renamePlan(saved.plan,'用户确定的标题',new AbortController().signal);
+    const resaved=JSON.parse((await ok('snow_save_plan',{resultId:computed.resultId})).content[0].text);
+    assert.equal(resaved.plan.title,'用户确定的标题');assert.equal(resaved.interaction.items[0].title,resaved.plan.title);assert.equal((await ctx.snowTrip.listPlans()).length,1);
+
     // 标签独立持久化；重复保存核算快照不能覆盖用户更新的标签。
     const tracking={booking:'unreserved',refund:'refundable',refundPolicy:'2月4日00:00前可退'};
     assert.deepEqual((await ctx.snowTrip.updatePlanTracking(saved.plan.id,tracking)).tracking,tracking);
@@ -166,7 +169,7 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
     ctx.snowTrip.savePlan=async plan=>{if(plan.id===second.resultId){failedAttempts++;throw new Error('模拟写盘失败');}return realSave(plan);};
     answer=async request=>({answers:[{id:request.questions[0].id,selected:['保存所选'],custom:JSON.stringify({stage:'results',selected:[0,1]})}]});
     const partial=JSON.parse((await ok('snow_plan_stage',{stage:'results',key:'save-both',planningId:p.planningId,resultIds:[computed.resultId,second.resultId]})).content[0].text);
-    assert.deepEqual(partial.items.map(r=>r.status),['saved','failed']);assert.equal(failedAttempts,1);
+    assert.deepEqual(partial.items.map(r=>r.status),['saved','failed']);assert.equal(failedAttempts,1);assert.equal(partial.items[0].title,'用户确定的标题');assert.equal(partial.items[0].plan.title,partial.items[0].title);
     ctx.snowTrip.savePlan=realSave;answer=saveAnswer;
     // 更改规划后，旧核算记录保留但不能作为新条件下的结果使用。
     const newer=await prepare({budget:60000});

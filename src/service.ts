@@ -50,7 +50,7 @@ export class SnowTrip extends TypertRemoteService {
     });
   }
   // 仅供服务端工具调用；保存前由工具核查套餐版本与资料完成状态。
-  async savePlan(record: PlanRecord): Promise<void> {
+  async savePlan(record: PlanRecord): Promise<PlanRecord> {
     await this.ready;
     return this.write(async()=>{
       const value=planRecord.parse(record);
@@ -62,7 +62,20 @@ export class SnowTrip extends TypertRemoteService {
         if(!current||current.revision!==entry.revision)throw new Error(`套餐 ${entry.snapshot.name} 已变更，方案未保存，请重新计算`);
       }
       const table=this.domain.table('plans'),existing=table.get(value.id);
-      await table.put(value.id,existing?.tracking?{...value,tracking:existing.tracking}:value);
+      const saved={...value,...(existing?{title:existing.title}:{}),...(existing?.tracking?{tracking:existing.tracking}:{})};
+      await table.put(value.id,saved);
+      return structuredClone(saved);
+    });
+  }
+  async renamePlan(previous:PlanRecord,title:string,signal:AbortSignal):Promise<PlanRecord> {
+    await this.ready;
+    return this.write(async()=>{
+      signal.throwIfAborted();
+      const table=this.domain.table('plans');
+      if(!isDeepStrictEqual(table.get(previous.id),previous))throw new Error('原方案已变化或已删除，请刷新后重新确认改名');
+      const value=planRecord.parse({...previous,title});
+      await table.put(value.id,value);
+      return structuredClone(value);
     });
   }
   // 与套餐写入共用队列，确认后的版本检查和替换不可被其他写入穿插。
@@ -72,7 +85,7 @@ export class SnowTrip extends TypertRemoteService {
       signal.throwIfAborted();
       const table=this.domain.table('plans');
       if(!isDeepStrictEqual(table.get(previous.id),previous))throw new Error('原方案已变化或已删除，请刷新差异后重新确认');
-      const value=planRecord.parse({...candidate,id:asNew?randomUUID():previous.id,createdAt:asNew?new Date().toISOString():previous.createdAt,sessionId:previous.sessionId,...(asNew?{tracking:{booking:null,refund:null,refundPolicy:null}}:{})});
+      const value=planRecord.parse({...candidate,title:asNew?candidate.title:previous.title,id:asNew?randomUUID():previous.id,createdAt:asNew?new Date().toISOString():previous.createdAt,sessionId:previous.sessionId,...(asNew?{tracking:{booking:null,refund:null,refundPolicy:null}}:{})});
       for(const entry of value.packages){
         const latest=this.domain.table('packages').get(entry.id);
         if(!latest||latest.revision!==entry.revision)throw new Error('套餐已变化或已删除，请重新核算并确认差异');

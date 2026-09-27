@@ -22,6 +22,7 @@ export function PlanQuestionCard({pending,packages,snapshot,outcome}) {
   const editable=(data.stage==='confirm'||data.stage==='estimate');
   // 卡内可编辑字段会走自由输入回传：把当前编辑快照序列化进 custom，selected 承载按钮动作。
   const Editable=editable?PlanEditableBody:null;
+  const supplement=!readOnly&&(<details className="snow-plan-message"><summary>{data.stage==='results'?'讨论或调整方案？补充说明':'想调整条件？补充说明'}</summary><div className="snow-plan-message-body"><label>继续补充想法<textarea rows={3} placeholder={data.stage==='results'?'例如：比较两份方案的雪票费用，或把预算调低一些…':'例如：餐饮预算调低一些，暂不租赁雪具…'} value={message} disabled={busy} onChange={e=>setMessage(e.target.value)}/></label><button disabled={busy||!message.trim()} onClick={()=>answer({custom:message.trim()})}>发送补充</button><p>也可以直接在输入框继续说明；{['results','update'].includes(data.stage)?'发送补充不会保存方案。':'发送补充不会确认以上费用。'}</p></div></details>);
   return <article className="snow snow-plan-card" aria-label={stageTitles[data.stage]||'方案卡片'} data-plan-stage={data.stage} data-collapsed={collapsed?'true':undefined} data-planning={data.planning?'true':undefined} data-readonly={readOnly?'true':undefined}>
     {readOnly&&<div className="snow-result-outcome" role="status"><strong>{data.stage==='update'?updateOutcome(outcome):outcome?.action==='select'?'已选择方案 · 已进入更新确认':outcome?.action==='save'?`已提交保存 · 已选 ${data.selected?.length??0} 份 · 已保存 ${outcome.items?.filter(item=>item.status==='saved').length??0} 份`:outcome?.action==='cancel'?'已取消 · 未保存方案':'已提交补充 · 未保存方案'}</strong>{outcome?.error&&<p role="alert">{outcome.error}</p>}{outcome?.custom&&<p style={{whiteSpace:'pre-wrap'}}>你的补充：{outcome.custom}</p>}</div>}
     <header className="snow-plan-heading">{!readOnly&&data.stage==='results'&&<button className="snow-plan-context-toggle" onClick={event=>{
@@ -33,10 +34,10 @@ export function PlanQuestionCard({pending,packages,snapshot,outcome}) {
     {data.notice?.text&&<p>{data.notice.text}</p>}
     {!readOnly&&data.notice?.actions&&<footer className="snow-plan-actions">{cancel}{data.notice.actions.map((action,i)=><button key={i} className={i===0?'primary':''} disabled={busy} onClick={()=>answer({selected:[action.label]})}>{action.label}</button>)}</footer>}
     {Editable&&<Editable data={data} packages={packages??data.packages} busy={busy} error={error} onAnswer={answer} cancel={cancel} readOnly={readOnly}/>}
-    {data.stage==='update'&&<PlanUpdateBody data={data} busy={busy} onAnswer={answer} cancel={cancel} readOnly={readOnly} outcome={outcome}/>}
+    {data.stage==='update'&&<PlanUpdateBody data={data} busy={busy} onAnswer={answer} cancel={cancel} readOnly={readOnly} outcome={outcome} supplement={supplement} error={error}/>}
     {!Editable&&data.stage!=='update'&&!data.notice?.actions&&<PlanOptionsBody data={data} busy={busy} error={error} onAnswer={answer} cancel={cancel} readOnly={readOnly}/>}
-    {error&&!Editable&&<p role="alert">{error}</p>}
-    {!readOnly&&<details className="snow-plan-message"><summary>{data.stage==='results'?'讨论或调整方案？补充说明':'想调整条件？补充说明'}</summary><div className="snow-plan-message-body"><label>继续补充想法<textarea rows={3} placeholder={data.stage==='results'?'例如：比较两份方案的雪票费用，或把预算调低一些…':'例如：餐饮预算调低一些，暂不租赁雪具…'} value={message} disabled={busy} onChange={e=>setMessage(e.target.value)}/></label><button disabled={busy||!message.trim()} onClick={()=>answer({custom:message.trim()})}>发送补充</button><p>也可以直接在输入框继续说明；{['results','update'].includes(data.stage)?'发送补充不会保存方案。':'发送补充不会确认以上费用。'}</p></div></details>}
+    {error&&!Editable&&data.stage!=='update'&&<p role="alert">{error}</p>}
+    {data.stage!=='update'&&supplement}
   </article>;
 }
 
@@ -46,22 +47,28 @@ function updateOutcome(outcome) {
  if(outcome?.action==='adjust')return '已选择继续调整 · 未保存';
  return outcome?.action==='cancel'?'已取消 · 未保存':'已提交补充 · 未保存';
 }
-function PlanUpdateBody({data,busy,onAnswer,cancel,readOnly,outcome}) {
+function PlanUpdateBody({data,busy,onAnswer,cancel,readOnly,outcome,supplement,error}) {
  const [asNew,setAsNew]=useState(false);
  const copy=readOnly?outcome?.selected?.[0]==='确认另存':asNew;
- const table=(rows,label)=><div className="table-scroll"><table aria-label={label}><thead><tr><th scope="col">修改项</th><th scope="col">修改前</th><th scope="col">修改后</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><th scope="row">{r.label}</th><td style={{whiteSpace:'pre-wrap'}}>{readableBasis(r.before)}</td><td style={{whiteSpace:'pre-wrap'}}>{readableBasis(r.after)}</td></tr>)}</tbody></table></div>;
+ const table=(rows,label)=><div className="table-scroll"><table aria-label={label}><thead><tr><th scope="col">修改项</th><th scope="col">修改前</th><th scope="col">修改后</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><th scope="row">{r.label}</th><td style={{whiteSpace:'pre-wrap'}}>{r.label==='方案名称'?r.before:readableBasis(r.before)}</td><td style={{whiteSpace:'pre-wrap'}}>{r.label==='方案名称'?r.after:readableBasis(r.after)}</td></tr>)}</tbody></table></div>;
  const details=(data.changes??[]).filter(r=>r.detail);
  const previous=data.previous?.tracking;
  const booking={confirmed:'已确认',unreserved:'未预约'},refund={refundable:'可退',nonrefundable:'不可退'};
  return <>
-  {table((data.changes??[]).filter(r=>!r.detail),'方案修改前后差异')}
+  <div className="snow-plan-update-body">
+  {table([...(data.changes??[]).filter(r=>!r.detail),...(copy&&data.copyTitle&&data.copyTitle!==data.plan.title?[{label:'方案名称',before:data.plan.title,after:data.copyTitle}]:[])],'方案修改前后差异')}
   <p className="snow-plan-pills"><strong>{data.costChange}</strong></p>
   {details.length>0&&<details className="snow-plan-more"><summary>查看费用与说明变化明细</summary>{table(details,'费用与说明变化明细')}</details>}
-  <details className="snow-plan-more"><summary>查看调整后的完整方案</summary><PlanOptionsBody data={{stage:'review',plan:data.plan}} readOnly/>{data.plan.conditions&&<p>房间数：{data.plan.conditions.rooms} · 人数：{data.plan.conditions.people??'未知'} · 滑雪天数：{data.plan.conditions.skiDays??'未知'}</p>}{data.plan.packages?.map(p=><p key={p.id}>{p.snapshot?.name} · {p.snapshot?.region} · {p.snapshot?.resort} · {p.snapshot?.hotels?.join('、')}</p>)}{data.plan.sharedCosts?.map((c,i)=><p key={i}>{c.label}：{yuan(c.amount)} · {readableBasis(c.basis)}</p>)}{data.plan.allocation?.map((line,i)=><p key={i}>{readableBasis(line)}</p>)}</details>
-  <aside className="snow-plan-note" aria-label="预约与退改信息处理">
+  {!data.rename&&<details className="snow-plan-more"><summary>查看调整后的完整方案</summary><PlanOptionsBody data={{stage:'review',plan:data.plan}} readOnly/>{data.plan.conditions&&<p>房间数：{data.plan.conditions.rooms} · 人数：{data.plan.conditions.people??'未知'} · 滑雪天数：{data.plan.conditions.skiDays??'未知'}</p>}{data.plan.packages?.map(p=><p key={p.id}>{p.snapshot?.name} · {p.snapshot?.region} · {p.snapshot?.resort} · {p.snapshot?.hotels?.join('、')}</p>)}{data.plan.sharedCosts?.map((c,i)=><p key={i}>{c.label}：{yuan(c.amount)} · {readableBasis(c.basis)}</p>)}{data.plan.allocation?.map((line,i)=><p key={i}>{readableBasis(line)}</p>)}</details>}
+  {!data.rename&&<aside className="snow-plan-note" aria-label="预约与退改信息处理">
    {copy?<><strong>另存为新方案</strong><p>原方案保留，新方案的预约、退改状态及策略均为未知。</p></>:data.resetTracking?<><strong>预约与退改信息将重置</strong><p>日期、人数、房间数或套餐搭配变化，需重新确认预约和退改条件。</p><p>{booking[previous?.booking]??'未知'} → 未知；{refund[previous?.refund]??'未知'} → 未知</p>{previous?.refundPolicy&&<p>原策略将清空：{previous.refundPolicy}</p>}</>:<><strong>预约与退改信息保留</strong><p>{booking[previous?.booking]??'预约状态未知'} · {refund[previous?.refund]??'退改状态未知'}{previous?.refundPolicy?` · ${previous.refundPolicy}`:''}</p></>}
-  </aside>
-  {!readOnly&&<footer className="snow-plan-actions">{cancel}<button disabled={busy} onClick={()=>onAnswer({selected:['继续调整']})}>继续调整</button><button disabled={busy} onClick={()=>setAsNew(!asNew)}>{asNew?'改为更新原方案':'另存为新方案'}</button><button className="primary" disabled={busy} onClick={()=>onAnswer({selected:[asNew?'确认另存':'确认更新']})}>{busy?'正在保存…':asNew?'确认另存':'确认更新'}</button></footer>}
+  </aside>}
+  </div>
+  {!readOnly&&<div className="snow-plan-update-footer">
+  {error&&<p role="alert">{error}</p>}
+  <footer className="snow-plan-actions">{cancel}<button disabled={busy} onClick={()=>onAnswer({selected:['继续调整']})}>继续调整</button>{!data.rename&&<button disabled={busy} onClick={()=>setAsNew(!asNew)}>{asNew?'改为更新原方案':'另存为新方案'}</button>}<button className="primary" disabled={busy} onClick={()=>onAnswer({selected:[asNew?'确认另存':'确认更新']})}>{busy?'正在保存…':asNew?'确认另存':'确认更新'}</button></footer>
+  {supplement}
+  </div>}
  </>;
 }
 

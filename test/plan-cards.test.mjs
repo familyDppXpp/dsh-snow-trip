@@ -262,3 +262,13 @@ test('更新候选单选，更新后候选选择与差异卡均保留只读操�
  const html=server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data:{interaction:{stage:'update',card:update,action:'update',selected:['确认更新'],status:'saved',selection:{card:candidates,selected:[1]}}}}));
  assert.match(html,/已选择方案 · 已进入更新确认/);assert.match(html,/已选择确认更新 · 已更新/);assert.match(html,/data-plan-stage="results"/);assert.match(html,/data-plan-stage="update"/);assert.equal((html.match(/data-readonly="true"/g)||[]).length,2);assert.doesNotMatch(html,/<input|<textarea|保存所选|核对更新差异/);
 });
+
+
+test('独立改名卡仅展示标题差异，历史保留原文和用户操作',async()=>{
+ const detail={rename:true,previous:{title:'100分滑雪'},plan:{title:'春节100分之旅'},changes:[{label:'方案名称',before:'100分滑雪',after:'春节100分之旅',detail:false}],resetTracking:false,costChange:'仅修改标题，费用与套餐快照不变'};
+ const html=await render(pending('update','rename',detail));
+ assert.match(html,/100分滑雪/);assert.match(html,/春节100分之旅/);assert.doesNotMatch(html,/另存为新方案|查看调整后的完整方案|¥1.00/);
+ const {PlanInteractionCard}=await load('src/package-cards.jsx');
+ const history=server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data:{interaction:{stage:'update',action:'update',selected:['确认更新'],status:'saved',card:{...detail,stage:'update'}}}}));
+ assert.match(history,/已选择确认更新 · 已更新/);assert.match(history,/100分滑雪/);assert.doesNotMatch(history,/<button|<input|<textarea/);
+});

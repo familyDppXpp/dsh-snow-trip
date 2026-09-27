@@ -715,3 +715,12 @@
 @media(min-width:1151px){#snow-plan-filters .filter-grid:not(.snow-plan-dates){grid-template-columns:repeat(3,minmax(0,1fr))}}
 
 @media(min-width:1151px){#snow-explore-filters .filter-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+
+/* 方案更新：高度随内容增长，正文滚动，操作与补充说明始终留在底部。 */
+.snow.snow-save-composer:has(>.snow-plan-card[data-plan-stage=update]){max-height:80dvh;overflow:hidden}
+.snow.snow-save-composer>.snow-plan-card[data-plan-stage=update]{height:auto;max-height:calc(80dvh - 16px);display:flex;flex-direction:column;overflow:hidden;scrollbar-gutter:auto}
+.snow.snow-save-composer .snow-plan-update-body{flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.snow.snow-save-composer .snow-plan-card[data-plan-stage=update]>:not(.snow-plan-update-body){flex-shrink:0}
+.snow .snow-plan-update-footer{border-top:1px solid var(--line);padding-top:8px}
+.snow .snow-plan-update-footer>.snow-plan-actions{margin-top:0}
+.snow .snow-plan-update-footer>.snow-plan-message{margin-bottom:0}

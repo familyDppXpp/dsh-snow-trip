@@ -6,7 +6,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {z} from 'zod';
 import {conditions,segment,validate,validateSegments,calculate,PlanningError,dateAfter,type Planning,type Calculation} from './planning.js';
 import {planQuestionSchema} from './plan-question.js';
-import {toCents,type PlanRecord} from './plans.js';
+import {toCents,planRecord,type PlanRecord} from './plans.js';
 import type {PackageRecord} from './packages.js';
 import {packageChanges,updatePreview} from './plan-update.js';
 import type {} from './service.js';
@@ -42,21 +42,21 @@ export function registerPlanningTools(ctx:Context){
   const original=calculation?await ctx.snowTrip.getPlanning(calculation.planningId):null;
   return original?{...plan,conditions:original.conditions}:plan;
  };
- const confirmUpdate=async(previous:PlanRecord,candidate:PlanRecord,exec:ToolRunContext,resultId?:string)=>{
+ const confirmUpdate=async(previous:PlanRecord,candidate:PlanRecord,exec:ToolRunContext,resultId?:string,rename=false)=>{
   owner(exec);
-  const preview=updatePreview(await withConditions(previous),candidate);
-  const card=JSON.parse(JSON.stringify(validate(planQuestionSchema,{stage:'update',key:exec.callId,previous,plan:preview.plan,changes:preview.rows,resetTracking:preview.resetTracking,costChange:preview.costChange})));
+  const preview=rename?{plan:candidate,rows:[{label:'方案名称',before:previous.title,after:candidate.title,detail:false}],resetTracking:false,costChange:'仅修改标题，费用与套餐快照不变'}:updatePreview(await withConditions(previous),{...candidate,title:previous.title});
+  const card=JSON.parse(JSON.stringify(validate(planQuestionSchema,{stage:'update',key:exec.callId,rename,copyTitle:candidate.title,previous,plan:preview.plan,changes:preview.rows,resetTracking:preview.resetTracking,costChange:preview.costChange})));
   const questionId=`snow-plan-update-${exec.callId}`;
-  const answer=await ctx.userQuestions.ask({agent:exec.agent!,signal:exec.signal,questions:[{id:questionId,header:'确认更新方案',question:'核对修改前后差异，确认后保存。',detail:JSON.stringify(card)}]});
+  const answer=await ctx.userQuestions.ask({agent:exec.agent!,signal:exec.signal,questions:[{id:questionId,header:rename?'确认修改标题':'确认更新方案',question:rename?'核对原标题和新标题，确认后保存。':'核对修改前后差异，确认后保存。',detail:JSON.stringify(card)}]});
   exec.signal.throwIfAborted();
   const item=answer.answers[0];
   if(answer.answers.length!==1||item?.id!==questionId)throw new Error('更新卡回答与当前请求不匹配');
   const selected=item.selected??[],action=selected[0];
   const interaction={stage:'update',card,selected,custom:item.custom?.trim()||null};
-  if(selected.length===1&&['确认更新','确认另存'].includes(action)){
+  if(selected.length===1&&(action==='确认更新'||!rename&&action==='确认另存')){
    try{
     if(resultId)await currentResult(resultId,exec);
-    const plan=await ctx.snowTrip.replacePlan(previous,preview.plan,action==='确认另存',exec.signal);
+    const plan=rename?await ctx.snowTrip.renamePlan(previous,candidate.title,exec.signal):await ctx.snowTrip.replacePlan(previous,{...preview.plan,title:action==='确认另存'?candidate.title:previous.title},action==='确认另存',exec.signal);
     return {status:action==='确认另存'?'saved':'updated',plan,interaction:{...interaction,action:'update',status:'saved'},message:'保存已完成，按实际操作简短告知已更新或已另存，不重复要求确认。'};
    }catch(error){return {status:'failed',interaction:{...interaction,action:'update',status:'failed',error:String(error)},message:'保存失败，原方案未改变；说明原因，不自动重试。'};}
   }
@@ -65,7 +65,13 @@ export function registerPlanningTools(ctx:Context){
   if(cancelled||action==='继续调整'&&!interaction.custom)exec.concludeTurn();
   return {status:cancelled?'cancelled':'adjusting',planId:previous.id,interaction:{...interaction,action:cancelled?'cancel':action==='继续调整'?'adjust':'supplement'},custom:interaction.custom,message:cancelled?'已取消，原方案未改变。':'未保存；有补充则继续处理，没有补充则等待用户说明调整内容。'};
  };
- add('snow_update_plan','更新已有方案：先按 planId 自动比较已存套餐快照与最新资料。仅名称/地区/雪场文字修正时直接展示差异确认卡，用户确认后更新原方案或另存；影响核算时返回 needs_calculation 和原条件，请以 sourcePlanId 调用 snow_prepare_plan 后重新核算。resultId 只能是绑定该原方案的新核算结果，不接收模型填写的差异或金额。', {planId:str,resultId:{type:'string'}},async(args,exec)=>{
+ add('snow_rename_plan','仅修改已存方案标题。先查询定位方案，再传 planId 和 title（去除首尾空白后 1–200 字）；展示原标题与新标题确认卡，用户确认才保存。保留原 ID、费用、套餐快照及预约退改信息，不读取最新套餐、不重新核算、不需要 resultId 或 sourcePlanId。取消或失败不改名。',{planId:str,title:{...str,description:'用户指定的新标题，1–200 字'}},async(args,exec)=>{
+  owner(exec);
+  const {planId,title}=validate(z.strictObject({planId:z.uuid(),title:planRecord.shape.title}),args);
+  const previous=await ctx.snowTrip.getPlan(planId);if(!previous)throw new Error('方案不存在或已删除');
+  return confirmUpdate(previous,{...previous,title},exec,undefined,true);
+ });
+ add('snow_update_plan','更新已有方案：先按 planId 自动比较已存套餐快照与最新资料。仅名称/地区/雪场文字修正时直接展示差异确认卡，用户确认后更新原方案或另存；影响核算时返回 needs_calculation 和原条件，请以 sourcePlanId 调用 snow_prepare_plan 后重新核算。resultId 为可选；不传时直接比较套餐快照，无需先创建规划。传入时必须是绑定该原方案的新核算结果，不接收模型填写的差异或金额。', {planId:str,resultId:{type:'string'}},async(args,exec)=>{
   owner(exec);
   const {planId,resultId}=validate(z.strictObject({planId:z.uuid(),resultId:z.uuid().optional()}),args);
   const previous=await ctx.snowTrip.getPlan(planId);if(!previous)throw new Error('方案不存在或已删除');
@@ -175,7 +181,7 @@ export function registerPlanningTools(ctx:Context){
     const updated=await confirmUpdate(p.sourcePlan,r.plan,exec,r.id);
     return {...updated,interaction:{...updated.interaction,selection:{card,selected:payload.selected}}};
    }
-   const saved=[];for(const index of new Set(payload.selected)){try{if(!results[index])throw new Error('所选方案不存在');const r=await currentResult(results[index].id,exec);await ctx.snowTrip.savePlan(r.plan);saved.push({resultId:r.id,status:'saved',planId:r.id,title:r.plan.title,plan:r.plan});}catch(e){saved.push({resultId:results[index]?.id,status:'failed',error:String(e)});}}
+   const saved=[];for(const index of new Set(payload.selected)){try{if(!results[index])throw new Error('所选方案不存在');const r=await currentResult(results[index].id,exec);const plan=await ctx.snowTrip.savePlan(r.plan);saved.push({resultId:r.id,status:'saved',planId:r.id,title:plan.title,plan});}catch(e){saved.push({resultId:results[index]?.id,status:'failed',error:String(e)});}}
    return {status:'save_results',message:'用户已完成选择并提交保存。按 items 中每项 status 简短说明实际结果；saved 才表示保存成功，failed 需说明失败原因。前端已保留只读选择记录并展示保存结果，不要再提示点击保存，不重复展示完整对比，不重复调用保存。',items:saved,interaction:{stage:detail.stage,action:'save',card,selected:item.selected,custom:null,items:saved}};
   }
   return {status:'answered',selected:item?.selected??[],custom:item?.custom??null,interaction:{stage:detail.stage,action:item?.selected?.length?'action':item?.custom?.trim()?'supplement':'cancel',card,selected:item?.selected??[],custom:item?.custom??null}};
@@ -190,6 +196,6 @@ export function registerPlanningTools(ctx:Context){
   if(answer.answers.length===1&&item?.id===questionId&&item.selected?.includes('取消本次操作')){exec.concludeTurn();return {status:'cancelled',interaction:{stage:'results',action:'cancel',card:JSON.parse(JSON.stringify({results:[resultView(r)]}))},message:'用户取消保存，等待新的指示。'};}
   if(answer.answers.length!==1||item?.id!==questionId||item.selected?.length!==1||item.selected[0]!=='保存所选')return {status:'cancelled',interaction:{stage:'results',action:item?.custom?.trim()?'supplement':'cancel',custom:item?.custom??null,card:{results:[resultView(r)]}}};
   const payload=validate(z.strictObject({stage:z.literal('results'),selected:z.tuple([z.literal(0)])}),JSON.parse(item.custom??'{}'));
-  await currentResult(resultId,exec);await ctx.snowTrip.savePlan(r.plan);return {version:1,status:'saved',plan:r.plan,interaction:{stage:'results',action:'save',card:{results:[resultView(r)]},items:[{title:r.plan.title,status:'saved',planId:r.id}]}};
+  await currentResult(resultId,exec);const plan=await ctx.snowTrip.savePlan(r.plan);return {version:1,status:'saved',plan,interaction:{stage:'results',action:'save',card:{results:[resultView(r)]},items:[{title:plan.title,status:'saved',planId:r.id}]}};
  });
 }
