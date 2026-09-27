@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {calendarDay,undatedRecords,planDateRanges,filterCalendarDay,seasonCalendar,localDay} from '../src/home-calendar.js';
+import {calendarDay,undatedRecords,planDateRanges,filterCalendarDay,seasonCalendar,localDay,validMonthRange} from '../src/home-calendar.js';
 
 const a={id:'a',validFrom:'2026-12-30',validTo:'2027-01-02',unavailableDates:['2027-01-01'],nights:3,usedNights:0,voided:false};
 const b={id:'b',start:'2026-12-31',nights:2,items:[]};
@@ -70,12 +70,16 @@ test('真实宿主保存、修改、级联删除后的读取重新聚合，方�
 
 
 test('四个月的雪季总览：十二月至三月、跨年闰日、统计按记录与日期去重',()=>{
-  const season=seasonCalendar([a,a,c],[b,b],2026);
+  const season=seasonCalendar([a,a,c],[b,b]);
   assert.deepEqual(season.months.map(localDay),['2026-12-01','2027-01-01','2027-02-01','2027-03-01']);
   assert.equal(season.days.size,121);assert.equal(season.packageCount,1);assert.equal(season.planCount,1);assert.equal(season.plannedDays,3);
   assert.equal(season.days.has('2026-11-30'),false);assert.equal(season.days.has('2027-04-01'),false);
-  const leap=seasonCalendar([], [{id:'leap',start:'2028-02-28',nights:2}],2027);
-  assert.equal(leap.days.size,122);assert.equal(leap.days.get('2028-02-29').plans.length,1);assert.equal(leap.planCount,1);assert.equal(leap.plannedDays,3);
+  assert.equal(seasonCalendar([],[],'2026-01','2027-12').months.length,24);
+  const jan=seasonCalendar([a,c],[b],'2027-01','2027-01');
+  assert.equal(jan.months.length,1);assert.equal(jan.days.size,31);assert.equal(jan.plannedDays,2);assert.equal(jan.planCount,1);
+  for(const value of [null,{}, {start:'2025-12',end:'2027-01'},{start:'2026-13',end:'2027-01'},{start:'2027-02',end:'2027-01'}])assert.equal(validMonthRange(value),false);
+  assert.throws(()=>seasonCalendar([],[],'2027-02','2027-01'));
+
 });
 
 test('图例多选：空选和全选展示全部，部分选择仅显示对应类型',()=>{

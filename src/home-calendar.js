@@ -32,8 +32,12 @@ export function filterCalendarDay(day,filters) {
   const show=type=>!filters.length||filters.includes(type);
   return {plans:day.plans.filter(p=>show(p.tracking?.booking==='confirmed'?'confirmed':'draft')),packages:show('packages')?day.packages:[],pendingPackages:show('pending')?day.pendingPackages:[]};
 }
-export function seasonCalendar(packages,plans,year) {
-  const months=[11,12,13,14].map(month=>new Date(year,month,1));
+export const defaultMonthRange={start:'2026-12',end:'2027-03'};
+export const validMonthRange=value=>!!value&&[value.start,value.end].every(month=>typeof month==='string'&&/^202[67]-(0[1-9]|1[0-2])$/.test(month))&&value.start<=value.end;
+export function seasonCalendar(packages,plans,start=defaultMonthRange.start,end=defaultMonthRange.end) {
+  if(!validMonthRange({start,end}))throw new Error('月份区间须在 2026–2027 年内，且开始月不晚于结束月');
+  const months=[];
+  for(let month=new Date(`${start}-01T00:00:00`);localDay(month).slice(0,7)<=end;month=new Date(month.getFullYear(),month.getMonth()+1,1))months.push(month);
   const days=new Map(),packageIds=new Set(),planIds=new Set();
   let plannedDays=0;
   for(const month of months){

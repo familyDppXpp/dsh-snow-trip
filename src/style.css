@@ -735,22 +735,6 @@
 .snow-home-active .page{padding-top:12px}
 .snow-home-active .page-footer{display:none}
 .snow .snow-home{--season-ink:#183b32;--season-muted:#60786f;--season-panel:#fff;--season-line:#e8eeeb;--season-soft:#def0e7;container-type:inline-size;color:var(--season-ink)}
-.snow .snow-season-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:24px;position:relative;overflow:hidden;border-radius:24px;background:#183b32;color:#f0f8f3;padding:28px 36px;box-shadow:0 12px 36px -24px #183b3270}
-.snow .snow-season-intro{grid-row:1/3;align-self:center;position:relative;z-index:1}
-.snow .snow-season-eyebrow{font-size:10px;letter-spacing:2px;color:#b2d0c2}
-.snow .snow-season-intro h1{font-family:"Avenir Next","PingFang SC",system-ui,sans-serif;font-size:40px;line-height:1.2;font-weight:600;letter-spacing:-1.5px;margin:14px 0 12px}
-.snow .snow-season-intro h1 span{color:#b8efd3}
-.snow .snow-season-intro p{font-size:12px;color:#b2d0c2}
-.snow .snow-season-edition{text-align:right;align-self:start}
-.snow .snow-season-edition>div{display:flex;align-items:center;justify-content:flex-end;gap:12px;line-height:1;font-family:"Avenir Next",system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-7px}
-.snow .snow-season-edition strong{font-size:88px;font-weight:500}
-.snow .snow-season-edition>div>span{font-size:55px;font-weight:200;color:#658b7a;transform:rotate(12deg);margin:0 8px}
-.snow .snow-season-edition p{font-size:10px;letter-spacing:2px;color:#b2d0c2;margin-top:10px}
-.snow .snow-season-edition p span{margin:0 10px;color:#658b7a}
-.snow .snow-season-totals{display:flex;gap:26px;align-self:end;justify-content:flex-end;padding-top:18px;margin-top:16px;border-top:1px solid #ffffff20}
-.snow .snow-season-totals>div{display:flex;align-items:baseline;gap:6px}
-.snow .snow-season-totals strong{font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}
-.snow .snow-season-totals span{font-size:10px;color:#b2d0c2}
 .snow .snow-season-months{margin-top:24px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .snow .snow-season-month{min-width:0;background:var(--season-panel);border-radius:18px;padding:18px 14px 16px;box-shadow:0 2px 3px #183b3203,0 12px 28px -22px #183b3250;outline:1px solid #183b3205}
 .snow .snow-season-month>header{display:flex;justify-content:space-between;align-items:center;margin:0 4px 16px}
@@ -797,30 +781,9 @@
 }
 @container(max-width:850px){
  .snow .snow-season-months{grid-template-columns:repeat(2,minmax(0,1fr))}
- .snow .snow-season-hero{padding:24px;column-gap:16px}
- .snow .snow-season-intro h1{font-size:32px}
- .snow .snow-season-edition strong{font-size:66px}
- .snow .snow-season-totals{gap:14px}
- .snow .snow-season-totals>div{display:block}
- .snow .snow-season-totals span{display:block;margin-top:3px}
  .snow .snow-season-bottom{align-items:flex-start;flex-direction:column;gap:12px;padding:18px 0}
 }
 @container(max-width:480px){
- .snow .snow-season-hero{grid-template-columns:minmax(0,1fr) auto;border-radius:18px;padding:20px;column-gap:10px}
- .snow .snow-season-intro{grid-row:auto}
- .snow .snow-season-eyebrow{font-size:8px;letter-spacing:1px}
- .snow .snow-season-intro h1{font-size:28px;letter-spacing:-1px;margin:12px 0 0}
- .snow .snow-season-intro p{display:none}
- .snow .snow-season-edition{align-self:center}
- .snow .snow-season-edition strong{font-size:46px;letter-spacing:-3px}
- .snow .snow-season-edition>div{gap:3px}
- .snow .snow-season-edition>div>span{font-size:30px;margin:0 5px}
- .snow .snow-season-edition p{font-size:8px;letter-spacing:0}
- .snow .snow-season-edition p span{margin:0 4px}
- .snow .snow-season-totals{grid-column:1/-1;justify-content:space-between;padding-top:12px;margin-top:18px}
- .snow .snow-season-totals>div{display:flex;gap:5px}
- .snow .snow-season-totals strong{font-size:18px}
- .snow .snow-season-totals span{font-size:9px}
  .snow .snow-season-months{gap:10px 8px}
  .snow .snow-season-month{padding:0 0 8px;border-radius:14px}
  .snow .snow-season-month>header{padding:14px 12px 0;margin:0 0 8px}
@@ -864,3 +827,61 @@
 .snow .snow-season-month:has(.snow-date:not([data-dismissed]):is(:hover,:focus-within)){position:relative;z-index:3}
 @media(hover:hover){.snow .snow-home .rdp-day_button:not([data-marked]):hover{background:var(--season-soft)}}
 .snow .snow-home:has(.snow-date:hover) .snow-date:not(:hover)>.snow-date-tooltip{display:none}
+
+.snow .snow-month-range-control{display:flex;justify-content:flex-end;margin-top:0;text-align:left}
+.snow .snow-month-range-control .field{margin:0;min-width:0;width:100%}
+.snow .snow-season-bottom+.snow-season-months{margin-top:0}
+.snow .snow-month-picker-year h3{margin:8px 0;font-size:14px}
+.snow .snow-month-picker-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.snow .snow-month-picker-grid button{min-height:36px;padding:6px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--ink)}
+.snow .snow-month-picker-grid button[aria-pressed=true]{background:#def0e7;color:#183b32}
+.snow .snow-month-picker-grid button[data-endpoint]{background:#28644c;color:#fff}
+.snow .snow-month-picker-grid button:focus-visible{outline:2px solid #478d6f;outline-offset:2px}
+
+.snow .snow-month-range-control .field>label{display:none}
+.snow .snow-month-range-control .package-tag-trigger{color:#c7ded3;background:transparent;border:0;border-radius:0;box-shadow:none;padding:0;font-size:12px;height:24px;min-height:24px}
+.snow .snow-month-range-control .package-tag-trigger:hover{background:transparent;color:#fff;text-decoration:underline;text-underline-offset:4px}
+
+
+.snow .snow-season-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:24px;position:relative;overflow:hidden;border-radius:24px;background:#183b32;color:#f0f8f3;padding:28px 36px;box-shadow:0 12px 36px -24px #183b3270}
+.snow .snow-season-intro{grid-row:1/3;align-self:center;position:relative;z-index:1}
+.snow .snow-season-eyebrow{font-size:10px;letter-spacing:2px;color:#b2d0c2}
+.snow .snow-season-intro h1{font-family:"Avenir Next","PingFang SC",system-ui,sans-serif;font-size:40px;line-height:1.2;font-weight:600;letter-spacing:-1.5px;margin:14px 0 12px}
+.snow .snow-season-intro h1 span{color:#b8efd3}
+.snow .snow-season-intro p{font-size:12px;color:#b2d0c2}
+.snow .snow-season-edition{text-align:right;align-self:start}
+.snow .snow-season-edition>.snow-season-year{display:flex;align-items:center;justify-content:flex-end;gap:12px;line-height:1;font-family:"Avenir Next",system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-7px}
+.snow .snow-season-edition strong{font-size:88px;font-weight:500;line-height:.85}
+.snow .snow-season-edition>.snow-season-year>span{font-size:55px;font-weight:200;color:#658b7a;transform:rotate(12deg);margin:0 8px}
+.snow .snow-season-edition p{font-size:10px;letter-spacing:2px;color:#b2d0c2;margin-top:10px}
+.snow .snow-season-edition p span{margin:0 10px;color:#658b7a}
+.snow .snow-season-totals{display:flex;gap:26px;align-self:end;justify-content:flex-end;padding-top:18px;margin-top:16px;border-top:1px solid #ffffff20}
+.snow .snow-season-totals>div{display:flex;align-items:baseline;gap:6px}
+.snow .snow-season-totals strong{font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}
+.snow .snow-season-totals span{font-size:10px;color:#b2d0c2}
+@container(max-width:850px){
+ .snow .snow-season-hero{padding:24px;column-gap:16px}
+ .snow .snow-season-intro h1{font-size:32px}
+ .snow .snow-season-edition strong{font-size:66px}
+ .snow .snow-season-totals{gap:14px}
+ .snow .snow-season-totals>div{display:block}
+ .snow .snow-season-totals span{display:block;margin-top:3px}
+}
+@container(max-width:480px){
+ .snow .snow-season-hero{grid-template-columns:minmax(0,1fr) auto;border-radius:18px;padding:20px;column-gap:10px}
+ .snow .snow-season-intro{grid-row:auto}
+ .snow .snow-season-eyebrow{font-size:8px;letter-spacing:1px}
+ .snow .snow-season-intro h1{font-size:28px;letter-spacing:-1px;margin:12px 0 0}
+ .snow .snow-season-intro p{display:none}
+ .snow .snow-season-edition{align-self:center}
+ .snow .snow-season-edition strong{font-size:46px;letter-spacing:-3px}
+ .snow .snow-season-edition>.snow-season-year{gap:3px}
+ .snow .snow-season-edition>.snow-season-year>span{font-size:30px;margin:0 5px}
+ .snow .snow-season-edition p{font-size:8px;letter-spacing:0}
+ .snow .snow-season-edition p span{margin:0 4px}
+ .snow .snow-season-totals{grid-column:1/-1;justify-content:space-between;padding-top:12px;margin-top:18px}
+ .snow .snow-season-totals>div{display:flex;gap:5px}
+ .snow .snow-season-totals strong{font-size:18px}
+ .snow .snow-season-totals span{font-size:9px}
+}
+@container(max-width:480px){.snow .snow-month-range-control .package-tag-trigger{font-size:10px;padding:0}.snow .snow-season-edition{min-width:148px}}

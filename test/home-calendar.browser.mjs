@@ -58,6 +58,28 @@ try{
   assert.ok(bounds.every(r=>Math.abs(r.top-bounds[0].top)<1&&r.bottom<=858),'桌面四个月必须同时完整显示在一屏内');
   assert.deepEqual(await calendar.locator('.snow-season-totals strong').allTextContents(),['1','3','1']);
   assert.match(await calendar.locator('.rdp-weekday').first().innerText(),/一/);
+  const chooseMonths=async(start,end)=>{
+    await calendar.getByRole('button',{name:/^展示月份：/}).click();
+    const picker=page.getByRole('group',{name:'展示月份选项',exact:true});
+    await picker.getByRole('button',{name:start,exact:true}).click();
+    assert.equal(await picker.getByRole('button',{name:'确定区间',exact:true}).isEnabled(),false);
+    await picker.getByRole('button',{name:end,exact:true}).click();
+    await picker.getByRole('button',{name:'确定区间',exact:true}).click();
+  };
+  await chooseMonths('2027年1月','2027年1月');
+  assert.equal(await calendar.locator('.rdp-month_grid').count(),1);
+  assert.deepEqual(await calendar.locator('.snow-season-totals strong').allTextContents(),['1','2','1']);
+  await page.waitForFunction(async()=>{const db=await new Promise(resolve=>{const req=indexedDB.open('dsh-snow-trip');req.onsuccess=()=>resolve(req.result);});try{return await new Promise(resolve=>{const req=db.transaction('data').objectStore('data').get('home-month-range');req.onsuccess=()=>resolve(req.result?.start==='2027-01'&&req.result?.end==='2027-01');});}finally{db.close();}});
+  await page.reload({waitUntil:'networkidle'});
+  await page.getByRole('button',{name:'稍后配置',exact:true}).click();
+  await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
+  await calendar.getByRole('button',{name:'展示月份：2027-01 至 2027-01',exact:true}).waitFor();
+  assert.equal(await calendar.locator('.rdp-month_grid').count(),1);
+  await chooseMonths('2027年12月','2026年1月');
+  assert.equal(await calendar.locator('.rdp-month_grid').count(),24);
+  await chooseMonths('2026年12月','2027年3月');
+  await expectDay('2026-12-31','2026-12-31，方案 1，套餐 1，待确认 1');
+
   await day('2026-12-31').hover();
   const tooltip=calendar.locator('#snow-date-2026-12-31');await tooltip.waitFor({state:'visible'});
   assert.match(await tooltip.innerText(),/跨年方案 B/);assert.match(await tooltip.innerText(),/跨年套餐 A/);
