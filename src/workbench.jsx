@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useId, useLayoutEffect, us
 import {date,evaluate,money,text} from './ledger.js';
 import {PackageCard,PackageBenefits,usePackages,PlanSavedCard} from './package-cards.jsx';
 import {packageStats,packageCandidates} from './package-explore.js';
-import {fieldLabels,purchaseLabels} from './packages.ts';
+import {extraPaymentDescription,fieldLabels,purchaseLabels} from './packages.ts';
 import {storage} from './storage.js';
 import {filterPlans,planStatuses,refundPolicies,tripDays} from './plan-filter.js';
 import {DatePicker} from './date-picker.jsx';
@@ -33,7 +33,7 @@ function SessionRail({mobile,open,onClose,width,children}) {
 function PackageFacts({record,fields}) {
   return <dl className="snow-detail-facts">{fields.map(key=>{
     const value=record[key];
-    const shown=value===null?'待确认':Array.isArray(value)?(value.length?value.join('；'):'已确认无'):['quote','paid','paidExtra'].includes(key)?yuan(value/100):typeof value==='boolean'?(value?'是':'否'):String(value);
+    const shown=key==='extraPayments'?(value?.map(extraPaymentDescription).join('；')||(record.paidExtra===0?'无':'待确认')):value===null?'待确认':Array.isArray(value)?(value.length?value.join('；'):'已确认无'):['quote','paid','paidExtra'].includes(key)?yuan(value/100):typeof value==='boolean'?(value?'是':'否'):String(value);
     return <div key={key}><dt>{fieldLabels[key]}</dt><dd className={value===null?'is-unknown':undefined}>{shown}</dd></div>;
   })}</dl>;
 }
@@ -87,7 +87,7 @@ function PackageSidebar({records,plans=[],allPackages=records,onBack,missing=fal
         <div className="snow-detail-highlights"><div><span>报价</span><strong>{record.quote===null?'待确认':yuan(record.quote/100)}</strong></div><div><span>住宿间夜</span><strong>{record.nights??'待确认'}{record.nights!==null&&<small> 间夜</small>}</strong></div></div>
         <section><h3>住宿信息</h3><PackageFacts record={record} fields={['hotels','roomType','resort','region','description']}/></section>
         <PackageBenefits record={record}/>
-        <section><h3>购买与使用</h3><PackageFacts record={record} fields={['purchasePlatform','paid','paidExtra','validFrom','validTo','usedNights','voided']}/></section>
+        <section><h3>购买与使用</h3><PackageFacts record={record} fields={['purchasePlatform','paid','paidExtra','extraPayments','validFrom','validTo','usedNights','voided']}/></section>
         <DetailSection className="snow-detail-section"><DetailHeading>使用规则</DetailHeading><PackageFacts record={record} fields={['surchargeRules','unavailableDates']}/></DetailSection>
         {record.unknowns.length>0&&<DetailSection className="snow-detail-section snow-detail-pending"><DetailHeading>待补全 <span>{record.unknowns.length} 项</span></DetailHeading><ul>{record.unknowns.map((item,i)=><li key={i}>{item}</li>)}</ul></DetailSection>}
       </div>

@@ -146,7 +146,7 @@ function PlanOptionsBody({data,busy,error,onAnswer,cancel,readOnly=false}) {
   if(data.stage==='review'){
     const plan=data.plan;
     return <>
-      {plan&&<><p>{plan.start??''}{plan.nights!=null?` · ${plan.nights} 晚`:''} · {plan.packages?.length??0} 份套餐搭配</p>
+      {plan&&<>{plan.costVersion!==2&&<p className="snow-plan-note">旧补款核算口径 · 保留当时金额，重新出行前请重新核算。</p>}<p>{plan.start??''}{plan.nights!=null?` · ${plan.nights} 晚`:''} · {plan.packages?.length??0} 份套餐搭配</p>
         {plan.daily?.length>0&&<div className="table-scroll"><table><thead><tr><th>日期</th><th>费用</th><th>依据</th></tr></thead><tbody>{plan.daily.map((row,i)=><tr key={i}><td>{row.date}</td><td>{yuan(row.amount)}</td><td>{readableBasis(row.basis)}</td></tr>)}</tbody></table></div>}
         <p className="snow-plan-pills"><span className="snow-plan-pill">整趟总价 {yuan(plan.total)}</span></p>
         {plan.reason&&<p className="snow-plan-reason">{plan.reason}</p>}

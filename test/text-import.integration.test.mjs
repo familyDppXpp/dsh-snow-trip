@@ -39,8 +39,8 @@ test('公开工具：卡片确认→保存→重开→查询；变更、取消�
       await presetScope.ctx.plugin(SnowTools);
     }});
     bindScopeParent(agent,presetKey);bindScopeParent(secondAgent,presetKey);
-    assert.deepEqual(ctx.tools.schemas(agent).map(t=>t.name).sort(),['snow_query','snow_query_plan','snow_list_plans','snow_update_plan_tracking','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_other_benefit','snow_pending_question','snow_clear_field','snow_commit','snow_evaluate','snow_save_plan','snow_plan_stage','snow_prepare_plan','snow_plan_results'].sort());
-    assert.deepEqual(ctx.tools.schemas(secondAgent).map(t=>t.name).sort(),['snow_query','snow_query_plan','snow_list_plans','snow_update_plan_tracking','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_other_benefit','snow_pending_question','snow_clear_field','snow_commit','snow_evaluate','snow_save_plan','snow_plan_stage','snow_prepare_plan','snow_plan_results'].sort());
+    assert.deepEqual(ctx.tools.schemas(agent).map(t=>t.name).sort(),['snow_extra_payment','snow_query','snow_query_plan','snow_list_plans','snow_update_plan_tracking','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_other_benefit','snow_pending_question','snow_clear_field','snow_commit','snow_evaluate','snow_save_plan','snow_plan_stage','snow_prepare_plan','snow_plan_results'].sort());
+    assert.deepEqual(ctx.tools.schemas(secondAgent).map(t=>t.name).sort(),['snow_extra_payment','snow_query','snow_query_plan','snow_list_plans','snow_update_plan_tracking','snow_draft','snow_draft_get','snow_draft_discard','snow_set_basic','snow_set_benefits','snow_set_purchase','snow_set_usage','snow_hotel','snow_surcharge','snow_unavailable_date','snow_other_benefit','snow_pending_question','snow_clear_field','snow_commit','snow_evaluate','snow_save_plan','snow_plan_stage','snow_prepare_plan','snow_plan_results'].sort());
     assert.deepEqual(ctx.tools.schemas({id:'ordinary-session'}),[]);
     assert.deepEqual(ctx.tools.schemas(),[]);
     const denied=await ctx.tools.execute({name:'snow_query',arguments:{},agent:{id:'ordinary-session'},signal:new AbortController().signal,callId:'denied'});
@@ -55,6 +55,14 @@ test('公开工具：卡片确认→保存→重开→查询；变更、取消�
     assert.ok(!ctx.tools.schemas(agent).some(t=>t.name==='snow_save_packages'));
     const {draftId}= (await ok('snow_draft',{})).value;
     assert.equal((await ok('snow_draft',{})).value.draftId,draftId,'重试创建不丢失草稿');
+    let payment=(await ok('snow_extra_payment',{draftId,action:'upsert',purpose:'周末补款',scope:'date',date:'2027-02-04',rooms:1,paid:200,total:400,settled:false,basis:'用户确认本晚已付200元，尚需200元'})).value;
+    const paymentId=payment.package.extraPayments[0].id;
+    assert.equal(payment.package.extraPayments[0].paid,200);
+    assert.equal((await execute('snow_extra_payment',{draftId,action:'upsert',id:paymentId,date:'2027-02-06'})).isError,true);
+    payment=(await ok('snow_extra_payment',{draftId,action:'upsert',id:paymentId,date:'2027-02-06',transferConfirmed:true})).value;
+    assert.equal(payment.package.extraPayments[0].date,'2027-02-06');
+    assert.equal((await execute('snow_extra_payment',{draftId,action:'upsert',paid:-1})).isError,true);
+    await ok('snow_extra_payment',{draftId,action:'none'});
     await ok('snow_set_basic',{draftId,description:'长白山住宿'});
     await ok('snow_set_purchase',{draftId,quote:1299.50,purchaseStatus:'unpurchased'});
     await ok('snow_set_usage',{draftId,nights:3});
@@ -154,6 +162,16 @@ test('公开工具：卡片确认→保存→重开→查询；变更、取消�
     assert.deepEqual(await ctx.snowTrip.deletePackage(later.id,later.revision,true),{sessionId:null,archiveError:'归档写盘失败'});
     onArchive=async()=>{};await ctx.snowTrip.archiveSession(later.sessionId);
     await owner.dispose();await boot();assert.deepEqual(await ctx.snowTrip.listPackages(),[]);
+    const extrasDraft=(await ok('snow_draft',{})).value.draftId;
+    await ok('snow_set_basic',{draftId:extrasDraft,name:'补款持久化测试'});
+    await ok('snow_set_purchase',{draftId:extrasDraft,purchaseStatus:'purchased',paidExtra:400});
+    const extra=(await ok('snow_extra_payment',{draftId:extrasDraft,action:'upsert',purpose:'日期加价',scope:'date',date:'2027-02-04',rooms:1,paid:200,total:300,settled:false,basis:'用户确认'})).value;
+    assert.equal(extra.package.paidExtra,400,'未归属的余额不能被一条已知明细覆盖');
+    const withExtras=(await ok('snow_commit',{draftId:extrasDraft})).value;
+    assert.equal(withExtras.completeness,'incomplete');assert.equal(withExtras.extraPayments[0].paid,20000);
+    await owner.dispose();await boot();
+    const queriedExtras=(await ok('snow_query',{id:withExtras.id})).value.packages[0];
+    assert.equal(queriedExtras.extraPayments[0].paid,200);assert.equal(queriedExtras.extraPayments[0].total,300);assert.equal(queriedExtras.paidExtra,400);
     await presetScope.dispose();assert.deepEqual(ctx.tools.schemas(agent),[]);
   }finally{await owner?.dispose();await rm(root,{recursive:true,force:true});}
 });

@@ -58,6 +58,7 @@ export function toCents(value: number|null|undefined): number|null {
 // 持久化方案记录：金额为分，packages 保存参与套餐的版本与完整快照。
 export const planRecord = z.strictObject({
   tracking: planTracking.optional(),
+  costVersion:z.literal(2).optional(),
   id: z.uuid(), schemaVersion: z.literal(1), createdAt: z.iso.datetime(), sessionId: text,
   title: z.string().trim().min(1).max(200),
   start: day.nullable(), nights: z.number().int().min(1).max(366).nullable(),
@@ -65,11 +66,14 @@ export const planRecord = z.strictObject({
   reason: text.nullable(), allocation: text.nullable(),
   estimates: z.array(z.strictObject({ label: text, amount: z.number().int().min(0), basis: text })).max(50),
   items: z.array(itemEntry).min(1).max(20),
-  daily: z.array(z.strictObject({ date: day, packageId: z.uuid(), amount: centsAmount, basis: text.nullable() })).max(400),
+  daily: z.array(z.strictObject({ date: day, packageId: z.uuid(), amount: centsAmount, basis: text.nullable(), base:centsAmount.optional(),extraPaid:centsAmount.optional(),extraPending:centsAmount.optional() })).max(400),
   sharedCosts: z.array(z.strictObject({ label: text, amount: z.number().int().min(0), basis: text })).max(50),
   unknowns: z.array(text).max(100),
   packages: z.array(z.strictObject({ id: z.uuid(), revision: z.number().int().min(1), snapshot: packageRecord })).min(1).max(20),
 }).superRefine((p,ctx)=>{
+  if(p.costVersion===2)for(const [index,row] of p.daily.entries()){
+    if(row.base==null||row.extraPaid==null||row.extraPending==null||row.amount!==row.base+row.extraPaid+row.extraPending)ctx.addIssue({code:'custom',path:['daily',index],message:'新口径逐日成本须等于套餐本价、已付补款与尚需补款之和'});
+  }
   const items=new Map<string,number>();
   for(const item of p.items)items.set(item.packageId,item.revision);
   for(const entry of p.packages){

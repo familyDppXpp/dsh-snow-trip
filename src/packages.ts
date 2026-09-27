@@ -9,6 +9,38 @@ const included=z.boolean().nullable().default(null);
 const quantity=z.number().int().min(1).max(100000).nullable().default(null);
 export const benefitBasisLabels={order:'整单',night:'每晚',day:'每日',other:'其他口径'};
 const basis=z.enum(['order','night','day','other']).nullable().default(null);
+export const extraPayment=z.strictObject({
+  id:z.string().trim().min(1).max(80),purpose:text.nullable().default(null),
+  scope:z.enum(['package','date']).nullable().default(null),date:z.iso.date().nullable().default(null),
+  rooms:z.number().int().min(1).max(100).nullable().default(null),
+  paid:amount,total:amount,settled:z.boolean().nullable().default(null),basis:text.nullable().default(null),
+});
+export type ExtraPayment=z.infer<typeof extraPayment>;
+export function extraPaymentUnknowns(p:{paidExtra:number|null;extraPayments?:ExtraPayment[]|null}) {
+  const rows=p.extraPayments;
+  if(!rows?.length)return p.paidExtra===0?[]:['补款明细'];
+  const errors:string[]=[];
+  if(new Set(rows.map(row=>row.id)).size!==rows.length)errors.push('补款明细 ID 重复');
+  const coverage=new Set<string>(),wholePurposes=new Set(rows.filter(row=>row.scope==='package').map(row=>row.purpose));
+  for(const row of rows){
+    const key=JSON.stringify([row.scope,row.date,row.purpose]);
+    if(coverage.has(key)||(row.scope==='date'&&wholePurposes.has(row.purpose)))errors.push('补款明细同一用途覆盖重复，请合并或澄清');
+    coverage.add(key);
+    if(!row.purpose||!row.scope||row.paid===null||row.settled===null||!row.basis||
+      (row.scope==='date'&&(!row.date||row.rooms===null))||
+      (row.scope==='package'&&(row.date!==null||row.rooms!==null))||
+      (row.settled===false&&(row.total===null||row.paid===null||row.total<row.paid)))errors.push(`补款明细 ${row.purpose??row.id}：用途、覆盖范围、金额或结清依据待确认`);
+  }
+  const sum=rows.reduce((total,row)=>total+(row.paid??0),0);
+  if(rows.some(row=>row.paid===null)||!Number.isSafeInteger(sum)||sum!==p.paidExtra)errors.push('补款明细合计与已付额外补款待核对');
+  return errors;
+}
+export function extraPaymentDescription(row:ExtraPayment) {
+  const money=(value:number|null)=>value===null?'待确认':`${(value/100).toFixed(2)}元`;
+  const scope=row.scope==='package'?'整个套餐':row.scope==='date'?`${row.date??'日期待确认'} · ${row.rooms??'待确认'}间房`:'覆盖范围待确认';
+  return `${row.purpose??'用途待确认'} · ${scope} · 已付${money(row.paid)} · ${row.settled===true?'商家确认已结清':row.settled===false?`未结清，应付${money(row.total)}`:'是否结清待确认'}${row.basis?'；'+row.basis:''}`;
+}
+
 export const benefitGroups=[
   {label:'雪票',included:'skiIncluded',counts:['skiTickets'],basis:'skiBasis',rule:'skiRule'},
   {label:'早餐',included:'breakfastIncluded',counts:['breakfastPeople'],basis:'breakfastBasis',rule:'breakfastRule'},
@@ -20,6 +52,7 @@ export const packageInput = z.strictObject({
   nights: z.number().int().min(1).max(100000).nullable().default(null),
   purchaseStatus: z.enum(['unknown','unpurchased','purchased']).default('unknown'),
   quote: amount, paid: amount, paidExtra: amount,
+  extraPayments:z.array(extraPayment).max(400).nullable().default(null),
   validFrom: day, validTo: day, splitRule: optionalText,
   skiIncluded:included,skiTickets:quantity,skiBasis:basis,skiRule:optionalText,
   breakfastIncluded:included,breakfastPeople:quantity,breakfastBasis:basis,breakfastRule:optionalText,
@@ -42,7 +75,7 @@ export const packageInput = z.strictObject({
 });
 export const fieldLabels = {
   name:'名称',description:'说明',hotels:'适用酒店',roomType:'房型',resort:'雪场',region:'地区',nights:'总间夜',
-  purchasePlatform:'购买平台',purchaseStatus:'购买状态',quote:'报价',paid:'实付',paidExtra:'已付额外补款',validFrom:'有效期开始',validTo:'有效期结束',
+  purchasePlatform:'购买平台',purchaseStatus:'购买状态',quote:'报价',paid:'实付',paidExtra:'已付额外补款',extraPayments:'补款明细',validFrom:'有效期开始',validTo:'有效期结束',
   skiIncluded:'是否含雪票',skiTickets:'雪票张数',skiBasis:'雪票发放口径',skiRule:'雪票说明',
   breakfastIncluded:'是否含早餐',breakfastPeople:'早餐人数',breakfastBasis:'早餐供应口径',breakfastRule:'早餐说明',
   spaIncluded:'是否含汤泉',spaPeople:'汤泉人数',spaVisits:'汤泉次数',spaBasis:'汤泉使用口径',spaRule:'汤泉说明',splitAllowed:'是否可拆分',
@@ -55,9 +88,9 @@ export function normalizePackage(input: unknown) {
       if(key===group.rule)return p[group.basis]==='other'&&p[group.rule]===null;
       if((group.counts as readonly string[]).includes(key)||key===group.basis)return p[group.included]===true&&p[key as keyof typeof fieldLabels]===null;
     }
-    if(key==='splitRule'||key==='otherBenefits')return false;
+    if(key==='splitRule'||key==='otherBenefits'||key==='extraPayments')return false;
     return p[key as keyof typeof fieldLabels]===null||(key==='purchaseStatus'&&p.purchaseStatus==='unknown');
-  }).map(([,label])=>label),...p.pendingQuestions];
+  }).map(([,label])=>label),...p.pendingQuestions,...extraPaymentUnknowns(p)];
   return {...p,name:p.name??'未命名套餐',unknowns,completeness:unknowns.length?'incomplete' as const:'complete' as const};
 }
 const normalized = packageInput.safeExtend({name:text,unknowns:z.array(text),completeness:z.enum(['incomplete','complete'])});
@@ -81,7 +114,7 @@ export const purchaseLabels={unknown:'待确认',unpurchased:'未购买',purchas
 export function packageSummary(p: ReturnType<typeof normalizePackage>) {
   return Object.entries(fieldLabels).map(([key,label])=>{
     const value=p[key as keyof typeof fieldLabels];
-    const shown=key.endsWith('Basis')&&value!==null?benefitBasisLabels[value as keyof typeof benefitBasisLabels]:key==='purchaseStatus'?purchaseLabels[p.purchaseStatus]:value===null?'待确认':Array.isArray(value)?(value.length?value.join('；'):'已确认无'):['quote','paid','paidExtra'].includes(key)?`${(Number(value)/100).toFixed(2)} 元`:typeof value==='boolean'?(value?'是':'否'):String(value);
+    const shown=key==='extraPayments'?(p.extraPayments?.map(extraPaymentDescription).join('；')||(p.paidExtra===0?'无':'待确认')):key.endsWith('Basis')&&value!==null?benefitBasisLabels[value as keyof typeof benefitBasisLabels]:key==='purchaseStatus'?purchaseLabels[p.purchaseStatus]:value===null?'待确认':Array.isArray(value)?(value.length?value.join('；'):'已确认无'):['quote','paid','paidExtra'].includes(key)?`${(Number(value)/100).toFixed(2)} 元`:typeof value==='boolean'?(value?'是':'否'):String(value);
     return `${label}：${shown}`;
   }).concat(`待补全：${p.unknowns.join('、')||'无'}`).join('\n');
 }

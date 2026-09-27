@@ -103,6 +103,14 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
     assert.throws(()=>calculate(planning,items,[records[0]],{...out,coverage:[{feeId:'meal',quantity:3,basis:'错误'}]},'测试','测试'),/覆盖数量/);
     const rounded=calculate(planning,items,[{...records[0],paid:90001}],{...out,total:55001},'尾差','测试');
     assert.deepEqual(rounded.plan.daily.map(d=>d.amount),[22501,22500]);
+    const readCalculations=ctx.snowTrip.listCalculations.bind(ctx.snowTrip),readCalculation=ctx.snowTrip.getCalculation.bind(ctx.snowTrip);
+    const oldCalculation={...await readCalculation(computed.resultId),id:crypto.randomUUID()};
+    oldCalculation.plan={...oldCalculation.plan,costVersion:undefined};
+    ctx.snowTrip.listCalculations=async id=>[oldCalculation,...await readCalculations(id)];
+    ctx.snowTrip.getCalculation=async id=>id===oldCalculation.id?oldCalculation:readCalculation(id);
+    assert.equal(JSON.parse((await ok('snow_plan_results',{planningId:p.planningId})).content[0].text).results.length,1,'旧口径结果不混入新候选');
+    assert.match((await execute('snow_save_plan',{resultId:oldCalculation.id})).content[0].text,/旧补款口径/);
+    ctx.snowTrip.listCalculations=readCalculations;ctx.snowTrip.getCalculation=readCalculation;
     const list=JSON.parse((await ok('snow_plan_results',{planningId:p.planningId,complete:true})).content[0].text);
     assert.equal(list.comparisonComplete,true);assert.equal(list.results[0].resultId,computed.resultId);
     // 结果卡不能接受模型填写的金额，旧接口不再是绕过核算的入口。

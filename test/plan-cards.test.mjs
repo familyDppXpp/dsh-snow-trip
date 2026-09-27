@@ -196,6 +196,12 @@ test('已存方案展示共同费用与总额加总，缺失分项时提示核�
   }
   const incomplete=server.renderToStaticMarkup(React.createElement(PlanSavedCard,{block:{kind:'tool-result',meta:{version:1,status:'saved',plan:{...plan,sharedCosts:[]}}}}));
   assert.match(incomplete,/需重新核对/);
+  assert.match(html,/旧补款核算口径/);
+  const modern={...plan,costVersion:2,daily:plan.daily.map(row=>({...row,base:row.amount-30000,extraPaid:20000,extraPending:10000}))};
+  const modernHtml=server.renderToStaticMarkup(React.createElement(PlanSavedCard,{block:{kind:'tool-result',meta:{version:1,status:'saved',plan:modern}}}));
+  assert.match(modernHtml,/本次已付补款 ¥200.00.*尚需补款 ¥100.00/);
+  assert.doesNotMatch(modernHtml,/旧补款核算口径|<input|<textarea/);
+
 });
 
 test('已确认条件保留费用及套餐快照且不可编辑，调整状态不显示',async()=>{

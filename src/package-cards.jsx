@@ -62,6 +62,7 @@ export function PlanSavedCard({block,children,onPackage,hideTitle=false}) {
     {onPackage&&<section className="snow-plan-packages" aria-label="引用的套餐"><h4>引用的套餐</h4>{meta.packages.map(entry=><button key={entry.id} aria-label={`查看套餐：${entry.snapshot.name} · 第 ${entry.revision} 版`} onClick={()=>onPackage(entry,meta)}><span className="snow-plan-package-copy"><strong>{entry.snapshot.name}</strong><small>保存时资料 · 第 {entry.revision} 版</small></span><span className="snow-plan-package-arrow" aria-hidden="true">→</span></button>)}</section>}
     </div>
     <div className="snow-saved-total"><span>整趟总成本</span><strong>{yuan(meta.total)}</strong></div></header>
+    {meta.costVersion!==2&&<p className="snow-plan-note">旧补款核算口径 · 保留当时金额；重新出行前请核对补款明细并重新核算。</p>}
     {meta.tracking&&<div className="snow-plan-tags" aria-label="出行标签">
       {meta.tracking.booking&&<span className="snow-session-tag">{meta.tracking.booking==='confirmed'?'已确认':'未预约'}</span>}
       {meta.tracking.refund&&<span className="snow-session-tag">{meta.tracking.refund==='refundable'?'可退':'不可退'}</span>}
@@ -69,11 +70,12 @@ export function PlanSavedCard({block,children,onPackage,hideTitle=false}) {
     </div>}
     {meta.reason&&<p className="snow-saved-reason">{basis(meta.reason)}</p>}
     <section className="snow-saved-breakdown" aria-label="总成本组成"><h4>总成本组成</h4><dl>
-      <div><dt>逐晚费用小计 <small>套餐计入成本及日期补款，详见下表</small></dt><dd>{yuan(nightly)}</dd></div>
+      <div><dt>逐晚费用小计 <small>套餐本价、已付补款及尚需补款，详见下表</small></dt><dd>{yuan(nightly)}</dd></div>
       {meta.sharedCosts.map((cost,index)=><div key={index}><dt>{cost.label}<small>整趟计一次{cost.basis?` · ${basis(cost.basis)}`:''}</small></dt><dd>{yuan(cost.amount)}</dd></div>)}
       <div className="snow-saved-sum"><dt>整趟总成本</dt><dd>{yuan(meta.total)}</dd></div>
     </dl>{nightly!=null&&meta.total!=null&&nightly+shared===meta.total?<p>{yuan(nightly)} 逐晚费用 + {yuan(shared)} 共同费用 = {yuan(meta.total)}</p>:<p>保存时的分项信息不完整或与总额不一致，需重新核对。</p>}
     {meta.allocation&&<p className="snow-saved-allocation">套餐计入依据：{basis(meta.allocation)}</p>}</section>
+    {meta.costVersion===2&&<p className="snow-plan-note">本次已付补款 {yuan(meta.daily.reduce((sum,row)=>sum+(row.extraPaid??0),0))} · 尚需补款 {yuan(meta.daily.reduce((sum,row)=>sum+(row.extraPending??0),0))}（均已计入总成本）</p>}
     {meta.daily.length>0&&<div className="table-scroll snow-saved-daily"><table aria-label={`${meta.title} 每日费用`}><thead><tr><th scope="col">日期</th><th scope="col">当晚费用</th><th scope="col">计算依据</th></tr></thead><tbody>{meta.daily.map(row=><tr key={row.date+row.packageId}><td>{row.date}</td><td>{yuan(row.amount)}</td><td>{basis(row.basis)}</td></tr>)}</tbody></table></div>}
     {meta.unknowns.length>0&&<p className="package-missing"><span>未知项</span>{meta.unknowns.join('、')}</p>}
     <small className="snow-saved-footnote">费用与套餐资料均为保存时快照</small>

@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState,useSyncExternalStore} from 'react';
-import {fieldLabels,purchaseLabels,benefitBasisLabels,saveMetadata,savePreviewSchema,packageMetadata} from './packages.ts';
+import {extraPaymentDescription,fieldLabels,purchaseLabels,benefitBasisLabels,saveMetadata,savePreviewSchema,packageMetadata} from './packages.ts';
 import {EvaluateCard,PlanFallback,PlanSavedCard,PreparedPlanCard} from './package-cards.jsx';
 
 export function saveQuestion(pending) {
@@ -12,6 +12,7 @@ const labels={...fieldLabels,pendingQuestions:'待确认问题'};
 const unknown=(key,value)=>value==null||(key==='purchaseStatus'&&value==='unknown');
 export const changedFields=(previous,preview)=>Object.keys(labels).filter(key=>JSON.stringify(previous[key])!==JSON.stringify(preview[key]));
 function shown(key,value) {
+  if(key==='extraPayments')return value==null?'待确认':value.length?value.map(extraPaymentDescription).join('；'):'无';
   if(key==='otherBenefits')return value==null?'未提供':value.length?value.join('；'):'无';
   if(unknown(key,value))return '待确认';
   if(key.endsWith('Basis'))return benefitBasisLabels[value];
@@ -28,7 +29,7 @@ export function otherBenefitChanges(previous,preview) {
   return [...previous.filter(item=>!preview.includes(item)).map(item=>({before:item,after:'已移除'})),...preview.filter(item=>!previous.includes(item)).map(item=>({before:'无此项',after:item}))];
 }
 function PackageDetails({preview:p}) {
-  const groups=[['套餐信息',['description','hotels','roomType','resort','region','nights']],['购买与使用',['purchasePlatform','purchaseStatus','quote','paid','paidExtra','usedNights','voided']],['使用规则',['validFrom','validTo','surchargeRules','unavailableDates']]];
+  const groups=[['套餐信息',['description','hotels','roomType','resort','region','nights']],['购买与使用',['purchasePlatform','purchaseStatus','quote','paid','paidExtra','extraPayments','usedNights','voided']],['使用规则',['validFrom','validTo','surchargeRules','unavailableDates']]];
   return <>{groups.map(([title,keys],index)=>{const known=keys.filter(key=>!unknown(key,p[key]));return <React.Fragment key={title}>{known.length>0&&<section><h4>{title}</h4><dl>{known.map(key=><div key={key}><dt>{labels[key]}</dt><dd>{shown(key,p[key])}</dd></div>)}</dl></section>}{index===0&&<PackageBenefits record={p}/>}</React.Fragment>;})}{p.unknowns.length>0&&<aside><strong>待补全</strong><p>{p.unknowns.join('、')}</p></aside>}</>;
 }
 export function SaveCard({item,pending}) {

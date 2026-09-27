@@ -31,7 +31,8 @@ export function registerPlanningTools(ctx:Context){
  const owner=(exec:ToolRunContext)=>{exec.signal.throwIfAborted();if(!exec.agent)throw new Error('需要当前会话');return exec.agent.id;};
  const add=(name:string,description:string,parameters:ParameterSchemaSpec,execute:(args:any,exec:ToolRunContext)=>Promise<any>)=>ctx.tools.register(defineTool({name,description,parameters,execute,output:{schema:{type:'json'},render:(_a,v)=>[{type:'text',text:JSON.stringify(v)}],presentationMeta:(_a,v:any)=>v as never}}));
  const planning=async(id:string,exec:ToolRunContext)=>{const p=await ctx.snowTrip.getPlanning(id);if(!p||p.sessionId!==owner(exec))throw new PlanningError('technical','planningId：当前会话不存在该规划');if(!p.confirmedByCard)throw new PlanningError('technical','此规划缺少卡片确认记录，请调用 snow_prepare_plan 由用户确认；不能直接核算或保存');if(p.supersededBy)throw new PlanningError('business',`条件已更新，请使用规划 ${p.supersededBy}`);return p;};
- const currentResult=async(id:string,exec:ToolRunContext)=>{const r=await ctx.snowTrip.getCalculation(id);if(!r||r.sessionId!==owner(exec))throw new PlanningError('technical','resultId：当前会话不存在该核算结果');await planning(r.planningId,exec);for(const item of r.plan.packages){const p=await ctx.snowTrip.getPackage(item.id);if(!p||p.revision!==item.revision||p.completeness!=='complete')throw new PlanningError('business','套餐版本或资料状态变化，请重新核算');}return r;};
+ const currentResult=async(id:string,exec:ToolRunContext)=>{const r=await ctx.snowTrip.getCalculation(id);if(!r||r.sessionId!==owner(exec))throw new PlanningError('technical','resultId：当前会话不存在该核算结果');await planning(r.planningId,exec);if(r.plan.costVersion!==2)throw new PlanningError('business','旧补款口径的核算结果不能再次保存，请重新核算；已存方案仍保留历史快照');for(const item of r.plan.packages){const p=await ctx.snowTrip.getPackage(item.id);if(!p||p.revision!==item.revision||p.completeness!=='complete')throw new PlanningError('business','套餐版本或资料状态变化，请重新核算');}return r;};
+ const currentCalculations=async(id:string)=>(await ctx.snowTrip.listCalculations(id)).filter(result=>result.plan.costVersion===2);
  const resultView=(r:Calculation)=>({...r.plan,resultId:r.id,end:dateAfter(r.plan.start!,r.plan.nights!),allocation:r.plan.allocation?[r.plan.allocation]:[],checks:r.checks,switches:r.switches,estimated:r.estimated,daily:r.plan.daily.map(d=>({...d,hotel:r.plan.packages.find(p=>p.id===d.packageId)?.snapshot.hotels?.join('、')}))});
  add('snow_list_plans','只读列出全部已存出行方案，不包含未保存的核算结果，不显示确认卡。金额为整数分。套餐快照属于方案保存时版本；需要最新套餐资料时用 snow_query 按套餐 ID 查询。',{},async args=>{
   validate(z.strictObject({}),args);
@@ -80,7 +81,7 @@ export function registerPlanningTools(ctx:Context){
   const p:Planning={id:randomUUID(),createdAt:new Date().toISOString(),sessionId:owner(exec),conditions:value,confirmedByCard:true,supersededBy:null,status:'running'};
   await ctx.snowTrip.createPlanning(p);return {status:'prepared',confirmedByCard:true,planningId:p.id,amountUnit:'分',conditions:p.conditions,packages:all.filter(pkg=>value.packageIds.includes(pkg.id)).map(pkg=>({id:pkg.id,name:pkg.name,revision:pkg.revision}))};
  });
- add('snow_evaluate','核算一份完整候选。只接收规划 ID、按日期排序的住宿段和脚本；已确认条件由工具读取。脚本接收 conditions/items/packages（金额均为分），返回 {daily:[{date,packageId,surcharge,basis}],coverage:[{feeId,quantity,basis}],total}；surcharge 为该夜新增补款，coverage 为套餐覆盖的已确认费用数量，total 须含套餐分摊成本。工具验证全程覆盖、版本、有效期、禁用日期、剩余间夜、不可拆分、费用加总和预算。技术错误只修正 items/script 并沿用同一 planningId 重试，不限次数，不再调用 snow_prepare_plan；业务不合格淘汰，不擅改预算。',{planningId:str,title:str,reason:str,items:{type:'array',items:{type:'object',additionalProperties:false,properties:itemParameters},required:true},script:{...str,description:'JavaScript 函数体，最多 50000 字符；只使用 conditions/items/packages 和标准内建；禁止 IO'}},async(args,exec)=>{
+ add('snow_evaluate','核算一份完整候选。只接收规划 ID、按日期排序的住宿段和脚本；已确认条件由工具读取。脚本接收 conditions/items/packages（金额均为分），返回 {daily:[{date,packageId,charges:[{purpose,amount,extraPaymentId?,rooms?}],basis}],coverage:[{feeId,quantity,basis}],total}；charges 为逐项补款（整数分），已有补款必须按用途和日期引用 extraPayments 的 id，每个适用明细每晚恰好一次，不能再作为新补款叠加；amount 是该夜该项已付+尚需之和，settled=true 以实际 paid 结清金额为准，未结清使用确认的 total。整包补款按本次间夜分摊；指定日期仅计对应晚；引用明细默认使用记录的 rooms，其他房间同项新费用另列无 ID 的项并明确 rooms，覆盖合计不得超出本次房间数。用途、金额或归属不明先补全套餐，改期不自动转用。coverage 为套餐覆盖的已确认费用数量，total 须含套餐分摊成本。工具验证全程覆盖、版本、有效期、禁用日期、剩余间夜、不可拆分、费用加总和预算。技术错误只修正 items/script 并沿用同一 planningId 重试，不限次数，不再调用 snow_prepare_plan；业务不合格淘汰，不擅改预算。',{planningId:str,title:str,reason:str,items:{type:'array',items:{type:'object',additionalProperties:false,properties:itemParameters},required:true},script:{...str,description:'JavaScript 函数体，最多 50000 字符；只使用 conditions/items/packages 和标准内建；禁止 IO'}},async(args,exec)=>{
   const a=validate(z.strictObject({planningId:z.uuid(),title:z.string().trim().min(1).max(200),reason:z.string().trim().min(1).max(4000),items:z.array(segment).min(1).max(20),script:z.string().trim().min(1).max(50000)}),args);
   const p=await planning(a.planningId,exec);
   await ctx.snowTrip.setPlanningStatus(p.id,'running');
@@ -89,13 +90,13 @@ export function registerPlanningTools(ctx:Context){
   try{
    const output=await runScript(a.script,{conditions:p.conditions,items:a.items,packages},exec.signal);exec.signal.throwIfAborted();
    const r=calculate(p,a.items,packages,output,a.title,a.reason);await ctx.snowTrip.putCalculation(r);
-   return {status:'computed',planningId:p.id,resultId:r.id,amountUnit:'分',passed:(await ctx.snowTrip.listCalculations(p.id)).length,message:'候选通过核算，完成比较后统一展示'};
+   return {status:'computed',planningId:p.id,resultId:r.id,amountUnit:'分',passed:(await currentCalculations(p.id)).length,message:'候选通过核算，完成比较后统一展示'};
   }catch(e){if(exec.signal.aborted)await ctx.snowTrip.setPlanningStatus(p.id,'stopped');throw e;}
  });
  add('snow_plan_results','读取已通过核算的结果；完成比较时传 complete=true。停止后仍可读取和保存已有结果，但不得声称完成全部比较。',{planningId:str,complete:{type:'boolean'}},async(args,exec)=>{
   const a=validate(z.strictObject({planningId:z.uuid(),complete:z.boolean().optional()}),args),p=await planning(a.planningId,exec);
   if(a.complete)await ctx.snowTrip.setPlanningStatus(p.id,'complete');
-  const results=await ctx.snowTrip.listCalculations(p.id);
+  const results=await currentCalculations(p.id);
   return {status:a.complete?'complete':p.status,planningId:p.id,comparisonComplete:a.complete||p.status==='complete',passed:results.length,results:results.sort((a,b)=>a.plan.total!-b.plan.total!||a.switches-b.switches).map(resultView)};
  });
  add('snow_plan_stage','展示核算结果、讨论或已存快照，并等待用户操作后才返回。返回 save_results 表示用户已提交保存，逐项按 items.status 报告成功或失败，不得再说等待选择或提示点击保存，不得重复保存。返回补充则处理 custom；取消则停止。结果/讨论只接收 resultIds；不得填写金额或行程。确认条件使用 snow_prepare_plan。',{stage:{type:'string',enum:['results','discussion','review','status'],required:true},key:str,planningId:{type:'string'},resultIds:{type:'array',items:{type:'string'}},planId:{type:'string'},message:{type:'string'}},async(args,exec)=>{
@@ -103,7 +104,7 @@ export function registerPlanningTools(ctx:Context){
   let detail:any={stage:a.stage,key:a.key};let results:Calculation[]=[];
   if(a.stage==='results'||a.stage==='discussion'){
    if(!a.planningId)throw new PlanningError('technical','planningId：必填');const p=await planning(a.planningId,exec);
-   const ids=a.resultIds??(await ctx.snowTrip.listCalculations(p.id)).map(r=>r.id);
+   const ids=a.resultIds??(await currentCalculations(p.id)).map(r=>r.id);
    for(const id of ids){const r=await currentResult(id,exec);if(r.planningId!==p.id)throw new PlanningError('technical','resultIds：不能混用不同规划');results.push(r);}
    results.sort((a,b)=>a.plan.total!-b.plan.total!||a.switches-b.switches);
    detail={...detail,results:results.map(resultView),selected:a.stage==='discussion'?results.map((_,i)=>i):[],message:a.message,comparisonComplete:p.status==='complete'};

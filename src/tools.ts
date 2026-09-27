@@ -4,7 +4,7 @@ import type {} from './service.js';
 import '@deepseek-ai/dsh-user-questions';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { normalizePackage, packageInput, packageRecord, fieldLabels, type PackageRecord } from './packages.js';
+import { extraPayment, normalizePackage, packageInput, packageRecord, fieldLabels, type PackageRecord } from './packages.js';
 import {registerPlanningTools} from './planning-tools.js';
 
 export const name='snow-trip-tools';
@@ -16,7 +16,7 @@ const queryInput=z.strictObject({id:z.uuid().optional(),query:z.string().trim().
 const moneyFields=['quote','paid','paidExtra'];
 const examples: Record<string,unknown>={quote:1299.5,paid:1299,paidExtra:0,nights:3,usedNights:0,voided:false,expectedRevision:1,offset:0,limit:20,validFrom:'2026-12-01',validTo:'2027-03-31',value:'长白山酒店'};
 function example(key:string,name='') {return key==='value'&&name==='snow_unavailable_date'?'2026-12-25':examples[key]??(key==='draftId'?'使用返回的草稿 ID':'请按工具声明提供该字段');}
-function amountsInYuan(data:Record<string,unknown>) {return Object.fromEntries(Object.entries(data).map(([key,value])=>[key,moneyFields.includes(key)&&typeof value==='number'?value/100:value]));}
+function amountsInYuan(data:Record<string,unknown>) {return Object.fromEntries(Object.entries(data).map(([key,value])=>[key,key==='extraPayments'&&Array.isArray(value)?value.map(row=>({...row,paid:typeof row.paid==='number'?row.paid/100:row.paid,total:typeof row.total==='number'?row.total/100:row.total})):moneyFields.includes(key)&&typeof value==='number'?value/100:value]));}
 function parse<T>(schema:z.ZodType<T>,args:unknown,name=''):T {
   const result=schema.safeParse(args);
   if(result.success)return result.data;
@@ -63,7 +63,7 @@ export function apply(ctx: Context) {
   register('snow_query','查询已存套餐，金额单位为元；草稿不在此列表。返回分页信息。',{id:{type:'string'},query:{type:'string'},offset:{type:'integer',description:'从 0 开始；后续页使用返回的 nextOffset'},limit:{type:'integer',description:'每页 1–50 条，默认 20；读取全部时按 truncated/nextOffset 逐页查询',default:20}},async args=>{
     const {id,query,offset,limit}=parse(queryInput,args);
     const all=(await ctx.snowTrip.listPackages()).filter(p=>(!id||p.id===id)&&(!query||[p.name,p.description,...(p.hotels??[])].join(' ').includes(query)));
-    return {packages:all.slice(offset,offset+limit).map(p=>({...p,quote:p.quote===null?null:p.quote/100,paid:p.paid===null?null:p.paid/100,paidExtra:p.paidExtra===null?null:p.paidExtra/100})),amountUnit:'元',total:all.length,truncated:offset+limit<all.length,nextOffset:offset+limit<all.length?offset+limit:null};
+    return {packages:all.slice(offset,offset+limit).map(p=>amountsInYuan(p)),amountUnit:'元',total:all.length,truncated:offset+limit<all.length,nextOffset:offset+limit<all.length?offset+limit:null};
   });
   register('snow_draft','创建套餐草稿；修改已有套餐传 id 和最新 expectedRevision。重复调用返回同一未保存草稿。草稿未保存，重启后需重建。',{id:{type:'string'},expectedRevision:{type:'integer'}},async(args,exec)=>{
     const input=parse(z.strictObject({id:z.uuid().optional(),expectedRevision:z.number().int().min(1).optional()}).refine(v=>(v.id===undefined)===(v.expectedRevision===undefined),'更新需同时传 id 和 expectedRevision'),args);
@@ -106,6 +106,32 @@ export function apply(ctx: Context) {
       packageInput.shape[key].parse(next);draft.data={...draft.data,[key]:next};return view(draftId,draft);
     });
   }
+  register('snow_extra_payment','逐条整理已付补款明细，金额为元。upsert 不传 id 新增，传返回的 id 修改；purpose 用途，scope=package 整个套餐或 date 指定一晚（date+rooms），paid 已付，total 未结清时确认的应付总额，settled 是否商家确认结清，basis 用户依据。缺项可暂存但不算完整资料。修改已有覆盖范围须用户明确允许转用并传 transferConfirmed=true。none 明确无补款；unknown 清空明细但保留已付总额。已知明细与原总额一致时同步总额；尚有未归属余额时保留原总额待核对。',{
+    ...draftParameter,action:{type:'string',enum:['upsert','remove','none','unknown'],required:true},id:{type:'string'},purpose:{type:'string'},scope:{type:'string',enum:['package','date']},date:{type:'string'},rooms:{type:'integer'},paid:{type:'number'},total:{type:'number'},settled:{type:'boolean'},basis:{type:'string'},transferConfirmed:{type:'boolean'},
+  },async(args,exec)=>{
+    const a=parse(z.strictObject({draftId:z.uuid(),action:z.enum(['upsert','remove','none','unknown']),id:z.string().trim().min(1).max(80).optional(),purpose:z.string().trim().min(1).max(4000).optional(),scope:z.enum(['package','date']).optional(),date:z.iso.date().optional(),rooms:z.number().int().min(1).max(100).optional(),paid:z.number().transform(cents).optional(),total:z.number().transform(cents).optional(),settled:z.boolean().optional(),basis:z.string().trim().min(1).max(4000).optional(),transferConfirmed:z.boolean().optional()}),args);
+    const draft=get(a.draftId,exec,true),rows=z.array(extraPayment).parse(draft.data.extraPayments??[]);
+    const {draftId,action,id,transferConfirmed,...patch}=a;
+    if((action==='none'||action==='unknown')&&id)throw new Error('清空全部明细不接受单条 ID；删除单条请用 remove');
+    if(action!=='upsert'&&(Object.keys(patch).length||transferConfirmed!==undefined))throw new Error('仅 upsert 可修改明细字段');
+    let next:typeof rows|null;
+    if(action==='unknown')next=null;
+    else if(action==='none')next=[];
+    else if(action==='remove'){
+      if(!id||!rows.some(row=>row.id===id))throw new Error('明细不存在，请先查询草稿');
+      next=rows.filter(row=>row.id!==id);
+    }else{
+      if(!Object.keys(patch).length)throw new Error('请提供补款明细');
+      const old=rows.find(row=>row.id===id);
+      if(id&&!old)throw new Error('明细不存在，请使用返回的 ID');
+      if(old&&(['scope','date','rooms'] as const).some(key=>key in patch&&old[key]!==null&&patch[key]!==old[key])&&!transferConfirmed)throw new Error('补款改期或覆盖范围变化，请先确认商家允许转用');
+      const row=extraPayment.parse({...old,...patch,id:id??randomUUID(),...(patch.scope==='package'?{date:null,rooms:null}:{})});
+      next=old?rows.map(item=>item.id===id?row:item):[...rows,row];
+    }
+    const data:Record<string,unknown>={...draft.data,extraPayments:next};
+    if(next&&next.every(row=>row.paid!==null)&&(action==='none'||draft.data.paidExtra==null||(rows.every(row=>row.paid!==null)&&draft.data.paidExtra===rows.reduce((sum,row)=>sum+row.paid!,0))))data.paidExtra=z.number().int().nonnegative().safe().parse(next.reduce((sum,row)=>sum+row.paid!,0));
+    draft.data=data;return view(draftId,draft);
+  });
   register('snow_clear_field','将草稿中的一个字段重置为未知；不修改已存套餐。',{...draftParameter,field:{type:'string',enum:fields,required:true}},async(args,exec)=>{
     const {draftId,field}=parse(z.strictObject({draftId:z.uuid(),field:z.enum(fields)}),args),draft=get(draftId,exec,true);
     draft.data={...draft.data,[field]:field==='pendingQuestions'?[]:field==='purchaseStatus'?'unknown':null};return view(draftId,draft);
