@@ -1,4 +1,5 @@
 import React, {useEffect,useState,useRef,useId} from 'react';
+import {cumulativePaid} from './package-explore.js';
 import {PlanQuestionCard} from './plan-question-card.jsx';
 import {packageMetadata,purchaseLabels,benefitSummary} from './packages.ts';
 import {evaluateMetadata,planMetadata} from './plans.ts';
@@ -12,7 +13,7 @@ export function PackageCard({record:p,onOpen,onDelete,onInspect,saved=false}) {
     <header className="package-heading"><h3>{onInspect?<button className="package-inspect" onClick={()=>onInspect(p)} aria-label={`查看套餐详情：${p.name}`}>{p.name}</button>:p.name}</h3><p>{p.hotels===null?'适用酒店待确认':p.hotels.join('、')||'已确认无适用酒店'}</p></header>
     <div className="package-stay-overview"><div><span>住宿间夜</span><strong>{p.nights??'待确认'}{p.nights!==null&&<small> 间夜</small>}</strong></div><div><span>已使用</span><strong>{p.usedNights??'待确认'}{p.usedNights!==null&&<small> 间夜</small>}</strong></div></div>
     <div className="package-validity"><span>有效期</span><p>{p.validFrom??'待确认'} 至 {p.validTo??'待确认'}</p></div>
-    <div className="package-cost-overview"><div className="package-paid"><span>实付金额</span><strong>{money(p.paid)}</strong></div><dl><div><dt>套餐报价</dt><dd>{money(p.quote)}</dd></div><div><dt>已付额外补款</dt><dd>{money(p.paidExtra)}</dd></div></dl></div>
+    <div className="package-cost-overview"><div className="package-paid"><span>累计已支付</span><strong>{cumulativePaid(p)===null?'待补全':money(cumulativePaid(p))}</strong></div><dl><div><dt>套餐本价实付</dt><dd>{money(p.paid)}</dd></div><div><dt>套餐报价</dt><dd>{money(p.quote)}</dd></div><div><dt>已付额外补款</dt><dd>{money(p.paidExtra)}</dd></div></dl></div>
     {p.unknowns.length>0&&<p className="package-missing"><span>待补全</span>{p.unknowns.join('、')}</p>}
     {saved&&<small>保存时快照</small>}
     {(onOpen||onDelete)&&<div className="package-actions">

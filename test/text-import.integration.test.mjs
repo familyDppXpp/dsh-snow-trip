@@ -108,7 +108,7 @@ test('公开工具：卡片确认→保存→重开→查询；变更、取消�
     assert.equal((await ok('snow_commit',{draftId})).value.id,record.id);
     assert.equal((await ctx.snowTrip.listPackages()).length,1,'提交重试不重复新增');
     assert.equal((await execute('snow_set_basic',{draftId,name:'不可修改'})).isError,true);
-    const query=await ok('snow_query',{});assert.equal(query.value.packages[0].quote,1299.5);assert.equal(query.value.amountUnit,'元');
+    const query=await ok('snow_query',{});assert.equal(query.value.packages[0].quote,1299.5);assert.equal(query.value.amountUnit,'元');assert.equal(query.value.packages[0].cumulativePaid,null);
     await owner.dispose();await boot();assert.deepEqual(await ctx.snowTrip.getPackage(record.id),record);
     const update=(await ok('snow_draft',{id:record.id,expectedRevision:1})).value.draftId;
     await ok('snow_set_purchase',{draftId:update,purchasePlatform:'微信小程序 xxx'});
@@ -164,14 +164,19 @@ test('公开工具：卡片确认→保存→重开→查询；变更、取消�
     await owner.dispose();await boot();assert.deepEqual(await ctx.snowTrip.listPackages(),[]);
     const extrasDraft=(await ok('snow_draft',{})).value.draftId;
     await ok('snow_set_basic',{draftId:extrasDraft,name:'补款持久化测试'});
-    await ok('snow_set_purchase',{draftId:extrasDraft,purchaseStatus:'purchased',paidExtra:400});
+    await ok('snow_set_purchase',{draftId:extrasDraft,purchaseStatus:'purchased',paid:900.25,paidExtra:400});
     const extra=(await ok('snow_extra_payment',{draftId:extrasDraft,action:'upsert',purpose:'日期加价',scope:'date',date:'2027-02-04',rooms:1,paid:200,total:300,settled:false,basis:'用户确认'})).value;
+    assert.equal(extra.package.cumulativePaid,1300.25);
+    assert.equal((await execute('snow_set_purchase',{draftId:extrasDraft,cumulativePaid:1300.25})).isError,true);
     assert.equal(extra.package.paidExtra,400,'未归属的余额不能被一条已知明细覆盖');
     const withExtras=(await ok('snow_commit',{draftId:extrasDraft})).value;
     assert.equal(withExtras.completeness,'incomplete');assert.equal(withExtras.extraPayments[0].paid,20000);
     await owner.dispose();await boot();
     const queriedExtras=(await ok('snow_query',{id:withExtras.id})).value.packages[0];
-    assert.equal(queriedExtras.extraPayments[0].paid,200);assert.equal(queriedExtras.extraPayments[0].total,300);assert.equal(queriedExtras.paidExtra,400);
+    assert.equal(queriedExtras.extraPayments[0].paid,200);assert.equal(queriedExtras.extraPayments[0].total,300);assert.equal(queriedExtras.paidExtra,400);assert.equal(queriedExtras.cumulativePaid,1300.25);assert.equal('cumulativePaid' in await ctx.snowTrip.getPackage(withExtras.id),false);
+    const zeroDraft=(await ok('snow_draft',{})).value.draftId;
+    assert.equal((await ok('snow_set_purchase',{draftId:zeroDraft,paid:0,paidExtra:0})).value.package.cumulativePaid,0);
+    assert.equal((await ok('snow_clear_field',{draftId:zeroDraft,field:'paidExtra'})).value.package.cumulativePaid,null);
     await presetScope.dispose();assert.deepEqual(ctx.tools.schemas(agent),[]);
   }finally{await owner?.dispose();await rm(root,{recursive:true,force:true});}
 });

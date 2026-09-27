@@ -1,3 +1,4 @@
+export const cumulativePaid = p => p.paid == null || p.paidExtra == null ? null : p.paid + p.paidExtra;
 // 宿主金额单位为分；文字规则保留原文，不推算逐晚补款。
 export function packageStats(rows) {
   const known = key => rows.filter(p=>p[key]!==null);
@@ -11,7 +12,7 @@ export function packageStats(rows) {
     regionsUnknown:rows.filter(p=>p.region===null).length,
   };
 }
-export function packageCandidates(rows,filter,sort,plans=[]) {
+export function packageCandidates(rows,filter,sort,plans=[],direction='desc') {
   const plannedIds=new Set(plans.flatMap(plan=>plan.items.map(item=>item.packageId)));
   const matches=rows.filter(p=>{
     if(filter.hasPlan&&plannedIds.has(p.id)!==(filter.hasPlan==='yes'))return false;
@@ -34,9 +35,9 @@ export function packageCandidates(rows,filter,sort,plans=[]) {
   });
   const key=sort==='paid'?'paid':'nights';
   return matches.sort((a,b)=>{
-    const av=a[key],bv=b[key];
+    const av=key==='paid'?cumulativePaid(a):a[key],bv=key==='paid'?cumulativePaid(b):b[key];
     if(av==null&&bv!=null)return 1;
     if(av!=null&&bv==null)return -1;
-    return (av==null?0:sort==='paid'?av-bv:bv-av)||a.id.localeCompare(b.id);
+    return (av==null?0:direction==='asc'?av-bv:bv-av)||a.id.localeCompare(b.id);
   }).map(record=>({record}));
 }

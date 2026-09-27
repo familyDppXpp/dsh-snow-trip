@@ -75,7 +75,7 @@ export const packageInput = z.strictObject({
 });
 export const fieldLabels = {
   name:'名称',description:'说明',hotels:'适用酒店',roomType:'房型',resort:'雪场',region:'地区',nights:'总间夜',
-  purchasePlatform:'购买平台',purchaseStatus:'购买状态',quote:'报价',paid:'实付',paidExtra:'已付额外补款',extraPayments:'补款明细',validFrom:'有效期开始',validTo:'有效期结束',
+  purchasePlatform:'购买平台',purchaseStatus:'购买状态',quote:'报价',paid:'套餐本价实付',paidExtra:'已付额外补款',extraPayments:'补款明细',validFrom:'有效期开始',validTo:'有效期结束',
   skiIncluded:'是否含雪票',skiTickets:'雪票张数',skiBasis:'雪票发放口径',skiRule:'雪票说明',
   breakfastIncluded:'是否含早餐',breakfastPeople:'早餐人数',breakfastBasis:'早餐供应口径',breakfastRule:'早餐说明',
   spaIncluded:'是否含汤泉',spaPeople:'汤泉人数',spaVisits:'汤泉次数',spaBasis:'汤泉使用口径',spaRule:'汤泉说明',splitAllowed:'是否可拆分',

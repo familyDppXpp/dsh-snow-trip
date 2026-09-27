@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {packageStats,packageCandidates} from '../src/package-explore.js';
 const base={id:'a',name:'山湖居',description:'亲子',hotels:['山湖酒店'],resort:'雪场',region:'吉林',nights:3,paid:209700,paidExtra:null,purchaseStatus:'purchased',completeness:'incomplete',usedNights:0,validFrom:'2026-12-01',validTo:'2026-12-06',unavailableDates:[],voided:false};
 const filter={start:'2026-12-04',nights:'3',region:'全部目的地',query:'',purchaseStatuses:[],completeness:[]};
-const ids=(rows,f=filter,sort='nights')=>packageCandidates(rows,f,sort).map(({record})=>record.id);
+const ids=(rows,f=filter,sort='nights',direction='desc')=>packageCandidates(rows,f,sort,[],direction).map(({record})=>record.id);
 test('宿主统计保留未知；筛选按日期、剩余间夜、地区和关键词排除不匹配或相关未知',()=>{
  const stats=packageStats([base,{...base,nights:null,paid:null}]);
  assert.equal(stats.paid,209700);assert.equal(stats.paidUnknown,2);assert.equal(stats.nights,3);assert.equal(stats.nightsUnknown,1);
@@ -25,13 +25,15 @@ test('标签同组取并集、跨组取交集；明确选择未知状态可匹�
  assert.deepEqual(ids(rows,{...filter,purchaseStatuses:['unknown'],completeness:['incomplete']}),['c']);
  assert.deepEqual(ids(rows),['a','b','c']);
 });
-test('晚数降序、实付升序，零金额正常、未知末尾，同值按 ID 稳定且不修改输入',()=>{
- const rows=[{...base,id:'c',nights:5,paid:100,paidExtra:999999},{...base,id:'b',paid:0},{...base,id:'a',paid:100},{...base,id:'d',nights:null,paid:null}];
+test('晚数和累计已支付均可升降序，零金额正常、未知末尾，同值按 ID 稳定且不修改输入',()=>{
+ const rows=[{...base,id:'c',nights:5,paid:100,paidExtra:999999},{...base,id:'b',paid:0,paidExtra:0},{...base,id:'a',paid:100,paidExtra:0},{...base,id:'d',nights:null,paid:null}];
  const unfiltered={...filter,start:'',nights:''};
  assert.deepEqual(ids(rows,unfiltered),['c','a','b','d']);
- assert.deepEqual(ids(rows,unfiltered,'paid'),['b','a','c','d']);
+ assert.deepEqual(ids(rows,unfiltered,'paid','asc'),['b','a','c','d']);
+ assert.deepEqual(ids(rows,unfiltered,'nights','asc'),['a','b','c','d']);
+ assert.deepEqual(ids(rows,unfiltered,'paid','desc'),['c','a','b','d']);
  assert.deepEqual(rows.map(p=>p.id),['c','b','a','d']);
- assert.deepEqual(ids(rows.toReversed(),unfiltered,'paid'),['b','a','c','d']);
+ assert.deepEqual(ids(rows.toReversed(),unfiltered,'paid','asc'),['b','a','c','d']);
 });
 
 test('出行方案按套餐 ID 关联，多方案去重、组合筛选与删除后刷新',()=>{
@@ -45,4 +47,9 @@ test('出行方案按套餐 ID 关联，多方案去重、组合筛选与删除�
  assert.deepEqual(matches('no',[]),['a','b','c']);
  assert.deepEqual(matches('yes',[]),[]);
  assert.deepEqual(matches('no',plans.slice(1)),['b','c']);
+});
+
+test('累计已支付任一金额未知时始终排末尾',()=>{
+ const rows=[{...base,id:'a',paid:999999},{...base,id:'b',paid:0,paidExtra:0},{...base,id:'c',paid:null,paidExtra:999999}];
+ for(const direction of ['asc','desc'])assert.deepEqual(ids(rows,{...filter,start:'',nights:''},'paid',direction),['b','a','c']);
 });

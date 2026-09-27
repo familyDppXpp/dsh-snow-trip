@@ -16,7 +16,10 @@ const queryInput=z.strictObject({id:z.uuid().optional(),query:z.string().trim().
 const moneyFields=['quote','paid','paidExtra'];
 const examples: Record<string,unknown>={quote:1299.5,paid:1299,paidExtra:0,nights:3,usedNights:0,voided:false,expectedRevision:1,offset:0,limit:20,validFrom:'2026-12-01',validTo:'2027-03-31',value:'长白山酒店'};
 function example(key:string,name='') {return key==='value'&&name==='snow_unavailable_date'?'2026-12-25':examples[key]??(key==='draftId'?'使用返回的草稿 ID':'请按工具声明提供该字段');}
-function amountsInYuan(data:Record<string,unknown>) {return Object.fromEntries(Object.entries(data).map(([key,value])=>[key,key==='extraPayments'&&Array.isArray(value)?value.map(row=>({...row,paid:typeof row.paid==='number'?row.paid/100:row.paid,total:typeof row.total==='number'?row.total/100:row.total})):moneyFields.includes(key)&&typeof value==='number'?value/100:value]));}
+function amountsInYuan(data:Record<string,unknown>) {
+  const cumulativePaid=typeof data.paid==='number'&&typeof data.paidExtra==='number'?(data.paid+data.paidExtra)/100:null;
+  return {cumulativePaid,...Object.fromEntries(Object.entries(data).map(([key,value])=>[key,key==='extraPayments'&&Array.isArray(value)?value.map(row=>({...row,paid:typeof row.paid==='number'?row.paid/100:row.paid,total:typeof row.total==='number'?row.total/100:row.total})):moneyFields.includes(key)&&typeof value==='number'?value/100:value]))};
+}
 function parse<T>(schema:z.ZodType<T>,args:unknown,name=''):T {
   const result=schema.safeParse(args);
   if(result.success)return result.data;
@@ -60,7 +63,7 @@ export function apply(ctx: Context) {
       if(wrong.length)return [{type:'text',text:wrong.map(([key,spec])=>`${key}：收到 ${JSON.stringify(args[key])}；需要 ${'type' in spec?spec.type:''}。示例：${JSON.stringify(example(key,name))}`).join('\n')}];
     },
   }));};
-  register('snow_query','查询已存套餐，金额单位为元；草稿不在此列表。返回分页信息。',{id:{type:'string'},query:{type:'string'},offset:{type:'integer',description:'从 0 开始；后续页使用返回的 nextOffset'},limit:{type:'integer',description:'每页 1–50 条，默认 20；读取全部时按 truncated/nextOffset 逐页查询',default:20}},async args=>{
+  register('snow_query','查询已存套餐，金额单位为元；草稿不在此列表。返回分页信息。paid 为套餐本价实付，不含 paidExtra 已付额外补款；cumulativePaid 为只读累计已支付，两者相加，任一未知则为 null，不代表本次方案成本。',{id:{type:'string'},query:{type:'string'},offset:{type:'integer',description:'从 0 开始；后续页使用返回的 nextOffset'},limit:{type:'integer',description:'每页 1–50 条，默认 20；读取全部时按 truncated/nextOffset 逐页查询',default:20}},async args=>{
     const {id,query,offset,limit}=parse(queryInput,args);
     const all=(await ctx.snowTrip.listPackages()).filter(p=>(!id||p.id===id)&&(!query||[p.name,p.description,...(p.hotels??[])].join(' ').includes(query)));
     return {packages:all.slice(offset,offset+limit).map(p=>amountsInYuan(p)),amountUnit:'元',total:all.length,truncated:offset+limit<all.length,nextOffset:offset+limit<all.length?offset+limit:null};
@@ -79,13 +82,13 @@ export function apply(ctx: Context) {
   for(const [name,keys,label] of [
     ['snow_set_basic',['name','description','roomType','resort','region','splitRule'],'基本信息'],
     ['snow_set_benefits',['skiIncluded','skiTickets','skiBasis','skiRule','breakfastIncluded','breakfastPeople','breakfastBasis','breakfastRule','spaIncluded','spaPeople','spaVisits','spaBasis','spaRule','splitAllowed'],'套餐权益；是否包含与数量、口径分别填写，数量不推算；口径 order=整单、night=每晚、day=每日、other=其他（具体写入说明）'],
-    ['snow_set_purchase',['purchasePlatform','purchaseStatus','quote','paid','paidExtra'],'购买信息及金额（元，最多两位小数）'],
+    ['snow_set_purchase',['purchasePlatform','purchaseStatus','quote','paid','paidExtra'],'购买信息及金额（元，最多两位小数）。paid 为套餐本价实付，不含 paidExtra；cumulativePaid 由系统计算，不可录入。用户只给累计金额时先核对本价与补款拆分，不能全部记入 paid'],
     ['snow_set_usage',['nights','usedNights','validFrom','validTo','voided'],'有效期（YYYY-MM-DD）和使用量'],
   ] as const){
     const parameters:ParameterSchemaSpec={...draftParameter};
     const shape:Record<string,z.ZodType>={draftId:z.uuid()};
     for(const key of keys){
-      parameters[key]={type:moneyFields.includes(key)?'number':['nights','usedNights','skiTickets','breakfastPeople','spaPeople','spaVisits'].includes(key)?'integer':['voided','skiIncluded','breakfastIncluded','spaIncluded','splitAllowed'].includes(key)?'boolean':'string',description:fieldLabels[key]+(moneyFields.includes(key)?'；单位元，例如 1299.50':'；未知请省略，清空用 snow_clear_field')};
+      parameters[key]={type:moneyFields.includes(key)?'number':['nights','usedNights','skiTickets','breakfastPeople','spaPeople','spaVisits'].includes(key)?'integer':['voided','skiIncluded','breakfastIncluded','spaIncluded','splitAllowed'].includes(key)?'boolean':'string',description:fieldLabels[key]+(key==='paid'?'；只含套餐本价，排除另记的已付额外补款':key==='paidExtra'?'；另外支付的补款合计，不包含套餐本价':'')+(moneyFields.includes(key)?'；单位元，例如 1299.50':'；未知请省略，清空用 snow_clear_field')};
       if(['skiBasis','breakfastBasis','spaBasis'].includes(key))parameters[key]={type:'string',enum:['order','night','day','other'],description:'整单 / 每晚 / 每日 / 其他；未知省略，其他口径填写对应 Rule 说明'};
       if(key==='purchaseStatus')parameters[key]={type:'string',enum:['unknown','unpurchased','purchased']};
       shape[key]=moneyFields.includes(key)?z.number().transform((value,context)=>{try{return cents(value);}catch(error){context.addIssue({code:'custom',message:error instanceof Error?error.message:String(error)});return z.NEVER;}}).optional():packageInput.shape[key].unwrap().optional();

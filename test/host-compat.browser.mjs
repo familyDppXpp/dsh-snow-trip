@@ -32,8 +32,11 @@ try {
   await panel.getByRole('option',{name:/^snow-import /}).waitFor();
   await panel.getByRole('option',{name:/^snow-plan /}).waitFor();
   await editor.fill('兼容性检查草稿，不发送');
-  await panel.getByRole('button',{name:'返回 DSH',exact:true}).click();
+  await panel.getByRole('button',{name:'雪季出行，返回首页',exact:true}).focus();
+  await page.keyboard.press('Escape');await panel.waitFor({state:'hidden'});
   await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
+  await panel.getByRole('region',{name:'首页月历',exact:true}).waitFor();
+  await panel.getByRole('button',{name:'继续未发送的会话',exact:true}).click();
   await editor.waitFor();
   assert.match(await editor.innerText(),/兼容性检查草稿/);
   if(process.env.SNOW_REAL_MODEL==='1'||process.env.SNOW_VERIFY_SAVED) {
