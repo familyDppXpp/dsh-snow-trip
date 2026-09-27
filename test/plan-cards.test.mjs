@@ -252,3 +252,13 @@ test('讨论补充按原卡片回放，不将讨论上下文伪装成已选择�
   assert.doesNotMatch(results,/已选择/);assert.match(results,/未选择/);
  }
 });
+
+test('更新候选单选，更新后候选选择与差异卡均保留只读操作记录',async()=>{
+ const candidates={stage:'results',updating:true,results:[{title:'第一份',total:45000},{title:'第二份',total:55000}],selected:[]};
+ const interactive=await render(pending('results','update-select',candidates));
+ assert.match(interactive,/type="radio"/);assert.doesNotMatch(interactive,/type="checkbox"/);assert.match(interactive,/核对更新差异/);
+ const {PlanInteractionCard}=await load('src/package-cards.jsx');
+ const update={stage:'update',plan:{title:'第二份',total:55000},previous:{total:45000},resetTracking:false,costChange:'增加 ¥100.00',changes:[{label:'整趟总成本',before:'¥450.00',after:'¥550.00',detail:false}]};
+ const html=server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data:{interaction:{stage:'update',card:update,action:'update',selected:['确认更新'],status:'saved',selection:{card:candidates,selected:[1]}}}}));
+ assert.match(html,/已选择方案 · 已进入更新确认/);assert.match(html,/已选择确认更新 · 已更新/);assert.match(html,/data-plan-stage="results"/);assert.match(html,/data-plan-stage="update"/);assert.equal((html.match(/data-readonly="true"/g)||[]).length,2);assert.doesNotMatch(html,/<input|<textarea|保存所选|核对更新差异/);
+});

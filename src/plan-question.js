@@ -27,7 +27,7 @@ function legacyEstimate(value) {
   return {...rest,estimates:parsed.data.map(({note,...entry})=>({...entry,basis:note})),scope:value.scope??$text};
 }
 export const planQuestionSchema=z.preprocess(legacyEstimate,z.looseObject({
-  stage:z.enum(['confirm','estimate','results','discussion','review','status']),
+  stage:z.enum(['confirm','estimate','results','discussion','review','update','status']),
   input:z.looseObject({start:z.string().optional(),nights:integer.nullable().optional(),budget:number.nullable().optional()}).optional(),
   ids:list(z.string()).optional(),
   suggestions:z.union([list(z.string()),z.strictObject({start:z.string().optional(),nights:integer.optional()})]).optional(),
@@ -36,7 +36,11 @@ export const planQuestionSchema=z.preprocess(legacyEstimate,z.looseObject({
   results:list(result).optional(),selected:list(integer).optional(),message:z.string().optional(),parent:z.string().nullable().optional(),
   notice:z.looseObject({title:z.string(),text:z.string(),tone:z.string().optional(),actions:list(z.looseObject({label:z.string(),value:z.string()})).optional()}).optional(),
   packages:list(packageSummary).optional(),plan:result.optional(),
+  changes:list(z.strictObject({label:z.string(),before:z.string(),after:z.string(),detail:boolean})).optional(),
+  resetTracking:boolean.optional(),costChange:z.string().optional(),previous:result.optional(),
+
 }).superRefine((value,ctx)=>{
+  if(value.stage==='update'&&(!value.plan||!value.previous||!value.changes||value.resetTracking===undefined||!value.costChange))ctx.addIssue({code:'custom',message:'更新卡缺少差异或快照'});
   if(value.stage==='estimate'&&!value.estimates?.length)ctx.addIssue({code:'custom',path:['estimates'],message:'请提供 estimates 费用列表'});
   if(value.stage==='review'&&!value.plan)ctx.addIssue({code:'custom',path:['plan'],message:'请提供保存时快照'});
   if(value.selected?.some(index=>index>=(value.results?.length??0)))ctx.addIssue({code:'custom',path:['selected'],message:'所选方案不存在'});
@@ -46,7 +50,7 @@ export const planQuestionSchema=z.preprocess(legacyEstimate,z.looseObject({
 export function planQuestion(pending) {
   const q=pending?.questions?.[0];
   if(pending?.questions?.length!==1||!q?.id?.startsWith('snow-plan-'))return null;
-  if(!/^snow-plan-(confirm|estimate|results|discussion|review|status)-.+$/.test(q.id))return null;
+  if(!/^snow-plan-(confirm|estimate|results|discussion|review|update|status)-.+$/.test(q.id))return null;
   const invalid=fields=>({stage:'status',callId:q.id,invalid:true,questionText:q.question??'',pending:q,notice:{title:'方案卡片数据有误',text:`${fields}。原请求尚未确认，请让助理按阶段格式重新生成；不会自动接受费用或保存方案。`,actions:[{label:'请助理重新生成卡片',value:'regenerate'}]}});
   try{
     const raw=JSON.parse(q.detail??'{}');

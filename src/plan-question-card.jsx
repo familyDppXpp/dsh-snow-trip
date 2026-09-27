@@ -9,7 +9,7 @@ const yuan=n=>n==null?'待确认':`¥${(n/100).toLocaleString('zh-CN',{minimumFr
 // 只转换明确以分标注的金额，保留原始计算结果与依据。
 const readableBasis=text=>String(text??'').replace(/(\d+(?:\.\d+)?)\s*分(?!摊|钟)/g,(_,value)=>yuan(Number(value)));
 const Badge=({children,tone})=><span className={`snow-plan-badge${tone?` snow-plan-badge-${tone}`:''}`}>{children}</span>;
-const stageTitles={confirm:'01 · 确认这次出行',estimate:'02 · 确认计算依据',results:'03 · 找到合适的搭配',discussion:'一起继续想',review:'已存方案 · 保存时快照',status:''};
+const stageTitles={confirm:'01 · 确认这次出行',estimate:'02 · 确认计算依据',results:'03 · 找到合适的搭配',discussion:'一起继续想',update:'确认更新方案',review:'已存方案 · 保存时快照',status:''};
 
 export function PlanQuestionCard({pending,packages,snapshot,outcome}) {
   const data=snapshot??planQuestion(pending);
@@ -23,20 +23,46 @@ export function PlanQuestionCard({pending,packages,snapshot,outcome}) {
   // 卡内可编辑字段会走自由输入回传：把当前编辑快照序列化进 custom，selected 承载按钮动作。
   const Editable=editable?PlanEditableBody:null;
   return <article className="snow snow-plan-card" aria-label={stageTitles[data.stage]||'方案卡片'} data-plan-stage={data.stage} data-collapsed={collapsed?'true':undefined} data-planning={data.planning?'true':undefined} data-readonly={readOnly?'true':undefined}>
-    {readOnly&&<div className="snow-result-outcome" role="status"><strong>{outcome?.action==='save'?`已提交保存 · 已选 ${data.selected?.length??0} 份 · 已保存 ${outcome.items?.filter(item=>item.status==='saved').length??0} 份`:outcome?.action==='cancel'?'已取消 · 未保存方案':'已提交补充 · 未保存方案'}</strong>{outcome?.custom&&<p style={{whiteSpace:'pre-wrap'}}>你的补充：{outcome.custom}</p>}</div>}
+    {readOnly&&<div className="snow-result-outcome" role="status"><strong>{data.stage==='update'?updateOutcome(outcome):outcome?.action==='select'?'已选择方案 · 已进入更新确认':outcome?.action==='save'?`已提交保存 · 已选 ${data.selected?.length??0} 份 · 已保存 ${outcome.items?.filter(item=>item.status==='saved').length??0} 份`:outcome?.action==='cancel'?'已取消 · 未保存方案':'已提交补充 · 未保存方案'}</strong>{outcome?.error&&<p role="alert">{outcome.error}</p>}{outcome?.custom&&<p style={{whiteSpace:'pre-wrap'}}>你的补充：{outcome.custom}</p>}</div>}
     <header className="snow-plan-heading">{!readOnly&&data.stage==='results'&&<button className="snow-plan-context-toggle" onClick={event=>{
       const root=event.currentTarget.closest('.snow-workbench')??document;
       const records=[...root.querySelectorAll('.snow-confirmed-plan')].filter(el=>el.getClientRects().length);
       setCollapsed(!collapsed);
       if(!collapsed)requestAnimationFrame(()=>records.at(-1)?.scrollIntoView({block:'start'}));
-    }}>{collapsed?'展开方案':'查看确认条件'}</button>}<Badge>{stageTitles[data.stage]}</Badge>{data.notice?<h3>{data.notice.title}</h3>:data.stage==='review'&&data.plan?.title?<h3>{data.plan.title}</h3>:<h3>{data.stage==='results'?`可选方案 · ${data.results?.length??0} 份`:data.stage==='estimate'?'确认共同费用':data.questionText||'请确认'}</h3>}{!readOnly&&data.stage==='results'&&<p className="snow-plan-intro">查看整趟成本与每日安排，勾选后保存；也可以先比较或调整。</p>}{data.stage==='estimate'&&<p className="snow-plan-intro">逐项核对金额与依据，可以直接修改后再确认。</p>}</header>
+    }}>{collapsed?'展开方案':'查看确认条件'}</button>}<Badge>{stageTitles[data.stage]}</Badge>{data.notice?<h3>{data.notice.title}</h3>:['review','update'].includes(data.stage)&&data.plan?.title?<h3>{data.plan.title}</h3>:<h3>{data.stage==='results'?`可选方案 · ${data.results?.length??0} 份`:data.stage==='estimate'?'确认共同费用':data.questionText||'请确认'}</h3>}{!readOnly&&data.stage==='results'&&<p className="snow-plan-intro">{data.updating?'选择一份方案，核对修改前后差异后更新。':'查看整趟成本与每日安排，勾选后保存；也可以先比较或调整。'}</p>}{data.stage==='estimate'&&<p className="snow-plan-intro">逐项核对金额与依据，可以直接修改后再确认。</p>}</header>
     {data.notice?.text&&<p>{data.notice.text}</p>}
     {!readOnly&&data.notice?.actions&&<footer className="snow-plan-actions">{cancel}{data.notice.actions.map((action,i)=><button key={i} className={i===0?'primary':''} disabled={busy} onClick={()=>answer({selected:[action.label]})}>{action.label}</button>)}</footer>}
     {Editable&&<Editable data={data} packages={packages??data.packages} busy={busy} error={error} onAnswer={answer} cancel={cancel} readOnly={readOnly}/>}
-    {!Editable&&!data.notice?.actions&&<PlanOptionsBody data={data} busy={busy} error={error} onAnswer={answer} cancel={cancel} readOnly={readOnly}/>}
+    {data.stage==='update'&&<PlanUpdateBody data={data} busy={busy} onAnswer={answer} cancel={cancel} readOnly={readOnly} outcome={outcome}/>}
+    {!Editable&&data.stage!=='update'&&!data.notice?.actions&&<PlanOptionsBody data={data} busy={busy} error={error} onAnswer={answer} cancel={cancel} readOnly={readOnly}/>}
     {error&&!Editable&&<p role="alert">{error}</p>}
-    {!readOnly&&<details className="snow-plan-message"><summary>{data.stage==='results'?'讨论或调整方案？补充说明':'想调整条件？补充说明'}</summary><div className="snow-plan-message-body"><label>继续补充想法<textarea rows={3} placeholder={data.stage==='results'?'例如：比较两份方案的雪票费用，或把预算调低一些…':'例如：餐饮预算调低一些，暂不租赁雪具…'} value={message} disabled={busy} onChange={e=>setMessage(e.target.value)}/></label><button disabled={busy||!message.trim()} onClick={()=>answer({custom:message.trim()})}>发送补充</button><p>也可以直接在输入框继续说明；{data.stage==='results'?'发送补充不会保存方案。':'发送补充不会确认以上费用。'}</p></div></details>}
+    {!readOnly&&<details className="snow-plan-message"><summary>{data.stage==='results'?'讨论或调整方案？补充说明':'想调整条件？补充说明'}</summary><div className="snow-plan-message-body"><label>继续补充想法<textarea rows={3} placeholder={data.stage==='results'?'例如：比较两份方案的雪票费用，或把预算调低一些…':'例如：餐饮预算调低一些，暂不租赁雪具…'} value={message} disabled={busy} onChange={e=>setMessage(e.target.value)}/></label><button disabled={busy||!message.trim()} onClick={()=>answer({custom:message.trim()})}>发送补充</button><p>也可以直接在输入框继续说明；{['results','update'].includes(data.stage)?'发送补充不会保存方案。':'发送补充不会确认以上费用。'}</p></div></details>}
   </article>;
+}
+
+function updateOutcome(outcome) {
+ const action=outcome?.selected?.[0];
+ if(outcome?.action==='update')return `已选择${action??'确认更新'} · ${outcome.status==='saved'?(action==='确认另存'?'已另存为新方案':'已更新'):'保存失败 · 原方案未改变'}`;
+ if(outcome?.action==='adjust')return '已选择继续调整 · 未保存';
+ return outcome?.action==='cancel'?'已取消 · 未保存':'已提交补充 · 未保存';
+}
+function PlanUpdateBody({data,busy,onAnswer,cancel,readOnly,outcome}) {
+ const [asNew,setAsNew]=useState(false);
+ const copy=readOnly?outcome?.selected?.[0]==='确认另存':asNew;
+ const table=(rows,label)=><div className="table-scroll"><table aria-label={label}><thead><tr><th scope="col">修改项</th><th scope="col">修改前</th><th scope="col">修改后</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><th scope="row">{r.label}</th><td style={{whiteSpace:'pre-wrap'}}>{readableBasis(r.before)}</td><td style={{whiteSpace:'pre-wrap'}}>{readableBasis(r.after)}</td></tr>)}</tbody></table></div>;
+ const details=(data.changes??[]).filter(r=>r.detail);
+ const previous=data.previous?.tracking;
+ const booking={confirmed:'已确认',unreserved:'未预约'},refund={refundable:'可退',nonrefundable:'不可退'};
+ return <>
+  {table((data.changes??[]).filter(r=>!r.detail),'方案修改前后差异')}
+  <p className="snow-plan-pills"><strong>{data.costChange}</strong></p>
+  {details.length>0&&<details className="snow-plan-more"><summary>查看费用与说明变化明细</summary>{table(details,'费用与说明变化明细')}</details>}
+  <details className="snow-plan-more"><summary>查看调整后的完整方案</summary><PlanOptionsBody data={{stage:'review',plan:data.plan}} readOnly/>{data.plan.conditions&&<p>房间数：{data.plan.conditions.rooms} · 人数：{data.plan.conditions.people??'未知'} · 滑雪天数：{data.plan.conditions.skiDays??'未知'}</p>}{data.plan.packages?.map(p=><p key={p.id}>{p.snapshot?.name} · {p.snapshot?.region} · {p.snapshot?.resort} · {p.snapshot?.hotels?.join('、')}</p>)}{data.plan.sharedCosts?.map((c,i)=><p key={i}>{c.label}：{yuan(c.amount)} · {readableBasis(c.basis)}</p>)}{data.plan.allocation?.map((line,i)=><p key={i}>{readableBasis(line)}</p>)}</details>
+  <aside className="snow-plan-note" aria-label="预约与退改信息处理">
+   {copy?<><strong>另存为新方案</strong><p>原方案保留，新方案的预约、退改状态及策略均为未知。</p></>:data.resetTracking?<><strong>预约与退改信息将重置</strong><p>日期、人数、房间数或套餐搭配变化，需重新确认预约和退改条件。</p><p>{booking[previous?.booking]??'未知'} → 未知；{refund[previous?.refund]??'未知'} → 未知</p>{previous?.refundPolicy&&<p>原策略将清空：{previous.refundPolicy}</p>}</>:<><strong>预约与退改信息保留</strong><p>{booking[previous?.booking]??'预约状态未知'} · {refund[previous?.refund]??'退改状态未知'}{previous?.refundPolicy?` · ${previous.refundPolicy}`:''}</p></>}
+  </aside>
+  {!readOnly&&<footer className="snow-plan-actions">{cancel}<button disabled={busy} onClick={()=>onAnswer({selected:['继续调整']})}>继续调整</button><button disabled={busy} onClick={()=>setAsNew(!asNew)}>{asNew?'改为更新原方案':'另存为新方案'}</button><button className="primary" disabled={busy} onClick={()=>onAnswer({selected:[asNew?'确认另存':'确认更新']})}>{busy?'正在保存…':asNew?'确认另存':'确认更新'}</button></footer>}
+ </>;
 }
 
 // confirm/estimate：卡内表单可编辑，提交时把编辑值序列化进 custom。
@@ -118,7 +144,7 @@ function PlanOptionsBody({data,busy,error,onAnswer,cancel,readOnly=false}) {
     }}>{combo.title||`方案 ${index+1}`}{selected.includes(index)&&<span aria-label="已选择"> ✓</span>}</button>)}</div>
     <div className="snow-result-panels">{(data.results??[]).map((combo,index)=><article key={index} role="tabpanel" id={`${tabsId}-panel-${index}`} aria-labelledby={`${tabsId}-tab-${index}`} hidden={active!==index} tabIndex={0} className={`snow snow-plan-result${selected.includes(index)?' is-selected':''}`}>
       {readOnly&&<span className="snow-result-select">{selected.includes(index)?'✓ 已选择':'未选择'}</span>}
-      {!readOnly&&<label className="snow-result-select"><input type="checkbox" aria-label={`选择方案 ${index+1}`} checked={selected.includes(index)} disabled={busy} onChange={()=>setSelected(selected.includes(index)?selected.filter(i=>i!==index):[...selected,index])}/><span>{selected.includes(index)?'已选择':'选择此方案'}</span></label>}
+      {!readOnly&&<label className="snow-result-select"><input type={data.updating?'radio':'checkbox'} name={data.updating?tabsId:undefined} aria-label={`选择方案 ${index+1}`} checked={selected.includes(index)} disabled={busy} onChange={()=>setSelected(data.updating?[index]:selected.includes(index)?selected.filter(i=>i!==index):[...selected,index])}/><span>{selected.includes(index)?'已选择':'选择此方案'}</span></label>}
       <div className="snow-plan-result-head"><div><Badge>{index===0?'优先推荐':`备选 ${index+1}`}</Badge><h3>{combo.title||'候选搭配'}</h3><small>{combo.start??''}{combo.end?` → ${combo.end}`:''}{combo.nights!=null?` · ${combo.nights} 晚`:''}</small></div>
       <div className="snow-plan-money"><strong>{yuan(combo.total)}</strong><small>整趟总成本{combo.estimated?' · 含已确认估算':''}</small></div></div>
       {combo.reason&&<p className="snow-plan-reason">{readableBasis(combo.reason)}</p>}
@@ -129,8 +155,8 @@ function PlanOptionsBody({data,busy,error,onAnswer,cancel,readOnly=false}) {
       <p className="snow-plan-pills"><span className="snow-plan-pill">{combo.budget==null?'未设预算':combo.total==null?'预算待核对':combo.total>combo.budget?'超出预算':`预算内 · 余 ${yuan(combo.budget-combo.total)}`}</span></p>
     </article>)}</div>
     {!readOnly&&<footer className="snow-plan-bar">
-      <span aria-live="polite">{selected.length?`已选择 ${selected.length} 份`:'勾选方案后可保存'}</span>
-      {cancel}<button className="primary" disabled={!selected.length||busy} onClick={()=>respond('保存所选')}>{busy?'正在处理…':`保存所选${selected.length?`（${selected.length}）`:''}`}</button>
+      <span aria-live="polite">{selected.length?`已选择 ${selected.length} 份`:data.updating?'选择一份方案后核对差异':'勾选方案后可保存'}</span>
+      {cancel}<button className="primary" disabled={!selected.length||busy} onClick={()=>respond('保存所选')}>{busy?'正在处理…':data.updating?'核对更新差异':`保存所选${selected.length?`（${selected.length}）`:''}`}</button>
     </footer>}
   </>;
   if(data.stage==='discussion'){

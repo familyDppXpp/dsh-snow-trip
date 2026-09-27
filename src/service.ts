@@ -5,6 +5,8 @@ import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { z } from 'zod';
+import {isDeepStrictEqual} from 'node:util';
+import {randomUUID} from 'node:crypto';
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
 import { packageRecord, type PackageRecord } from './packages.js';
 import { planRecord, planTrackingPatch, type PlanTrackingPatch, type PlanRecord } from './plans.js';
@@ -61,6 +63,24 @@ export class SnowTrip extends TypertRemoteService {
       }
       const table=this.domain.table('plans'),existing=table.get(value.id);
       await table.put(value.id,existing?.tracking?{...value,tracking:existing.tracking}:value);
+    });
+  }
+  // 与套餐写入共用队列，确认后的版本检查和替换不可被其他写入穿插。
+  async replacePlan(previous:PlanRecord,candidate:PlanRecord,asNew:boolean,signal:AbortSignal):Promise<PlanRecord> {
+    await this.ready;
+    return this.write(async()=>{
+      signal.throwIfAborted();
+      const table=this.domain.table('plans');
+      if(!isDeepStrictEqual(table.get(previous.id),previous))throw new Error('原方案已变化或已删除，请刷新差异后重新确认');
+      const value=planRecord.parse({...candidate,id:asNew?randomUUID():previous.id,createdAt:asNew?new Date().toISOString():previous.createdAt,sessionId:previous.sessionId,...(asNew?{tracking:{booking:null,refund:null,refundPolicy:null}}:{})});
+      for(const entry of value.packages){
+        const latest=this.domain.table('packages').get(entry.id);
+        if(!latest||latest.revision!==entry.revision)throw new Error('套餐已变化或已删除，请重新核算并确认差异');
+      }
+      const calculation=candidate.id===previous.id?null:this.domain.table('calculations').get(candidate.id);
+      if(calculation&&this.domain.table('planning').get(calculation.planningId)?.supersededBy)throw new Error('出行条件已变化，请重新核算');
+      await table.put(value.id,value);
+      return structuredClone(value);
     });
   }
   async createPlanning(value:Planning):Promise<void> {

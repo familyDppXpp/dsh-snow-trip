@@ -2,13 +2,9 @@ import {z} from 'zod';
 import {planRecord} from './plans.js';
 import {extraPaymentUnknowns,type PackageRecord} from './packages.js';
 const text=z.string().trim().min(1).max(4000);
-export const amount=z.number().int().nonnegative().safe();
-export const fee=z.strictObject({id:text,label:text,quantity:z.number().nonnegative().max(100000),unitPrice:amount,basis:text,source:z.enum(['user','estimate'])});
-export const conditions=z.strictObject({start:z.iso.date(),nights:z.number().int().min(1).max(366),budget:amount.nullable().default(null),rooms:z.number().int().min(1).max(100),people:z.number().int().min(1).max(1000).optional(),skiDays:z.number().int().min(0).max(367).optional(),packageIds:z.array(z.uuid()).max(1000).default([]),fees:z.array(fee).max(50).default([])}).superRefine((p,c)=>{
-  if(new Set(p.fees.map(f=>f.id)).size!==p.fees.length)c.addIssue({code:'custom',path:['fees'],message:'费用 ID 不得重复'});
-  if(p.skiDays!==undefined&&p.skiDays>p.nights+1)c.addIssue({code:'custom',path:['skiDays'],message:'滑雪天数超过出行天数'});
-});
-export const planningRecord=z.strictObject({id:z.uuid(),sessionId:text,createdAt:z.iso.datetime(),conditions, confirmedByCard:z.boolean().default(false), supersededBy:z.uuid().nullable().default(null),status:z.enum(['running','complete','stopped']).default('running')});
+export {conditions,amount,fee} from './plans.js';
+import {conditions,amount} from './plans.js';
+export const planningRecord=z.strictObject({id:z.uuid(),sessionId:text,createdAt:z.iso.datetime(),conditions, sourcePlan:planRecord.optional(), confirmedByCard:z.boolean().default(false), supersededBy:z.uuid().nullable().default(null),status:z.enum(['running','complete','stopped']).default('running')});
 export type Planning=z.infer<typeof planningRecord>;
 export const segment=z.strictObject({packageId:z.uuid(),revision:z.number().int().min(1),start:z.iso.date(),nights:z.number().int().min(1).max(366)});
 export const resultRecord=z.strictObject({id:z.uuid(),planningId:z.uuid(),sessionId:text,createdAt:z.iso.datetime(),plan:planRecord,checks:z.array(text),switches:z.number().int().nonnegative(),estimated:z.boolean()});
@@ -96,6 +92,6 @@ export function calculate(p:Planning,items:z.infer<typeof segment>[],packages:Pa
  if(output.total!==total)throw new PlanningError('technical',`total：收到 ${output.total} 分，按套餐分摊、逐日补款和剩余共同费用应为 ${total} 分`);
  if(p.conditions.budget!==null&&total>p.conditions.budget)throw new PlanningError('business',`整趟总成本 ${total} 分超过预算 ${p.conditions.budget} 分`);
  const id=crypto.randomUUID(),createdAt=new Date().toISOString();
- const plan=planRecord.parse({id,schemaVersion:1,costVersion:2,createdAt,sessionId:p.sessionId,title,start:p.conditions.start,nights:p.conditions.nights,budget:p.conditions.budget,total,paid:null,pending:null,reason,allocation:allocation.join('\n'),estimates:p.conditions.fees.map(f=>({label:f.label,amount:Math.round(f.quantity*f.unitPrice),basis:f.basis})),items,daily,sharedCosts,unknowns:[],packages:packages.map(snapshot=>({id:snapshot.id,revision:snapshot.revision,snapshot}))});
+ const plan=planRecord.parse({conditions:p.conditions,id,schemaVersion:1,costVersion:2,createdAt,sessionId:p.sessionId,title,start:p.conditions.start,nights:p.conditions.nights,budget:p.conditions.budget,total,paid:null,pending:null,reason,allocation:allocation.join('\n'),estimates:p.conditions.fees.map(f=>({label:f.label,amount:Math.round(f.quantity*f.unitPrice),basis:f.basis})),items,daily,sharedCosts,unknowns:[],packages:packages.map(snapshot=>({id:snapshot.id,revision:snapshot.revision,snapshot}))});
  return resultRecord.parse({id,planningId:p.id,sessionId:p.sessionId,createdAt,plan,checks:['行程连续且完整','套餐版本与资料状态已核查','有效期、禁用日期、剩余间夜和拆分约束通过','整趟成本加总校验通过'],switches:items.length-1,estimated:p.conditions.fees.some(f=>f.source==='estimate')});
 }

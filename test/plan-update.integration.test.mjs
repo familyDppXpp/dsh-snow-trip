@@ -1,0 +1,69 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {Context} from '@deepseek-ai/cordis';
+import {createScope,bindScopeParent} from '@deepseek-ai/dsh-scope';
+import * as SnowTools from 'dsh-snow-trip/tools';
+import Tools from '@deepseek-ai/dsh-tools';
+import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
+import Storage from '@deepseek-ai/dsh-storage';
+import * as StorageJson from '@deepseek-ai/dsh-storage-json';
+import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
+import {SnowTrip} from '../lib/service.js';
+import {normalizePackage} from '../lib/types/packages.js';
+import {planQuestion} from '../src/plan-question.js';
+
+test('已有方案更新：自动差异、确认/取消/另存、重新核算、冲突与历史快照',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'snow-update-'));const ctx=new Context();let scope,answer;
+ const owner=ctx.plugin({async apply(inner){await inner.plugin(SystemPrompt);await inner.plugin(Tools);await inner.plugin(Storage);await inner.plugin(StorageJson,{root});await inner.plugin(StorageDomain,{backend:'json'});inner.provide('workspaceRegistry',{archiveSession:async()=>{}});inner.provide('userQuestions',{ask:request=>answer(request)});await inner.plugin(SnowTrip);}});
+ await owner;const agent={id:'update-test'},key={};
+ await ctx.plugin({inject:['snowTrip','tools','userQuestions'],async apply(inner){scope=createScope(inner,key);await scope.ctx.plugin(SnowTools);}});bindScopeParent(agent,key);
+ const execute=(name,args)=>ctx.tools.execute({name,arguments:args,agent,signal:new AbortController().signal,callId:crypto.randomUUID()});
+ const run=async(name,args)=>{const r=await execute(name,args);assert.equal(r.isError,false,JSON.stringify(r));return JSON.parse(r.content[0].text);};
+ let lastCard;
+ const choose=action=>async request=>{lastCard=planQuestion({questions:request.questions});assert.ok(lastCard&&!lastCard.invalid);return {answers:[{id:request.questions[0].id,selected:[action]}]};};
+ try{
+  const now=new Date().toISOString(),id=crypto.randomUUID();
+  let pkg={...normalizePackage({name:'禾木套餐',description:'说明',hotels:['酒店'],roomType:'双床',resort:'禾木',region:'禾木',nights:4,purchaseStatus:'purchased',purchasePlatform:'测试',quote:90000,paid:90000,paidExtra:0,usedNights:0,voided:false,validFrom:'2026-12-01',validTo:'2027-03-31',splitAllowed:true,splitRule:'可拆分',skiIncluded:false,breakfastIncluded:false,spaIncluded:false,otherBenefits:[],surchargeRules:[],unavailableDates:[],pendingQuestions:[]}),id,revision:1,schemaVersion:1,createdAt:now,updatedAt:now,sessionId:agent.id};
+  await ctx.snowTrip.savePackage(pkg);assert.equal(pkg.completeness,'complete');
+  const plan={id:crypto.randomUUID(),schemaVersion:1,costVersion:2,createdAt:now,sessionId:agent.id,title:'滑雪方案',start:'2027-01-01',nights:2,budget:null,total:45000,paid:null,pending:null,reason:null,allocation:null,estimates:[],items:[{packageId:id,revision:1,start:'2027-01-01',nights:2}],daily:[],sharedCosts:[],unknowns:[],packages:[{id,revision:1,snapshot:pkg}],conditions:{start:'2027-01-01',nights:2,rooms:1,people:2,budget:null,packageIds:[id],fees:[]},tracking:{booking:'confirmed',refund:'refundable',refundPolicy:'出发前可退'}};
+  await ctx.snowTrip.savePlan(plan);
+  const change=async patch=>{pkg={...pkg,...patch,revision:pkg.revision+1,updatedAt:new Date().toISOString()};await ctx.snowTrip.savePackage(pkg,pkg.revision-1);};
+  await change({resort:'吉克普林'});
+  answer=choose('继续调整');let result=await run('snow_update_plan',{planId:plan.id});
+  assert.equal(result.interaction.action,'adjust');assert.deepEqual(await ctx.snowTrip.getPlan(plan.id),plan);assert.match(lastCard.changes[0].label,/资料修正/);
+  answer=choose('取消本次操作');result=await run('snow_update_plan',{planId:plan.id});assert.equal(result.status,'cancelled');
+  answer=choose('确认更新');result=await run('snow_update_plan',{planId:plan.id});assert.equal(result.status,'updated');assert.equal(result.plan.id,plan.id);assert.deepEqual(result.plan.tracking,plan.tracking);assert.equal((await ctx.snowTrip.listPlans()).length,1);assert.equal(result.plan.packages[0].snapshot.resort,'吉克普林');
+  const history=structuredClone(result.interaction);
+  answer=choose('确认另存');result=await run('snow_update_plan',{planId:plan.id});assert.equal(result.status,'saved');assert.notEqual(result.plan.id,plan.id);assert.equal(result.plan.tracking.booking,null);assert.equal((await ctx.snowTrip.listPlans()).length,2);
+  await change({paid:100000});
+  answer=()=>{throw new Error('费用变化不能直接弹保存卡');};result=await run('snow_update_plan',{planId:plan.id});assert.equal(result.status,'needs_calculation');assert.equal(result.conditions.people,2);
+  answer=async request=>{const card=JSON.parse(request.questions[0].detail);return {answers:[{id:request.questions[0].id,selected:['生成方案'],custom:JSON.stringify({values:{...card.input,budget:''},ids:card.ids,fees:card.fees})}]};};
+  const {budget,...confirmedConditions}=result.conditions;
+  const prepared=await run('snow_prepare_plan',{sourcePlanId:plan.id,conditions:confirmedConditions});
+  const input={planningId:prepared.planningId,title:plan.title,reason:'更新套餐成本',items:[{packageId:id,revision:pkg.revision,start:plan.start,nights:2}],script:'return {daily:[{date:"2027-01-01",packageId:items[0].packageId,surcharge:0,basis:"无补款"},{date:"2027-01-02",packageId:items[0].packageId,surcharge:0,basis:"无补款"}],coverage:[],total:50000}'};
+  const computed=await run('snow_evaluate',input);
+  answer=async request=>JSON.parse(request.questions[0].detail).stage==='results'?{answers:[{id:request.questions[0].id,selected:['保存所选'],custom:JSON.stringify({stage:'results',selected:[0]})}]}:choose('确认更新')(request);
+  result=await run('snow_plan_stage',{stage:'results',key:'update-candidate',planningId:prepared.planningId,resultIds:[computed.resultId]});assert.deepEqual(result.interaction.selection.selected,[0]);assert.equal(result.interaction.selection.card.results[0].resultId,computed.resultId);assert.equal(result.status,'updated');assert.equal(result.plan.total,50000);assert.equal(result.plan.id,plan.id);assert.deepEqual(result.plan.tracking,plan.tracking);assert.equal((await ctx.snowTrip.listPlans()).length,2);
+  assert.equal(history.card.plan.total,45000);assert.equal(history.card.previous.packages[0].snapshot.resort,'禾木');
+  await change({region:'阿勒泰'});
+  const before=await ctx.snowTrip.getPlan(plan.id);
+  answer=async request=>{await change({name:'统一名称'});return choose('确认更新')(request);};
+  result=await run('snow_update_plan',{planId:plan.id});assert.equal(result.status,'failed');assert.match(result.interaction.error,/套餐已变化/);assert.deepEqual(await ctx.snowTrip.getPlan(plan.id),before);
+  answer=async request=>{await ctx.snowTrip.updatePlanTracking(plan.id,{booking:'unreserved'});return choose('确认更新')(request);};
+  result=await run('snow_update_plan',{planId:plan.id});assert.equal(result.status,'failed');assert.match(result.interaction.error,/原方案已变化/);assert.equal((await ctx.snowTrip.getPlan(plan.id)).tracking.booking,'unreserved');
+  answer=choose('确认更新');result=await run('snow_update_plan',{planId:plan.id});assert.equal(result.status,'updated');
+  assert.equal(result.plan.packages[0].snapshot.name,'统一名称');
+  // 旧核算结果不能再次覆盖已经更新的方案。
+  answer=choose('确认更新');result=await execute('snow_save_plan',{resultId:computed.resultId});assert.equal(result.isError,true);assert.match(result.content[0].text,/套餐版本/);
+  answer=async request=>{const c=JSON.parse(request.questions[0].detail);return {answers:[{id:request.questions[0].id,selected:['生成方案'],custom:JSON.stringify({values:{...c.input,budget:''},ids:c.ids,fees:c.fees})}]};};
+  const moved=await run('snow_prepare_plan',{sourcePlanId:plan.id,conditions:{...confirmedConditions,people:3}});
+  const movedResult=await run('snow_evaluate',{...input,planningId:moved.planningId,items:input.items.map(i=>({...i,revision:pkg.revision}))});
+  answer=choose('确认更新');result=await run('snow_save_plan',{resultId:movedResult.resultId});assert.equal(result.status,'updated');assert.equal(result.interaction.card.resetTracking,true);assert.equal(result.plan.tracking.booking,null);assert.equal(result.plan.conditions.people,3);
+  answer=async request=>{await ctx.snowTrip.deletePlan(plan.id);return choose('确认另存')(request);};
+  result=await run('snow_update_plan',{planId:plan.id});assert.equal(result.status,'failed');assert.equal(await ctx.snowTrip.getPlan(plan.id),null);assert.equal((await ctx.snowTrip.listPlans()).length,1,'确认期间被删除的原方案不应恢复或被另存');
+
+ }finally{scope?.dispose();await owner.dispose();await rm(root,{recursive:true,force:true});}
+});

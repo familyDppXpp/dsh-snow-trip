@@ -131,6 +131,10 @@ export function PreparedPlanCard({data}) {
 
 
 export function PlanInteractionCard({data}) {
+ if(data?.interaction?.stage==='update'&&data.interaction.card){
+  const {selection,...outcome}=data.interaction;
+  return <>{selection&&<PlanQuestionCard snapshot={{...selection.card,selected:selection.selected}} outcome={{action:'select'}}/>}<PlanQuestionCard snapshot={outcome.card} outcome={outcome}/></>;
+ }
  if(data?.conditions&&['prepared','adjusting'].includes(data.status))return <PreparedPlanCard data={data}/>;
  if(data?.version===1&&data.status==='saved'&&data.plan&&!data.interaction?.card?.results?.length)return <PlanSavedCard block={{kind:'tool-result',meta:{version:1,status:'saved',plan:data.plan}}}/>;
  const record=data?.interaction??(data?.status==='save_results'?{action:'save',stage:'results',items:data.items}:null);if(!record)return null;

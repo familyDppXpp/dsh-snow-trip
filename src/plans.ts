@@ -3,6 +3,13 @@ import { packageRecord } from './packages.js';
 
 const text = z.string().trim().min(1).max(4000);
 const day = z.iso.date();
+export const amount=z.number().int().nonnegative().safe();
+export const fee=z.strictObject({id:text,label:text,quantity:z.number().nonnegative().max(100000),unitPrice:amount,basis:text,source:z.enum(['user','estimate'])});
+export const conditions=z.strictObject({start:z.iso.date(),nights:z.number().int().min(1).max(366),budget:amount.nullable().default(null),rooms:z.number().int().min(1).max(100),people:z.number().int().min(1).max(1000).optional(),skiDays:z.number().int().min(0).max(367).optional(),packageIds:z.array(z.uuid()).max(1000).default([]),fees:z.array(fee).max(50).default([])}).superRefine((p,c)=>{
+  if(new Set(p.fees.map(f=>f.id)).size!==p.fees.length)c.addIssue({code:'custom',path:['fees'],message:'费用 ID 不得重复'});
+  if(p.skiDays!==undefined&&p.skiDays>p.nights+1)c.addIssue({code:'custom',path:['skiDays'],message:'滑雪天数超过出行天数'});
+});
+
 // 存储与业务口径统一为非负整数分；工具输入用元，经 toCents 校验换算。
 const centsAmount = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).nullable();
 const itemEntry = z.strictObject({
@@ -57,6 +64,7 @@ export function toCents(value: number|null|undefined): number|null {
 
 // 持久化方案记录：金额为分，packages 保存参与套餐的版本与完整快照。
 export const planRecord = z.strictObject({
+  conditions: conditions.optional(),
   tracking: planTracking.optional(),
   costVersion:z.literal(2).optional(),
   id: z.uuid(), schemaVersion: z.literal(1), createdAt: z.iso.datetime(), sessionId: text,
