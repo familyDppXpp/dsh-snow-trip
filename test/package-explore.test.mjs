@@ -33,3 +33,16 @@ test('晚数降序、实付升序，零金额正常、未知末尾，同值按 I
  assert.deepEqual(rows.map(p=>p.id),['c','b','a','d']);
  assert.deepEqual(ids(rows.toReversed(),unfiltered,'paid'),['b','a','c','d']);
 });
+
+test('出行方案按套餐 ID 关联，多方案去重、组合筛选与删除后刷新',()=>{
+ const rows=[base,{...base,id:'b',revision:2},{...base,id:'c'}];
+ const plans=[{items:[{packageId:'a',revision:1},{packageId:'b',revision:1}]},{items:[{packageId:'a',revision:1}]}];
+ const matches=(hasPlan,records=plans,patch={})=>packageCandidates(rows,{...filter,hasPlan,...patch},'nights',records).map(({record})=>record.id);
+ assert.deepEqual(matches(''),['a','b','c']);
+ assert.deepEqual(matches('yes'),['a','b']);
+ assert.deepEqual(matches('no'),['c']);
+ assert.deepEqual(matches('yes',plans,{query:'不存在'}),[]);
+ assert.deepEqual(matches('no',[]),['a','b','c']);
+ assert.deepEqual(matches('yes',[]),[]);
+ assert.deepEqual(matches('no',plans.slice(1)),['b','c']);
+});

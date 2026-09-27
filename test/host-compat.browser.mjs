@@ -56,8 +56,9 @@ try {
     assert.ok(saved);
     assert.equal(saved.purchaseStatus,'unpurchased');assert.equal(saved.quote,129900);assert.equal(saved.revision,1);
     await panel.getByRole('button',{name:/^已录套餐/}).click();
-    await panel.getByLabel('入住日期',{exact:true}).fill('');
-    await panel.getByRole('button',{name:'查找方案',exact:true}).click();
+    await panel.getByRole('button',{name:/^入住日期：/}).click();
+    await panel.getByRole('button',{name:'清空日期',exact:true}).click();
+    await panel.getByRole('button',{name:'查找套餐',exact:true}).click();
     await panel.locator(`[data-package-id="${saved.id}"]`).first().waitFor();
     await page.reload({waitUntil:'networkidle'});
     await page.waitForFunction(()=>!!window.snowSessionCheck);

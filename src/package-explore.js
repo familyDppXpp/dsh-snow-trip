@@ -11,8 +11,10 @@ export function packageStats(rows) {
     regionsUnknown:rows.filter(p=>p.region===null).length,
   };
 }
-export function packageCandidates(rows,filter,sort) {
+export function packageCandidates(rows,filter,sort,plans=[]) {
+  const plannedIds=new Set(plans.flatMap(plan=>plan.items.map(item=>item.packageId)));
   const matches=rows.filter(p=>{
+    if(filter.hasPlan&&plannedIds.has(p.id)!==(filter.hasPlan==='yes'))return false;
     if(filter.region!=='全部目的地'&&p.region!==filter.region)return false;
     if(![p.name,p.description,p.resort,...(p.hotels??[])].filter(Boolean).join(' ').toLowerCase().includes(filter.query.toLowerCase()))return false;
     if(filter.purchaseStatuses?.length&&!filter.purchaseStatuses.includes(p.purchaseStatus))return false;

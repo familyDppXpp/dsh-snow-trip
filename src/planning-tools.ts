@@ -43,6 +43,17 @@ export function registerPlanningTools(ctx:Context){
   if(!plan)throw new Error('方案不存在或已删除');
   return {plan,amountUnit:'分'};
  });
+ add('snow_update_plan_tracking','用户明确要求时，按已存方案 ID 更新预约状态、是否可退和可退策略描述。省略字段保留原值；unknown 清空状态；改为不可退或未知会清空旧策略。可退必须有策略描述。只更新标签，不重新核算或改变行程费用，不展示编辑表单。先查询定位方案，不猜测 ID 或退改条件。',{
+  id:str,booking:{type:'string',enum:['confirmed','unreserved','unknown'],description:'已确认、未预约或清空；省略则保留'},
+  refund:{type:'string',enum:['refundable','nonrefundable','unknown'],description:'可退、不可退或清空；省略则保留'},
+  refundPolicy:{type:'string',description:'用户提供的可退策略，例如 2月4日00:00前可退、未预约可退；省略保留'},
+ },async(args,exec)=>{
+  owner(exec);
+  const {id,booking,refund,refundPolicy}=validate(z.strictObject({id:z.uuid(),booking:z.enum(['confirmed','unreserved','unknown']).optional(),refund:z.enum(['refundable','nonrefundable','unknown']).optional(),refundPolicy:z.string().trim().min(1).max(4000).optional()}),args);
+  const patch={...(booking===undefined?{}:{booking:booking==='unknown'?null:booking}),...(refund===undefined?{}:{refund:refund==='unknown'?null:refund}),...(refundPolicy===undefined?{}:{refundPolicy})};
+  const plan=await ctx.snowTrip.updatePlanTracking(id,patch);
+  return {status:'updated',plan,amountUnit:'分'};
+ });
  add('snow_prepare_plan','合并确认条件与共同费用并创建规划 ID。金额统一为整数分。首次创建及条件变更必须由用户点击卡片生成方案；模型不能跳过。更改条件时创建新规划，旧结果保留但不再用于新规划。',{conditions:{type:'object',properties:conditionParameters,additionalProperties:false,required:true},needsConfirmation:{type:'boolean',description:'兼容旧参数；无论 true/false 都必须由用户点击确认卡'},userEvidence:{type:'string',description:'用户提供的条件依据，不能代替卡片确认'}},async(args,exec)=>{
   const input=validate(z.strictObject({conditions,needsConfirmation:z.boolean().optional(),userEvidence:z.string().trim().min(1).optional()}),args);
   let value=input.conditions;

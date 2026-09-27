@@ -13,8 +13,12 @@ try{
   await page.getByRole('button',{name:/筛选出行/}).waitFor();
   assert.equal(await filters.isVisible(),false);
   await page.getByRole('button',{name:/筛选出行/}).click();
-  await filters.getByLabel('入住日期',{exact:true}).fill('2027-02-06');
-  await filters.getByRole('button',{name:'查找方案',exact:true}).click();
+  await filters.getByRole('button',{name:/^入住日期：/}).click();
+  const calendar=page.getByRole('group',{name:'入住日期选项',exact:true});
+  await calendar.getByLabel('选择年份',{exact:true}).selectOption('2027');
+  await calendar.getByLabel('选择月份',{exact:true}).selectOption('1');
+  await calendar.getByRole('button',{name:'2027-02-06',exact:true}).click();
+  await filters.getByRole('button',{name:'查找套餐',exact:true}).click();
   await filters.waitFor({state:'hidden'});
   assert.match(await page.getByRole('button',{name:/筛选出行/}).innerText(),/2027-02-06/);
   const menu=page.getByRole('dialog',{name:'雪季导航',exact:true});

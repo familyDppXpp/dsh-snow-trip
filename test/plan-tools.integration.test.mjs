@@ -127,6 +127,32 @@ test('方案闭环：核算校验版本与完整状态，保存核查版本并�
     assert.equal((await execute('snow_query_plan',{id:crypto.randomUUID()})).isError,true);
     assert.equal(saved.plan.total,65000);assert.equal((await ctx.snowTrip.listPlans()).length,1);
     await ok('snow_save_plan',{resultId:computed.resultId});assert.equal((await ctx.snowTrip.listPlans()).length,1);
+    // 标签独立持久化；重复保存核算快照不能覆盖用户更新的标签。
+    const tracking={booking:'unreserved',refund:'refundable',refundPolicy:'2月4日00:00前可退'};
+    assert.deepEqual((await ctx.snowTrip.updatePlanTracking(saved.plan.id,tracking)).tracking,tracking);
+    await ctx.snowTrip.savePlan(saved.plan);
+    assert.deepEqual((await ctx.snowTrip.getPlan(saved.plan.id)).tracking,tracking);
+    await assert.rejects(()=>ctx.snowTrip.updatePlanTracking(saved.plan.id,{...tracking,refundPolicy:'  '}));
+    await assert.rejects(()=>ctx.snowTrip.updatePlanTracking(saved.plan.id,{...tracking,refund:'nonrefundable'}));
+    await assert.rejects(()=>ctx.snowTrip.updatePlanTracking(crypto.randomUUID(),tracking),/不存在/);
+    const changed={booking:'confirmed',refund:'nonrefundable',refundPolicy:null};
+    assert.deepEqual((await ctx.snowTrip.updatePlanTracking(saved.plan.id,changed)).tracking,changed);
+    // 自然语言工具只更新明确给出的字段，不弹确认卡，不更改费用。
+    const previousAnswer=answer;answer=async()=>{throw new Error('标签更新不应弹确认卡');};
+    const updateTracking=async fields=>JSON.parse((await ok('snow_update_plan_tracking',{id:saved.plan.id,...fields})).content[0].text).plan;
+    assert.equal((await execute('snow_update_plan_tracking',{id:saved.plan.id})).isError,true);
+    assert.equal((await execute('snow_update_plan_tracking',{id:saved.plan.id,refund:'refundable'})).isError,true);
+    assert.equal((await execute('snow_update_plan_tracking',{id:crypto.randomUUID(),booking:'confirmed'})).isError,true);
+    let tagged=await updateTracking({refund:'refundable',refundPolicy:'  未预约可退  '});
+    assert.deepEqual(tagged.tracking,{booking:'confirmed',refund:'refundable',refundPolicy:'未预约可退'});
+    tagged=await updateTracking({booking:'unreserved'});
+    assert.deepEqual(tagged.tracking,{booking:'unreserved',refund:'refundable',refundPolicy:'未预约可退'});
+    assert.equal(tagged.total,saved.plan.total);assert.deepEqual(tagged.items,saved.plan.items);
+    assert.equal((await updateTracking({refundPolicy:'2月4日00:00前可退'})).tracking.refundPolicy,'2月4日00:00前可退');
+    assert.equal((await updateTracking({refund:'nonrefundable'})).tracking.refundPolicy,null);
+    assert.deepEqual((await updateTracking({booking:'unknown',refund:'unknown'})).tracking,{booking:null,refund:null,refundPolicy:null});
+    assert.equal((await execute('snow_update_plan_tracking',{id:saved.plan.id,refundPolicy:'不可凭空增加策略'})).isError,true);
+    answer=previousAnswer;
     const second=JSON.parse((await ok('snow_evaluate',{...input,title:'第二候选'})).content[0].text);
     const realSave=ctx.snowTrip.savePlan.bind(ctx.snowTrip);let failedAttempts=0;
     ctx.snowTrip.savePlan=async plan=>{if(plan.id===second.resultId){failedAttempts++;throw new Error('模拟写盘失败');}return realSave(plan);};

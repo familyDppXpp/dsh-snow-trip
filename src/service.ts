@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
 import { packageRecord, type PackageRecord } from './packages.js';
-import { planRecord, type PlanRecord } from './plans.js';
+import { planRecord, planTrackingPatch, type PlanTrackingPatch, type PlanRecord } from './plans.js';
 import {planningRecord,resultRecord,type Planning,type Calculation} from './planning.js';
 
 declare module '@deepseek-ai/cordis' { interface Context { snowTrip: SnowTrip } }
@@ -59,7 +59,8 @@ export class SnowTrip extends TypertRemoteService {
         const current=packages.get(entry.id);
         if(!current||current.revision!==entry.revision)throw new Error(`套餐 ${entry.snapshot.name} 已变更，方案未保存，请重新计算`);
       }
-      await this.domain.table('plans').put(value.id,value);
+      const table=this.domain.table('plans'),existing=table.get(value.id);
+      await table.put(value.id,existing?.tracking?{...value,tracking:existing.tracking}:value);
     });
   }
   async createPlanning(value:Planning):Promise<void> {
@@ -84,6 +85,20 @@ export class SnowTrip extends TypertRemoteService {
   async listPlans(): Promise<PlanRecord[]> {
     await this.ready;
     return [...this.domain.table('plans').entries()].map(([,p])=>structuredClone(p));
+  }
+  // 仅供自然语言工具调用，页面只读展示标签与策略。
+  async updatePlanTracking(id:string, tracking:PlanTrackingPatch):Promise<PlanRecord> {
+    await this.ready;
+    return this.write(async()=>{
+      const key=z.uuid().parse(id),value=planTrackingPatch.parse(tracking),table=this.domain.table('plans');
+      const current=table.get(key);
+      if(!current)throw new Error('方案不存在或已删除');
+      const merged={booking:null,refund:null,refundPolicy:null,...current.tracking,...value};
+      if(value.refund!==undefined&&value.refund!=='refundable'&&value.refundPolicy===undefined)merged.refundPolicy=null;
+      const updated=planRecord.parse({...current,tracking:merged});
+      await table.put(key,updated);
+      return structuredClone(updated);
+    });
   }
   @Remote('deletePlan')
   async deletePlan(id: string): Promise<{sessionId:string|null;archiveError:string|null}> {

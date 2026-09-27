@@ -8,6 +8,7 @@ import {PlanQuestionCard,PlanStageFailure} from './plan-question-card.jsx';
 import {planQuestion} from './plan-question.js';
 import remote from '../lib/typert.remote-client.js';
 import styles from './style.css';
+import calendarStyles from 'react-day-picker/style.css';
 import {referenceSource,appendRecordPrompt,recordReferenceSource,addRecordReference,restoreDraftReferences} from './references.js';
 import {registerReferenceMessages} from './reference-message.jsx';
 import {DepartureHero} from './departure.jsx';
@@ -36,7 +37,7 @@ function Entry({wide, prepare}) {
 
 export async function apply(ctx) {
   ctx.effect(()=>{
-    const style=document.createElement('style');style.textContent=styles;document.head.append(style);
+    const style=document.createElement('style');style.textContent=calendarStyles+'\n'+styles;document.head.append(style);
     return ()=>style.remove();
   });
   await ctx.remote.$mount(remote);

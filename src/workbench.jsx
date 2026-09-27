@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {date,evaluate,money,text} from './ledger.js';
 import {PackageCard,PackageBenefits,usePackages,PlanSavedCard} from './package-cards.jsx';
 import {packageStats,packageCandidates} from './package-explore.js';
 import {fieldLabels,purchaseLabels} from './packages.ts';
 import {storage} from './storage.js';
+import {filterPlans,planStatuses,refundPolicies,tripDays} from './plan-filter.js';
+import {DatePicker} from './date-picker.jsx';
 import {snowSessions, sessionTitle, groupSessions, packagesForSession, continuationPrompt} from './sessions.js';
 
 const PackageSidebarContext=createContext(null);
@@ -102,7 +104,7 @@ function PackageSidebar({records,plans=[],allPackages=records,onBack,missing=fal
 }
 
 const yuan=n=>n==null?'待确认':new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',maximumFractionDigits:2}).format(n);
-const initial={start:'',nights:'',region:'全部目的地',query:'',purchaseStatuses:[],completeness:[]};
+const initial={start:'',nights:'',region:'全部目的地',query:'',purchaseStatuses:[],completeness:[],hasPlan:''};
 function Icon({name='mountain',size=20}) {
   const paths={sort:'M8 4v16M4 16l4 4 4-4M14 5h7M14 10h5M14 15h3',edit:'m15 4 5 5M4 20l5-1L21 7a2 2 0 0 0-5-5L4 14z',fork:'M5 3v9a7 7 0 0 0 7 7h5M5 5h12M20 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0M21 19a2 2 0 1 1-4 0 2 2 0 0 1 4 0',archive:'M4 4h16v5H4zM5 9v11h14V9M9 13h6',mountain:'M2 19 9 5l4 8 3-5 6 11H2M6 11l3 2 3-2',search:'M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0',grid:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',compare:'M8 3v18M16 3v18M3 7h5M16 17h5M5 5l-2 2 2 2M19 15l2 2-2 2',book:'M4 3h13a3 3 0 0 1 3 3v15H6a2 2 0 0 1-2-2V3M4 17h16M8 7h8M8 11h6',upload:'M12 16V3M7 8l5-5 5 5M4 15v6h16v-6',pin:'M12 22s8-8 8-14a8 8 0 0 0-16 0c0 6 8 14 8 14M15 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0',arrow:'M4 12h16M14 6l6 6-6 6',check:'M4 12l5 5L20 6',close:'M5 5l14 14M19 5 5 19',calendar:'M4 5h16v16H4zM4 10h16M8 2v6M16 2v6',save:'M5 3h14v19l-7-5-7 5V3',info:'M12 10v7M12 6v1M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'};
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]||paths.mountain}/></svg>;
@@ -140,25 +142,30 @@ function Modal({title,children,onClose,wide=false,dismissible=true}) {
   useEffect(()=>{ref.current.showModal();},[]);
   return <dialog ref={ref} className={`snow-modal snow ${wide?'wide':''}`} aria-label={title} onClose={onClose} onCancel={event=>{if(!dismissible)event.preventDefault();}} onClick={e=>{if(dismissible&&e.target===ref.current)ref.current.close();}}><div className="modal-head"><h2>{title}</h2><button aria-label="关闭" disabled={!dismissible} className="icon-button" onClick={()=>ref.current.close()}><Icon name="close"/></button></div><div className="modal-body">{children}</div></dialog>;
 }
-function PackageDropdown({label,labelIcon,summary,children}) {
+function PackageDropdown({label,labelIcon,summary,children,popupClass='',minWidth=220,triggerRef}) {
   const id=useId(),popup=useRef(null),trigger=useRef(null);
+  const [open,setOpen]=useState(false);
+  useLayoutEffect(()=>{
+    if(!open)return;
+    const menu=popup.current,rect=trigger.current.getBoundingClientRect();
+    menu.style.width=Math.min(Math.max(rect.width,minWidth),window.innerWidth-16)+'px';
+    menu.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-menu.offsetWidth-8))+'px';
+    menu.style.top=(rect.bottom+6+menu.offsetHeight<=window.innerHeight-8?rect.bottom+6:Math.max(8,rect.top-menu.offsetHeight-6))+'px';
+  },[open,minWidth]);
   useEffect(()=>{
+    const menu=popup.current,toggled=event=>setOpen(event.newState==='open');
+    menu.addEventListener('toggle',toggled);
     const close=event=>{if(event.type==='resize'||!popup.current?.contains(event.target))popup.current?.hidePopover();};
     window.addEventListener('resize',close);window.addEventListener('scroll',close,true);
-    return()=>{window.removeEventListener('resize',close);window.removeEventListener('scroll',close,true);};
+    return()=>{menu.removeEventListener('toggle',toggled);window.removeEventListener('resize',close);window.removeEventListener('scroll',close,true);};
   },[]);
   return <div className="field package-tag-filter"><label htmlFor={id+'-trigger'} title={labelIcon?label:undefined}>{labelIcon?<Icon name={labelIcon}/>:label}</label>
-    <button id={id+'-trigger'} ref={trigger} type="button" className="package-tag-trigger" aria-label={label+'：'+summary} popovertarget={id} onClick={event=>{
-      event.preventDefault();const menu=popup.current;menu.togglePopover();
-      if(!menu.matches(':popover-open'))return;
-      const rect=trigger.current.getBoundingClientRect();
-      menu.style.width=Math.min(Math.max(rect.width,220),window.innerWidth-16)+'px';
-      menu.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-menu.offsetWidth-8))+'px';
-      menu.style.top=(rect.bottom+6+menu.offsetHeight<=window.innerHeight-8?rect.bottom+6:Math.max(8,rect.top-menu.offsetHeight-6))+'px';
+    <button id={id+'-trigger'} ref={node=>{trigger.current=node;if(triggerRef)triggerRef.current=node;}} type="button" className="package-tag-trigger" aria-label={label+'：'+summary} aria-expanded={open} popovertarget={id} onClick={event=>{
+      event.preventDefault();setOpen(!popup.current.matches(':popover-open'));popup.current.togglePopover();
     }}><span>{summary}</span></button>
-    <div id={id} ref={popup} popover="auto" className="snow package-tag-options" role="group" aria-label={label+'选项'} onKeyDown={event=>{
+    <div id={id} ref={popup} popover="auto" className={`snow package-tag-options ${popupClass}`} role="group" aria-label={label+'选项'} onKeyDown={event=>{
       if(event.key==='Escape'){event.preventDefault();event.stopPropagation();popup.current.hidePopover();trigger.current.focus();}
-    }}>{children(()=>{popup.current.hidePopover();trigger.current.focus();},id)}</div>
+    }}>{children(()=>{popup.current.hidePopover();trigger.current.focus();},id,open)}</div>
   </div>;
 }
 
@@ -171,6 +178,29 @@ function PackageSelect({label,labelIcon,value,options,onChange}) {
 }
 
 function Field({label,children}){const id=useId();return <div className="field"><label htmlFor={id}>{label}</label>{React.cloneElement(children,{id})}</div>;}
+function DateFilter({label,mode='single',start,end,onChange,triggerRef}) {
+  return <PackageDropdown label={label} summary={start?(mode==='range'?`${start} 至 ${end}`:start):'不限日期'} minWidth={320} popupClass="snow-date-popover" triggerRef={triggerRef}>{(close,id,open)=>open&&<DatePicker mode={mode} start={start} end={end} onChange={onChange} onClose={close}/>}</PackageDropdown>;
+}
+const emptyPlanFilter={statuses:[],refundPolicy:[],days:[],start:'',end:''};
+function PlanFilters({plans,value,onChange,count,mobile}) {
+  const [draft,setDraft]=useState(value),[open,setOpen]=useState(false);
+  useEffect(()=>setDraft(value),[value]);
+  const groups=[['statuses','预约与退改',planStatuses],['refundPolicy','可退策略',refundPolicies(plans).map(policy=>[policy,policy])],['days','出行天数',tripDays(plans).map(days=>[days,`${days} 天`])]];
+  return <section className="search-panel" aria-label="方案筛选">
+    {mobile?<button className="snow-filter-toggle" aria-expanded={open} aria-controls="snow-plan-filters" onClick={()=>setOpen(value=>!value)}><Icon name="search" size={17}/><span><strong>筛选方案</strong><small>出行时间 · 预约与退改 · 可退策略 · 出行天数</small></span><span aria-hidden="true">{open?'−':'＋'}</span></button>:<div className="section-head"><h2><Icon name="search"/> 找一份已存方案</h2><span>按出行时间、状态、策略和天数筛选</span></div>}
+    <form id="snow-plan-filters" hidden={mobile&&!open} onSubmit={event=>{event.preventDefault();onChange(draft);setOpen(false);}}>
+      <div className="filter-grid snow-plan-dates">
+        <DateFilter label="出行时间" mode="range" start={draft.start} end={draft.end} onChange={dates=>setDraft({...draft,...dates})}/>
+      </div>
+      <p id="snow-plan-date-hint" className="muted">不选日期则不限时间；方案须包含所选完整区间（含首尾日期）。</p>
+      <div className="filter-grid">
+        {groups.map(([key,label,options])=><PackageDropdown key={key} label={label} summary={draft[key].map(item=>options.find(([id])=>id===item)?.[1]??item).join('、')||'全部'}>{()=>options.length?options.map(([id,title])=><label key={id}><input type="checkbox" checked={draft[key].includes(id)} onChange={event=>setDraft({...draft,[key]:event.target.checked?[...draft[key],id]:draft[key].filter(item=>item!==id)})}/>{title}</label>):<p>当前方案暂无{label}</p>}</PackageDropdown>)}
+      </div>
+      <div className="filter-bottom"><span role="status">显示 {count} / {plans.length} 份</span></div>
+      <div className="filter-actions"><button className="primary" type="submit"><Icon name="search"/> 查找方案</button><button type="button" onClick={()=>{setDraft(emptyPlanFilter);onChange(emptyPlanFilter);}}>重置筛选</button></div>
+    </form>
+  </section>;
+}
 function SessionFeedback({state}) {
   const snapshot=useSyncExternalStore(listener=>state.subscribe(listener),()=>state.getSnapshot());
   const error=snapshot.promptError?.error;
@@ -238,10 +268,12 @@ export function App({useSessions, useSessionStatus, renderSlot, SessionProvider,
   }
 
   const [hostSaved,setHostSaved]=useState([]),[plansError,setPlansError]=useState(''),[plansLoaded,setPlansLoaded]=useState(false),[plansRefresh,setPlansRefresh]=useState(0);
+  const [planFilter,setPlanFilter]=useState(emptyPlanFilter);
+  const filteredPlans=filterPlans(hostSaved,planFilter);
   const [ledger,setLedger]=useState(null),[loading,setLoading]=useState(true);
   const [filtersOpen,setFiltersOpen]=useState(false);
   const [view,setView]=useState(()=>actions.lastSession()?'conversation':'explore'),[form,setForm]=useState(initial),[filter,setFilter]=useState(initial),[selection,setSelection]=useState([]),[sort,setSort]=useState('nights');
-  useEffect(()=>{let active=true;setPlansError('');actions.listPlans().then(rows=>{if(active){setHostSaved(rows.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)));setPlansLoaded(true);}}).catch(e=>{if(active)setPlansError(e.message);});return()=>{active=false;};},[view,plansRefresh,planSessionVersion]);
+  useEffect(()=>{let active=true;setPlansLoaded(false);setPlansError('');actions.listPlans().then(rows=>{if(active){setHostSaved(rows.sort((a,b)=>b.createdAt.localeCompare(a.createdAt)));setPlansLoaded(true);}}).catch(e=>{if(active)setPlansError(e.message);});return()=>{active=false;};},[view,plansRefresh,planSessionVersion]);
   const [detail,setDetail]=useState(null),[comparing,setComparing]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState(''),[formError,setFormError]=useState('');
   useEffect(()=>{
     setPackageSidebarOpen(!mobile);
@@ -298,7 +330,8 @@ export function App({useSessions, useSessionStatus, renderSlot, SessionProvider,
   };
   const closeInspectedPackage=()=>{const id=inspectedPackage;setInspectedPackage(null);requestAnimationFrame(()=>document.querySelector(`[data-package-id="${id}"] .package-inspect`)?.focus());};
   const stats=packageStats(host.rows);
-  const candidates=packageCandidates(host.rows,filter,sort);
+  const planFilterPending=filter.hasPlan&&(!plansLoaded||plansError);
+  const candidates=planFilterPending?[]:packageCandidates(host.rows,filter,sort,hostSaved);
   async function continueRecord(record,kind) {
     if(sessionBusy)return;
     setSessionBusy(true);setSessionError('');
@@ -354,11 +387,15 @@ export function App({useSessions, useSessionStatus, renderSlot, SessionProvider,
   <div className="page"><div aria-live="polite" className={`feedback ${notice?'visible':''}`}>{notice}</div>{error&&<div role="alert" className="notice error">{error}</div>}
   {view==='explore'&&<><section className="hero"><div className="hero-copy"><div className="eyebrow"><span className="green-dot"/> 雪季计划进行中</div><h1>下一站，<br/>去山里过冬。</h1><p>从已购套餐出发，找到时间和预算都合适的那一程。</p><div className="hero-tags"><span>套餐权益</span><span>逐晚补款</span><span>方案对比</span></div></div><Mountain/><div className="mountain-caption">这个雪季，把好时光留给山野。</div></section>
   <section className="stats" aria-label="台账概况"><div><span>已录入套餐</span><strong>{host.loading||host.error?'—':stats.count.toString().padStart(2,'0')}<small> 份</small></strong></div><div><span>已知住宿间夜</span><strong>{host.loading||host.error?'—':stats.nights}<small> 晚</small></strong>{stats.nightsUnknown>0&&<small>{stats.nightsUnknown} 份晚数待确认</small>}</div><div><span>已知实付与补款合计</span><strong>{host.loading||host.error?'—':yuan(stats.paid/100)}</strong>{stats.paidUnknown>0&&<small>{stats.paidUnknown} 份金额未完整，非最终总额</small>}</div><div><span>已知目的地区域</span><strong>{host.loading||host.error?'—':stats.regions.length}<small> 处</small></strong>{stats.regionsUnknown>0&&<small>{stats.regionsUnknown} 份地区待确认</small>}</div></section>
-  <section className="search-panel">{mobile?<button className="snow-filter-toggle" aria-expanded={filtersOpen} aria-controls="snow-explore-filters" onClick={()=>setFiltersOpen(open=>!open)}><Icon name="search" size={17}/><span><strong>筛选出行</strong><small>{filter.start||'不限日期'} · {filter.nights?`${filter.nights} 晚`:'按套餐晚数'} · {filter.region}</small></span><span aria-hidden="true">{filtersOpen?'−':'＋'}</span></button>:<div className="section-head"><h2><Icon name="search"/> 找一程适合的出行</h2><span>先选日期，再看套餐怎么用</span></div>}<form id="snow-explore-filters" hidden={mobile&&!filtersOpen} noValidate onSubmit={search}><div className="filter-grid"><Field label="入住日期"><input ref={startInput} aria-invalid={!!formError} aria-describedby={formError?'snow-filter-error':undefined} type="date" value={form.start} onChange={e=>setForm({...form,start:e.target.value})}/></Field><PackageSelect label="住宿晚数" value={form.nights} options={[["","按各套餐晚数"],...[1,2,3,4,5,7,10,15].map(n=>[String(n),`${n} 晚`])]} onChange={nights=>setForm({...form,nights})}/><PackageSelect label="目的地区域" value={form.region} options={['全部目的地',...stats.regions].map(region=>[region,region])} onChange={region=>setForm({...form,region})}/><PackageTagFilter value={form} onChange={setForm}/><button className="primary search-button" type="submit"><Icon name="search"/> 查找方案</button></div><div className="filter-bottom"><div className="text-search"><Icon name="search" size={17}/><input aria-label="搜索套餐或酒店" placeholder="搜索酒店、套餐或雪场" value={form.query} onChange={e=>setForm({...form,query:e.target.value})}/>{form.query&&<button type="button" aria-label="清空搜索" onClick={e=>{setForm({...form,query:''});setFilter({...filter,query:''});e.currentTarget.previousElementSibling.focus();}}><Icon name="close" size={14}/></button>}</div><button type="button" onClick={()=>{setForm(initial);setFilter(initial);}}>重置筛选</button></div>{formError&&<p id="snow-filter-error" role="alert" className="error">{formError}</p>}</form></section>
-  <div className="results-head"><div><h2>你的出行候选 <span>{host.loading||host.error?'—':candidates.length}</span></h2><p>{filter.start?`${filter.start} 入住`:'不限入住日期'} · 仅展示符合所选条件的套餐，不代表实时有房</p></div><PackageSelect label="排序" labelIcon="sort" value={sort} options={[["nights","住宿晚数从多到少"],["paid","实付金额从低到高"]]} onChange={setSort}/></div>
-  {host.error?<div className="empty" role="alert">读取套餐失败：{host.error}<button onClick={host.retry}>重试</button></div>:host.loading?<div className="empty" role="status">正在读取已录入套餐…</div>:!host.rows.length?<div className="empty"><Icon name="book" size={36}/><h3>先记下一份套餐</h3><p>粘贴套餐说明，和助理核对后保存。信息不全也可以先记下来。</p><button className="primary" onClick={()=>startSession()} disabled={sessionBusy}>{sessionBusy?'正在准备…':'开始录入'}</button></div>:!candidates.length?<div className="empty"><h3>没有符合筛选条件的套餐</h3><p>试试放宽日期、晚数、目的地、标签或搜索关键词。</p><button onClick={()=>{setForm(initial);setFilter(initial);}}>重置筛选</button></div>:<div className="cards package-candidates">{candidates.map(({record})=><div className="package-candidate" key={record.id}><PackageCard record={record} onInspect={record=>setInspectedPackage(record.id)} onOpen={openPackage} onDelete={record=>{setDeleteError('');const plans=hostSaved.filter(plan=>plan.packages.some(entry=>entry.id===record.id));setPendingDelete({record,plans,archive:!host.rows.some(p=>p.id!==record.id&&p.sessionId===record.sessionId)&&!hostSaved.some(p=>p.sessionId===record.sessionId&&!plans.some(plan=>plan.id===p.id))});}}/></div>)}</div>}{ledger&&<section aria-label="历史台账候选"><h2>历史 Excel 台账候选</h2>{!filter.start&&<p className="muted">选择入住日期后核算历史台账补款。</p>}<div className="cards">{results.map(r=>{const p=r.pkg;return <article key={p.id} className={`trip-card ${selection.includes(p.id)?'selected':''}`}><div className={`card-scenery scenery-${p.region}`}><Icon size={75}/><span className="destination"><Icon name="pin" size={14}/>{p.region}{p.regionInferred?' · 地区推断':''}</span><span className="package-id">套餐 {p.id}</span></div><div className="card-body"><div className="card-meta"><span>{p.status||'状态待确认'}</span><span>{p.split?'可拆分使用':'连住 / 拆分待确认'}</span></div><h3>{p.hotel||p.name}</h3><p className="package-name" title={p.name}>{p.name}</p><div className="stay"><Icon name="calendar" size={16}/>{r.start.slice(5)} — {r.end.slice(5)}<b>{r.nights} 晚</b></div><div className="cost-row"><div><small>台账房间补款{r.needsHotel?' · 示例':''}</small><strong>{r.complete?yuan(r.amount):'待核对'}{r.complete&&<em> / 本次</em>}</strong></div><button className="text-button" onClick={()=>setDetail(r)}>查看依据 <Icon name="arrow" size={15}/></button></div><p className="paid">原订单已付 {yuan(p.paidExtra===null?null:p.paid+p.paidExtra)}{p.split?' · 总间夜金额':''}</p><div className={`card-warning ${r.reasons.length?'blocked':''}`}><Icon name="info" size={14}/><span>{r.reasons[0]||(r.complete?(r.needsHotel?'加价仅为指定酒店示例，需确认门店':'加价已按晚展开，权益及库存仍需确认'):'年份、房型或部分日期加价待确认')}</span></div><div className="card-actions"><button onClick={()=>setDetail(r)}>套餐详情</button><button className={selection.includes(p.id)?'chosen':''} aria-pressed={selection.includes(p.id)} onClick={()=>toggle(p.id)}>{selection.includes(p.id)?<Icon name="check" size={16}/>:<Icon name="compare" size={16}/>} {selection.includes(p.id)?'已选对比':'加入对比'}</button></div></div></article>;})}</div></section>}</>}
+  <section className="search-panel">{mobile?<button className="snow-filter-toggle" aria-expanded={filtersOpen} aria-controls="snow-explore-filters" onClick={()=>setFiltersOpen(open=>!open)}><Icon name="search" size={17}/><span><strong>筛选出行</strong><small>{filter.start||'不限日期'} · {filter.nights?`${filter.nights} 晚`:'按套餐晚数'} · {filter.region}</small></span><span aria-hidden="true">{filtersOpen?'−':'＋'}</span></button>:<div className="section-head"><h2><Icon name="search"/> 找一程适合的出行</h2><span>先选日期，再看套餐怎么用</span></div>}<form id="snow-explore-filters" hidden={mobile&&!filtersOpen} noValidate onSubmit={search}><div className="filter-grid"><DateFilter label="入住日期" triggerRef={startInput} start={form.start} onChange={({start})=>setForm({...form,start})}/><PackageSelect label="住宿晚数" value={form.nights} options={[["","按各套餐晚数"],...[1,2,3,4,5,7,10,15].map(n=>[String(n),`${n} 晚`])]} onChange={nights=>setForm({...form,nights})}/><PackageSelect label="目的地区域" value={form.region} options={['全部目的地',...stats.regions].map(region=>[region,region])} onChange={region=>setForm({...form,region})}/><PackageTagFilter value={form} onChange={setForm}/><PackageSelect label="出行方案" value={form.hasPlan} options={[["","全部"],["yes","已有方案"],["no","暂无方案"]]} onChange={hasPlan=>setForm({...form,hasPlan})}/></div><div className="filter-bottom"><div className="text-search"><Icon name="search" size={17}/><input aria-label="搜索套餐或酒店" placeholder="搜索酒店、套餐或雪场" value={form.query} onChange={e=>setForm({...form,query:e.target.value})}/>{form.query&&<button type="button" aria-label="清空搜索" onClick={e=>{setForm({...form,query:''});setFilter({...filter,query:''});e.currentTarget.previousElementSibling.focus();}}><Icon name="close" size={14}/></button>}</div></div><div className="filter-actions"><button className="primary" type="submit"><Icon name="search"/> 查找套餐</button><button type="button" onClick={()=>{setForm(initial);setFilter(initial);}}>重置筛选</button></div>{formError&&<p id="snow-filter-error" role="alert" className="error">{formError}</p>}</form></section>
+  <div className="results-head"><div><h2>你的出行候选 <span>{host.loading||host.error||planFilterPending?'—':candidates.length}</span></h2><p>{filter.start?`${filter.start} 入住`:'不限入住日期'} · 仅展示符合所选条件的套餐，不代表实时有房</p></div><PackageSelect label="排序" labelIcon="sort" value={sort} options={[["nights","住宿晚数从多到少"],["paid","实付金额从低到高"]]} onChange={setSort}/></div>
+  {filter.hasPlan&&plansError?<div className="empty" role="alert">读取出行方案失败：{plansError}<button onClick={()=>setPlansRefresh(n=>n+1)}>重试</button></div>:planFilterPending?<div className="empty" role="status">正在读取出行方案…</div>:host.error?<div className="empty" role="alert">读取套餐失败：{host.error}<button onClick={host.retry}>重试</button></div>:host.loading?<div className="empty" role="status">正在读取已录入套餐…</div>:!host.rows.length?<div className="empty"><Icon name="book" size={36}/><h3>先记下一份套餐</h3><p>粘贴套餐说明，和助理核对后保存。信息不全也可以先记下来。</p><button className="primary" onClick={()=>startSession()} disabled={sessionBusy}>{sessionBusy?'正在准备…':'开始录入'}</button></div>:!candidates.length?<div className="empty"><h3>没有符合筛选条件的套餐</h3><p>试试放宽日期、晚数、目的地、标签、出行方案或搜索关键词。</p><button onClick={()=>{setForm(initial);setFilter(initial);}}>重置筛选</button></div>:<div className="cards package-candidates">{candidates.map(({record})=><div className="package-candidate" key={record.id}><PackageCard record={record} onInspect={record=>setInspectedPackage(record.id)} onOpen={openPackage} onDelete={record=>{setDeleteError('');const plans=hostSaved.filter(plan=>plan.packages.some(entry=>entry.id===record.id));setPendingDelete({record,plans,archive:!host.rows.some(p=>p.id!==record.id&&p.sessionId===record.sessionId)&&!hostSaved.some(p=>p.sessionId===record.sessionId&&!plans.some(plan=>plan.id===p.id))});}}/></div>)}</div>}{ledger&&<section aria-label="历史台账候选"><h2>历史 Excel 台账候选</h2>{!filter.start&&<p className="muted">选择入住日期后核算历史台账补款。</p>}<div className="cards">{results.map(r=>{const p=r.pkg;return <article key={p.id} className={`trip-card ${selection.includes(p.id)?'selected':''}`}><div className={`card-scenery scenery-${p.region}`}><Icon size={75}/><span className="destination"><Icon name="pin" size={14}/>{p.region}{p.regionInferred?' · 地区推断':''}</span><span className="package-id">套餐 {p.id}</span></div><div className="card-body"><div className="card-meta"><span>{p.status||'状态待确认'}</span><span>{p.split?'可拆分使用':'连住 / 拆分待确认'}</span></div><h3>{p.hotel||p.name}</h3><p className="package-name" title={p.name}>{p.name}</p><div className="stay"><Icon name="calendar" size={16}/>{r.start.slice(5)} — {r.end.slice(5)}<b>{r.nights} 晚</b></div><div className="cost-row"><div><small>台账房间补款{r.needsHotel?' · 示例':''}</small><strong>{r.complete?yuan(r.amount):'待核对'}{r.complete&&<em> / 本次</em>}</strong></div><button className="text-button" onClick={()=>setDetail(r)}>查看依据 <Icon name="arrow" size={15}/></button></div><p className="paid">原订单已付 {yuan(p.paidExtra===null?null:p.paid+p.paidExtra)}{p.split?' · 总间夜金额':''}</p><div className={`card-warning ${r.reasons.length?'blocked':''}`}><Icon name="info" size={14}/><span>{r.reasons[0]||(r.complete?(r.needsHotel?'加价仅为指定酒店示例，需确认门店':'加价已按晚展开，权益及库存仍需确认'):'年份、房型或部分日期加价待确认')}</span></div><div className="card-actions"><button onClick={()=>setDetail(r)}>套餐详情</button><button className={selection.includes(p.id)?'chosen':''} aria-pressed={selection.includes(p.id)} onClick={()=>toggle(p.id)}>{selection.includes(p.id)?<Icon name="check" size={16}/>:<Icon name="compare" size={16}/>} {selection.includes(p.id)?'已选对比':'加入对比'}</button></div></div></article>;})}</div></section>}</>}
   {view==='saved'&&<><section className="hero snow-saved-title" aria-label="已存方案概览"><div className="hero-copy"><h1>已存方案 <span>{hostSaved.length} 份</span></h1><p>回顾每一程的安排与花费。<br/>继续调整时，重新核对套餐与费用。</p></div><Mountain/></section>{plansError&&<p role="alert">{plansError}</p>}
-    {hostSaved.map(plan=><section className="snow-saved-entry" key={plan.id}><PlanSavedCard block={{kind:'tool-result',meta:{version:1,status:'saved',plan}}}>
+    <section className="stats" aria-label="方案总数统计">{[['总方案数',hostSaved.length],['已确认数',hostSaved.filter(plan=>plan.tracking?.booking==='confirmed').length],['可退款数',hostSaved.filter(plan=>plan.tracking?.refund==='refundable').length],['不可退款数',hostSaved.filter(plan=>plan.tracking?.refund==='nonrefundable').length]].map(([label,count])=><div key={label}><span>{label}</span><strong>{!plansLoaded||plansError?'—':count}<small> 份</small></strong></div>)}</section>
+    {hostSaved.length>0&&<PlanFilters plans={hostSaved} value={planFilter} onChange={setPlanFilter} count={filteredPlans.length} mobile={mobile}/>}
+    {hostSaved.length>0&&<div className="results-head"><div><h2>你的已存方案 <span>{filteredPlans.length}</span></h2><p>仅展示符合所选条件的方案</p></div></div>}
+    {hostSaved.length>0&&!filteredPlans.length&&<div className="empty"><h3>没有符合条件的方案</h3><button onClick={()=>setPlanFilter(emptyPlanFilter)}>清空筛选</button></div>}
+    {filteredPlans.map(plan=><section className="snow-saved-entry" key={plan.id}><PlanSavedCard block={{kind:'tool-result',meta:{version:1,status:'saved',plan}}}>
       <div className="package-actions"><button className="primary package-open" disabled={sessionBusy||deleteBusy} onClick={()=>continueRecord(plan,'plan')}>继续规划 <span aria-hidden="true">→</span></button><button className="package-delete" disabled={deleteBusy} onClick={()=>{setDeleteError('');setPendingPlanDelete(plan);}}>删除方案</button></div>
     </PlanSavedCard></section>)}
     {!hostSaved.length&&!plansError&&<div className="empty"><Icon name="save" size={36}/><h3>还没有保存的方案</h3><p>已录入套餐可在“已录套餐”中核对。</p><button disabled={sessionBusy||host.loading||!!host.error} onClick={()=>savedEntrySkill?startSession(`/${savedEntrySkill} `):setView('explore')}>{host.loading?'正在读取套餐…':host.error?'套餐读取失败':sessionBusy?'正在准备…':savedEntrySkill==='snow-import'?'录入套餐':savedEntrySkill==='snow-plan'?'规划出行':'查看已录套餐'}</button></div>}</>}

@@ -10,6 +10,21 @@ const itemEntry = z.strictObject({
   nights: z.number().int().min(1).max(366), start: day,
 });
 
+export const planTracking = z.strictObject({
+  booking: z.enum(['confirmed','unreserved']).nullable(),
+  refund: z.enum(['refundable','nonrefundable']).nullable(),
+  refundPolicy: text.nullable(),
+}).superRefine((value,ctx)=>{
+  if(value.refund==='refundable'&&!value.refundPolicy)ctx.addIssue({code:'custom',path:['refundPolicy'],message:'可退时请提供可退策略'});
+  if(value.refund!=='refundable'&&value.refundPolicy!==null)ctx.addIssue({code:'custom',path:['refundPolicy'],message:'仅可退状态可记录可退策略'});
+});
+export const planTrackingPatch=z.strictObject({
+  booking:planTracking.shape.booking.optional(),
+  refund:planTracking.shape.refund.optional(),
+  refundPolicy:planTracking.shape.refundPolicy.optional(),
+}).refine(value=>Object.values(value).some(item=>item!==undefined),'请提供至少一个要更新的字段');
+export type PlanTrackingPatch=z.infer<typeof planTrackingPatch>;
+
 // 会话 LLM 输入的方案对象，金额单位为元。
 export const planInput = z.strictObject({
   title: z.string().trim().min(1).max(200),
@@ -42,6 +57,7 @@ export function toCents(value: number|null|undefined): number|null {
 
 // 持久化方案记录：金额为分，packages 保存参与套餐的版本与完整快照。
 export const planRecord = z.strictObject({
+  tracking: planTracking.optional(),
   id: z.uuid(), schemaVersion: z.literal(1), createdAt: z.iso.datetime(), sessionId: text,
   title: z.string().trim().min(1).max(200),
   start: day.nullable(), nights: z.number().int().min(1).max(366).nullable(),

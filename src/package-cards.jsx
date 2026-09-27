@@ -62,6 +62,11 @@ export function PlanSavedCard({block,children,onPackage,hideTitle=false}) {
     {onPackage&&<section className="snow-plan-packages" aria-label="引用的套餐"><h4>引用的套餐</h4>{meta.packages.map(entry=><button key={entry.id} aria-label={`查看套餐：${entry.snapshot.name} · 第 ${entry.revision} 版`} onClick={()=>onPackage(entry,meta)}><span className="snow-plan-package-copy"><strong>{entry.snapshot.name}</strong><small>保存时资料 · 第 {entry.revision} 版</small></span><span className="snow-plan-package-arrow" aria-hidden="true">→</span></button>)}</section>}
     </div>
     <div className="snow-saved-total"><span>整趟总成本</span><strong>{yuan(meta.total)}</strong></div></header>
+    {meta.tracking&&<div className="snow-plan-tags" aria-label="出行标签">
+      {meta.tracking.booking&&<span className="snow-session-tag">{meta.tracking.booking==='confirmed'?'已确认':'未预约'}</span>}
+      {meta.tracking.refund&&<span className="snow-session-tag">{meta.tracking.refund==='refundable'?'可退':'不可退'}</span>}
+      {meta.tracking.refund==='refundable'&&<p>可退策略：{meta.tracking.refundPolicy}</p>}
+    </div>}
     {meta.reason&&<p className="snow-saved-reason">{basis(meta.reason)}</p>}
     <section className="snow-saved-breakdown" aria-label="总成本组成"><h4>总成本组成</h4><dl>
       <div><dt>逐晚费用小计 <small>套餐计入成本及日期补款，详见下表</small></dt><dd>{yuan(nightly)}</dd></div>
