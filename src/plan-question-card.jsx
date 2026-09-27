@@ -66,7 +66,7 @@ function PlanUpdateBody({data,busy,onAnswer,cancel,readOnly,outcome,supplement,e
   </div>
   {!readOnly&&<div className="snow-plan-update-footer">
   {error&&<p role="alert">{error}</p>}
-  <footer className="snow-plan-actions">{cancel}<button disabled={busy} onClick={()=>onAnswer({selected:['继续调整']})}>继续调整</button>{!data.rename&&<button disabled={busy} onClick={()=>setAsNew(!asNew)}>{asNew?'改为更新原方案':'另存为新方案'}</button>}<button className="primary" disabled={busy} onClick={()=>onAnswer({selected:[asNew?'确认另存':'确认更新']})}>{busy?'正在保存…':asNew?'确认另存':'确认更新'}</button></footer>
+  <footer className="snow-plan-actions">{cancel}{!data.rename&&<button disabled={busy} onClick={()=>onAnswer({selected:['继续调整']})}>继续调整</button>}{!data.rename&&<button disabled={busy} onClick={()=>setAsNew(!asNew)}>{asNew?'改为更新原方案':'另存为新方案'}</button>}<button className="primary" disabled={busy} onClick={()=>onAnswer({selected:[asNew?'确认另存':'确认更新']})}>{busy?'正在保存…':asNew?'确认另存':'确认更新'}</button></footer>
   {supplement}
   </div>}
  </>;
