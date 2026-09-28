@@ -30,7 +30,7 @@ export const planQuestionSchema=z.preprocess(legacyEstimate,z.looseObject({
   stage:z.enum(['confirm','estimate','results','discussion','review','update','status']),
   input:z.looseObject({start:z.string().optional(),nights:integer.nullable().optional(),budget:number.nullable().optional()}).optional(),
   ids:list(z.string()).optional(),
-  suggestions:z.union([list(z.string()),z.strictObject({start:z.string().optional(),nights:integer.optional()})]).optional(),
+  suggestions:z.union([list(z.string()),list(z.looseObject({label:z.string(),note:z.string().optional()})).transform(items=>items.map(item=>typeof item==='string'?item:item.note?`${item.label}：${item.note}`:item.label)),z.strictObject({start:z.string().optional(),nights:integer.optional()})]).optional(),
   estimates:list(cost).optional(),start:z.string().nullable().optional(),nights:integer.nullable().optional(),scope:z.string().optional(),
   suggested:z.strictObject({start:boolean.optional(),nights:boolean.optional()}).optional(),
   results:list(result).optional(),selected:list(integer).optional(),message:z.string().optional(),parent:z.string().nullable().optional(),
