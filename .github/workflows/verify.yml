@@ -1,4 +1,4 @@
-name: 独立构建检查
+name: 工作台构建检查
 on: [push, pull_request]
 jobs:
   verify:
@@ -15,5 +15,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: 验证核心逻辑及客户端产物
         run: pnpm test
+      - name: 验证类型
+        run: pnpm typecheck
       - name: 验证分发文件
-        run: pnpm pack
+        run: pnpm --filter dsh-snow-trip pack

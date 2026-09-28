@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib",
+    "declarationDir": "lib/types"
+  },
+  "include": [
+    "src/server/service.ts",
+    "src/server/tools.ts",
+    "src/server/permission-policy.js",
+    "src/server/index.js"
+  ]
+}

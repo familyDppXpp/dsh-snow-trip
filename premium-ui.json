@@ -1,8 +1,19 @@
 {
   "profile": "product-admin",
-  "sourceRoots": ["src"],
+  "sourceRoots": [
+    "packages/snow-trip/src"
+  ],
   "locale": "zh-CN",
-  "canonicalMap": "DESIGN.md",
-  "requiredCapabilities": ["Select/Listbox", "Date", "Form", "Scrollbar", "Toast"],
-  "ownership": { "Select/Listbox": "native", "Date": "native" }
+  "canonicalMap": "docs/DESIGN.md",
+  "requiredCapabilities": [
+    "Select/Listbox",
+    "Date",
+    "Form",
+    "Scrollbar",
+    "Toast"
+  ],
+  "ownership": {
+    "Select/Listbox": "native",
+    "Date": "native"
+  }
 }

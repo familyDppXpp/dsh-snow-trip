@@ -1,0 +1,25 @@
+diff --git a/lib/index.js b/lib/index.js
+index a76db65497322996bcd3e3536b053de42ec8ca47..89d1b022ccc3834cf05871692c53c68fc764e4da 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1400,6 +1400,7 @@ var FaceAnalyzer = class {
+ 		const declaration = preferredDeclaration(resolved);
+ 		if (declaration === void 0) return false;
+ 		if (this.registrationForFile(declaration.getSourceFile().fileName)?.name === "@deepseek-ai/dsh-typert-protocol") return true;
++		if (externalModuleIdentityForFile(declaration.getSourceFile().fileName)?.package === "@deepseek-ai/dsh-typert-protocol") return true;
+ 		for (let current = declaration; current !== void 0; current = optionalParent(current)) if (ts.isModuleDeclaration(current) && ts.isStringLiteral(current.name) && current.name.text === "@deepseek-ai/dsh-typert-protocol") return true;
+ 		return false;
+ 	}
+diff --git a/lib/types/analyzer.js b/lib/types/analyzer.js
+index b60a3da3c2bf24bf6e34de0ea638212f87e07ca4..496dd5eb8f41928d220e19dd4523230f3654bbef 100644
+--- a/lib/types/analyzer.js
++++ b/lib/types/analyzer.js
+@@ -1719,6 +1719,8 @@ class FaceAnalyzer {
+         const registration = this.registrationForFile(declaration.getSourceFile().fileName);
+         if (registration?.name === '@deepseek-ai/dsh-typert-protocol')
+             return true;
++        if (externalModuleIdentityForFile(declaration.getSourceFile().fileName)?.package === '@deepseek-ai/dsh-typert-protocol')
++            return true;
+         for (let current = declaration; current !== undefined; current = optionalParent(current)) {
+             if (ts.isModuleDeclaration(current)
+                 && ts.isStringLiteral(current.name)

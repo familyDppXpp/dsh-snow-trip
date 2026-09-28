@@ -18,7 +18,7 @@
 | 需要修改宿主源码吗？ | 已有 `--trusted-host` 配置入口，支持裸域名或 `host:port`；CLI 明确拒绝 `--host 0.0.0.0`。使用 loopback 服务加代理有现成配置基础，是否完全兼容仍需实测。[CLI](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/bundle/web-app/src/startup.ts:46)、[authority 校验](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/api-request-trust.ts:35) |
 | 页面打开就算成功吗？ | 不算。API 与 WebSocket 都需要通过来源检查及 cookie 认证。Host 必须可信，Origin 的 authority 必须与 Host 一致，跨站请求会拒绝。[检查逻辑](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/api-request-trust.ts:91)、[API](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/rpc-host.ts:96)、[WS](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/api/gateway/src/index.ts:212) |
 | 手机怎么登录？ | 以远端域名访问 `/?token=<当前宿主进程令牌>`，由宿主兑换绑定该 authority 的 cookie。localhost 登录态不能直接搬到手机域名。[认证](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/browser-auth.ts:240)、[cookie 校验](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/browser-auth.ts:289) |
-| 首次登录能直接进工作台吗？ | 当前 `/?token=...&app=snow-trip` 会 303 到固定 `/`，丢掉 app 参数。应先登录，再收藏不含 token 的 `https://<域名>/?app=snow-trip`。[重定向](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/browser-auth.ts:256)、[插件入口](/Users/liuyunxia/Documents/dsh/huaxue/src/client.jsx:18) |
+| 首次登录能直接进工作台吗？ | 当前 `/?token=...&app=snow-trip` 会 303 到固定 `/`，丢掉 app 参数。应先登录，再收藏不含 token 的 `https://<域名>/?app=snow-trip`。[重定向](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/browser-auth.ts:256)、[插件入口](/Users/liuyunxia/Documents/dsh/huaxue/packages/snow-trip/src/client/client.jsx:18) |
 
 DSH cookie 默认绝对有效期为 30 天，包含 `HttpOnly; SameSite=Strict`，当前源码未设置 `Secure` 属性。部署应保持手机侧 HTTPS、宿主侧仅 loopback，并保留 DSH 原认证；Tailscale 网络准入不能替代它。[cookie 属性](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/browser-auth.ts:120)、[默认期限](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/connection/src/index.ts:90)
 
@@ -56,7 +56,7 @@ Serve 将同一 Tailscale 私有网络内的请求转发到本机端口，提供
 tailscale serve --bg http://127.0.0.1:4330
 ```
 
-获得真实的 `设备名.网络名.ts.net` 后，在合适时机重启原 DSH 进程，保留原有模型、profile 和 DSH_HOME；不能同时再启动一个占用 4330 的实例。当前本机启动路径来自项目已有运行说明。[现有启动方式](/Users/liuyunxia/Documents/dsh/huaxue/README.md:37)
+获得真实的 `设备名.网络名.ts.net` 后，在合适时机重启原 DSH 进程，保留原有模型、profile 和 DSH_HOME；不能同时再启动一个占用 4330 的实例。当前本机启动路径来自项目已有运行说明。[现有启动方式](/Users/liuyunxia/Documents/dsh/huaxue/packages/snow-trip/README.md:39)
 
 ```sh
 cd /Users/liuyunxia/Documents/ai/deepseek-harness
@@ -70,7 +70,7 @@ DSH_HOME=/Users/liuyunxia/Documents/dsh/huaxue/.local/session-entry-home \
 ## 手机体验的已知差异
 
 - 远端域名被客户端识别为非 loopback，部分设置采用内存持久化，通用设置不创建与本机相同的文档控制器。不能承诺整个 DSH 界面与 localhost 完全等价。[设置存储](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/ui-settings/src/client/index.ts:58)、[通用设置](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/client/ui-settings-general/src/client/index.ts:76)
-- 本地 Mac 启动、监听 loopback 且非 SSH 时，目录选择器自动选 native。经隧道访问并不能改变这一启动时判定，手机触发目录选择可能在电脑弹窗。需要远程目录选择时，官方源码说明建议直接组合 browse 实现；但雪季新建会话路径调用服务端 `ensureWorkspace()`，自动创建宿主用户目录下的 `dsh-snow-trip`，再直接按路径创建 workspace，不走目录选择器，因此此限制不是雪季新建会话的既知阻塞。[雪季新建入口](/Users/liuyunxia/Documents/dsh/huaxue/src/client.jsx:127)、[默认目录](/Users/liuyunxia/Documents/dsh/huaxue/src/service.ts:158)、[宿主按路径创建](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/api/workspace-controller/src/client/service.ts:92)；[选择规则](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/host/directory-picker-auto/src/resolve.ts:49)、[已知限制](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/host/directory-picker-auto/README.md:108)
+- 本地 Mac 启动、监听 loopback 且非 SSH 时，目录选择器自动选 native。经隧道访问并不能改变这一启动时判定，手机触发目录选择可能在电脑弹窗。需要远程目录选择时，官方源码说明建议直接组合 browse 实现；但雪季新建会话路径调用服务端 `ensureWorkspace()`，自动创建宿主用户目录下的 `dsh-snow-trip`，再直接按路径创建 workspace，不走目录选择器，因此此限制不是雪季新建会话的既知阻塞。[雪季新建入口](/Users/liuyunxia/Documents/dsh/huaxue/packages/snow-trip/src/client/client.jsx:127)、[默认目录](/Users/liuyunxia/Documents/dsh/huaxue/packages/snow-trip/src/server/service.ts:158)、[宿主按路径创建](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/api/workspace-controller/src/client/service.ts:92)；[选择规则](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/host/directory-picker-auto/src/resolve.ts:49)、[已知限制](/Users/liuyunxia/Documents/ai/deepseek-harness/packages/host/directory-picker-auto/README.md:108)
 
 ## 验证记录与部署验收
 

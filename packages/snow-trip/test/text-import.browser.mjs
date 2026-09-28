@@ -1,0 +1,51 @@
+// 在隔离 DSH profile 和确定性模型上运行；不得连接真实用户数据。
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {detect,normalize} from '../src/client/ledger.js';
+const {chromium}=await import(process.env.SNOW_PLAYWRIGHT||'playwright');
+const url=(await readFile(process.env.SNOW_HOST_LOG,'utf8')).match(/http:\/\/127\.0\.0\.1:\d+[^\s\x1b]*/)?.[0];
+const browser=await chromium.launch({headless:true,executablePath:process.env.SNOW_CHROME});
+const page=await browser.newPage({viewport:{width:1280,height:960}});page.setDefaultTimeout(20000);
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+try {
+  await page.goto(url,{waitUntil:'networkidle'});
+  await page.waitForFunction(()=>window.snowSessionCheck);
+  // 原工作台可显示旧台账，宿主套餐概览不能混入旧库记录。
+  const raw={fileName:'隔离测试.xlsx',sheets:[{name:'台账',rows:[{number:1,cells:['编号','套餐名称','住宿晚数','订单金额（元）']},{number:2,cells:['001','旧台账记录',2,100]}]}]};
+  const ledger=normalize(raw,detect(raw.sheets));
+  await page.evaluate(ledger=>new Promise((resolve,reject)=>{const r=indexedDB.open('dsh-snow-trip',1);r.onupgradeneeded=()=>r.result.createObjectStore('data');r.onerror=()=>reject(r.error);r.onsuccess=()=>{const db=r.result,t=db.transaction('data','readwrite');t.objectStore('data').put(ledger,'ledger');t.oncomplete=()=>{db.close();resolve();};};}),ledger);
+  await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
+  const panel=page.getByRole('dialog',{name:'雪季出行工作台',exact:true});
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();
+  await panel.getByRole('button',{name:'开始录入',exact:true}).first().waitFor();
+  const before=(await page.evaluate(()=>window.snowSessionCheck.listPackages())).value.length;
+  assert.equal(await panel.locator('.snow-package-card').getByText('旧台账记录').count(),0);
+  await panel.getByRole('button',{name:'开始录入',exact:true}).first().click();
+  const editor=panel.locator('[contenteditable=true]');await editor.waitFor();
+  await editor.fill('长白山住宿，还没买，报价1299元，晚数不知道。请先保存资料。');await editor.press('Enter');
+  await panel.getByText('确认新增套餐',{exact:true}).waitFor();
+  assert.equal((await page.evaluate(()=>window.snowSessionCheck.listPackages())).value.length,before);
+  await page.screenshot({path:'.local/text-import-confirm.png'});
+  assert.ok(!(await panel.innerText()).includes('Current runtime context'));
+  await panel.getByText('确认保存',{exact:true}).click();
+  const submit=panel.getByRole('button',{name:/提交|发送/}).last();await submit.click();
+  await page.waitForFunction(()=>{const s=window.snowSessionCheck.state();return !s.byId[s.current]?.running;});
+  const process=panel.getByRole('button',{name:'1 次工具调用',exact:true});
+  if(await process.getAttribute('aria-expanded')==='false')await process.click();
+  const card=panel.locator('.snow-conversation .snow-package-card');await card.waitFor();
+  const id=await card.getAttribute('data-package-id');assert.equal(await card.getAttribute('data-revision'),'1');
+  assert.match(await card.innerText(),/未购买/);assert.match(await card.innerText(),/待补全/);
+  await page.screenshot({path:'.local/text-import-saved.png'});
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();
+  await panel.locator(`.snow-content [data-package-id="${id}"]`).waitFor();
+  await page.screenshot({path:'.local/text-import-overview.png'});
+  await page.reload({waitUntil:'networkidle'});
+  await page.getByRole('button',{name:'打开雪季出行工作台',exact:true}).click();
+  await panel.getByRole('button',{name:'找出行方案',exact:true}).click();
+  await panel.locator(`[data-package-id="${id}"]`).waitFor();
+  await panel.locator(`[data-package-id="${id}"]`).getByRole('button',{name:'打开相关会话',exact:true}).click();
+  await panel.getByText('1 次工具调用',{exact:true}).click();
+  await panel.locator(`.snow-conversation [data-package-id="${id}"]`).waitFor();
+  assert.deepEqual(errors,[]);
+  console.log('通过：旧库隔离、实际会话确认、持久化成功卡片、同 ID/revision 概览、刷新历史回放。');
+}catch(e){console.log(errors);await page.screenshot({path:'.local/text-import-failure.png'});console.log((await page.locator('body').innerText()).slice(-5000));throw e;}finally{await browser.close();}

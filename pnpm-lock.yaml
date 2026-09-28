@@ -4,9 +4,21 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@deepseek-ai/dsh-typert-generator@0.1.7-rc.2': 87357ca89ba2d3c0c2e81f0f842c6215936e2261f132a4b1081b94c07b65654f
+
 importers:
 
   .:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.4
+        version: 22.20.4
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
+  packages/snow-trip:
     dependencies:
       zod:
         specifier: 4.4.3
@@ -38,7 +50,7 @@ importers:
         version: 0.1.7-rc.2(d2e08270f2205e73d65e98cfcd910cae)
       '@deepseek-ai/dsh-typert-generator':
         specifier: 0.1.7-rc.2
-        version: 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
+        version: 0.1.7-rc.2(patch_hash=87357ca89ba2d3c0c2e81f0f842c6215936e2261f132a4b1081b94c07b65654f)(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-typert-protocol':
         specifier: 0.1.7-rc.2
         version: 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
@@ -48,9 +60,6 @@ importers:
       '@deepseek-ai/dsh-workspace':
         specifier: 0.1.7-rc.2
         version: 0.1.7-rc.2(bb62eb618f9c24e6adb5430fe59c1ef7)
-      '@types/node':
-        specifier: ^22.20.4
-        version: 22.20.4
       esbuild:
         specifier: 0.25.12
         version: 0.25.12
@@ -60,9 +69,9 @@ importers:
       react-day-picker:
         specifier: 9.14.0
         version: 9.14.0(react@18.3.1)
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
+      react-dom:
+        specifier: 18.3.1
+        version: 18.3.1(react@18.3.1)
       xlsx:
         specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
         version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
@@ -479,9 +488,17 @@ packages:
     peerDependencies:
       react: '>=16.8.0'
 
+  react-dom@18.3.1:
+    resolution: {integrity: sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==}
+    peerDependencies:
+      react: ^18.3.1
+
   react@18.3.1:
     resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
     engines: {node: '>=0.10.0'}
+
+  scheduler@0.23.2:
+    resolution: {integrity: sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==}
 
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
@@ -651,7 +668,7 @@ snapshots:
       '@deepseek-ai/dsh-util-values': 0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/schemastery': 3.18.4
 
-  '@deepseek-ai/dsh-typert-generator@0.1.7-rc.2(@deepseek-ai/cordis@4.0.4)':
+  '@deepseek-ai/dsh-typert-generator@0.1.7-rc.2(patch_hash=87357ca89ba2d3c0c2e81f0f842c6215936e2261f132a4b1081b94c07b65654f)(@deepseek-ai/cordis@4.0.4)':
     dependencies:
       '@deepseek-ai/cordis': 4.0.4
       '@jridgewell/gen-mapping': 0.3.13
@@ -853,7 +870,17 @@ snapshots:
       date-fns-jalali: 4.1.0-0
       react: 18.3.1
 
+  react-dom@18.3.1(react@18.3.1):
+    dependencies:
+      loose-envify: 1.4.0
+      react: 18.3.1
+      scheduler: 0.23.2
+
   react@18.3.1:
+    dependencies:
+      loose-envify: 1.4.0
+
+  scheduler@0.23.2:
     dependencies:
       loose-envify: 1.4.0
 

@@ -1,123 +1,19 @@
 {
-  "name": "dsh-snow-trip",
-  "version": "0.1.0",
+  "name": "dsh-workbenches",
   "private": true,
-  "description": "雪季出行工作台：从持续更新的套餐台账筛选、核算和对比出行方案",
   "type": "module",
-  "main": "./src/index.js",
-  "exports": {
-    ".": {
-      "types": "./lib/types/service.d.ts",
-      "default": "./src/index.js"
-    },
-    "./client": "./lib/client.js",
-    "./package.json": "./package.json",
-    "./tools": "./lib/tools.js",
-    "./typert": {
-      "types": "./lib/typert.host.d.ts",
-      "default": "./lib/typert.host.js"
-    },
-    "./remote": {
-      "types": "./lib/typert.remote-client.d.ts",
-      "default": "./lib/typert.remote-client.js"
-    },
-    "./types": {
-      "types": "./lib/types/packages.d.ts"
-    },
-    "./plan-types": {
-      "types": "./lib/types/plans.d.ts"
-    },
-    "./permissions": "./src/permission-policy.js"
-  },
-  "files": [
-    "src/index.js",
-    "lib/client.js",
-    "cordis.patch.yml",
-    "VERIFICATION.md",
-    "THIRD_PARTY_NOTICES.txt",
-    "lib/service.js",
-    "lib/tools.js",
-    "lib/types/service.d.ts",
-    "presets",
-    "lib/typert.host.js",
-    "lib/typert.host.d.ts",
-    "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts",
-    "lib/types/packages.d.ts",
-    "lib/types/plans.d.ts",
-    "lib/types/planning.d.ts",
-    "src/permission-policy.js"
-  ],
+  "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": ">=22.19.0"
   },
-  "dsh": {
-    "bundle": {
-      "patch": [
-        "./cordis.patch.yml",
-        "./presets/snow-trip/agent.cordis.yml"
-      ]
-    },
-    "client": {
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-renderer",
-        "@deepseek-ai/dsh-client-ui-sidebar",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-session",
-        "@deepseek-ai/dsh-client-ui-workspace",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-chat",
-        "@deepseek-ai/dsh-client-ui-attachment",
-        "@deepseek-ai/dsh-client-ui-tool",
-        "@deepseek-ai/dsh-client-modules",
-        "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-ui-user-questions",
-        "@deepseek-ai/dsh-client-ui-input-trigger",
-        "@deepseek-ai/dsh-client-ui-commands",
-        "@deepseek-ai/dsh-client-ui-skill",
-        "@deepseek-ai/dsh-client-ui-model-selection",
-        "@deepseek-ai/dsh-client-ui-permission-presets",
-        "@deepseek-ai/dsh-client-shortcuts"
-      ],
-      "platform": "web"
-    }
-  },
   "scripts": {
-    "prepare": "node build.mjs",
-    "build": "node build.mjs",
-    "test": "node --test test/*.test.mjs",
-    "typecheck": "tsc --noEmit"
+    "prepare": "pnpm run build",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.4",
-    "@deepseek-ai/dsh-scope": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-skill": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-storage": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-storage-domain": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-storage-json": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-tools": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-typert-generator": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-user-questions": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-workspace": "0.1.7-rc.2",
     "@types/node": "^22.20.4",
-    "esbuild": "0.25.12",
-    "react": "18.3.1",
-    "react-day-picker": "9.14.0",
-    "typescript": "6.0.3",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
-  },
-  "dependencies": {
-    "zod": "4.4.3"
-  },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "4.0.4",
-    "@deepseek-ai/dsh-skill": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-storage-domain": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-tools": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-user-questions": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-workspace": "0.1.7-rc.2"
+    "typescript": "6.0.3"
   }
 }

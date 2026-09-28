@@ -7,14 +7,9 @@
     "allowJs": true,
     "skipLibCheck": true,
     "declaration": true,
-    "rootDir": "src",
-    "outDir": "lib/types",
     "types": [
       "node"
     ]
   },
-  "include": [
-    "src/service.ts",
-    "src/tools.ts"
-  ]
+  "files": []
 }

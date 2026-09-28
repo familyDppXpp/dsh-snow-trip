@@ -1,5 +1,5 @@
 packages:
-  - .
+  - packages/*
 allowBuilds:
   esbuild@0.25.12: true
 minimumReleaseAgeExclude:
@@ -16,3 +16,5 @@ minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-system-prompt@0.1.7-rc.2'
   - '@deepseek-ai/dsh-typert-generator@0.1.7-rc.2'
   - '@deepseek-ai/dsh-user-questions@0.1.7-rc.2'
+patchedDependencies:
+  '@deepseek-ai/dsh-typert-generator@0.1.7-rc.2': patches/@deepseek-ai__dsh-typert-generator@0.1.7-rc.2.patch
