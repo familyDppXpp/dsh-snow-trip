@@ -6,7 +6,7 @@ const reactDom=process.env.SNOW_REACT_DOM_CLIENT||'/Users/liuyunxia/Documents/ai
 const bundle=await build({stdin:{resolveDir:process.cwd(),loader:'jsx',contents:`
 import React from 'react';
 import {createRoot} from ${JSON.stringify(reactDom)};
-import {PlanQuestionCard} from './src/client/plan-question-card.jsx';
+import {PlanQuestionCard} from './src/client/plans/question-card.tsx';
 const packages=['甲','乙'].map((name,i)=>({id:String(i),name,purchaseStatus:'purchased',nights:4,completeness:'complete'}));
 const pending={questions:[{id:'snow-plan-confirm-test',detail:JSON.stringify({stage:'confirm',key:'test',ids:[],packages})}],answer:async value=>{window.answer=value;}};
 createRoot(document.getElementById('root')).render(<PlanQuestionCard pending={pending}/>);

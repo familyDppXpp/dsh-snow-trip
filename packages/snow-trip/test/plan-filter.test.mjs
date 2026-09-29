@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {filterPlans,sortPlans,planRegions,refundPolicies,tripDays} from '../src/client/plan-filter.js';
+import {filterPlans,sortPlans,planRegions,refundPolicies,tripDays} from '../src/client/plans/filter.ts';
 test('出行区间须被方案完整包含，首尾可相等，支持跨月跨年与闰日',()=>{
   const plans=[
     {id:1,start:'2027-12-30',nights:4,tracking:{booking:'confirmed'}},

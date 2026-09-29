@@ -7,8 +7,8 @@ assert.ok(process.env.SNOW_REACT_DOM,'请提供 SNOW_REACT_DOM');
 const script=await build({stdin:{contents:`
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import {App} from './src/client/workbench.jsx';
-import {DepartureHero} from './src/client/departure.jsx';
+import {App} from './src/client/workbench/app.tsx';
+import {DepartureHero} from './src/client/conversation/departure.tsx';
 const mode=new URLSearchParams(location.search).get('mode');
 const rows=mode==='empty'?[]:(mode==='mixed'?['incomplete','complete']:['incomplete']).map((completeness,i)=>({id:String(i),sessionId:'old',name:'测试套餐',completeness,updatedAt:'2026-09-25',nights:null,paid:null,paidExtra:null,region:null}));
 const workspace={archivedSessionIds:[]},state={ids:[],byId:{}},draft={draft:''};

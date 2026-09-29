@@ -36,7 +36,7 @@ try{
   browser=await chromium.launch({headless:true,executablePath:process.env.SNOW_CHROME});
   const page=await browser.newPage({viewport:{width:1507,height:858}}),errors=[];
   page.on('crash',()=>console.error('浏览器页面崩溃'));
-  page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
+  page.setDefaultTimeout(10000);page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});
   await page.goto(url,{waitUntil:'networkidle'});await page.waitForFunction(()=>!!window.snowSessionCheck);
   await page.getByRole('button',{name:'继续',exact:true}).click();
   await page.getByRole('button',{name:'稍后配置',exact:true}).click();
@@ -48,7 +48,7 @@ try{
   const brand=()=>panel.getByRole('button',{name:'雪季出行，返回首页',exact:true}).filter({visible:true}).first();
   const day=value=>calendar.getByRole('button',{name:new RegExp('^'+value+'，')});
   const expectDay=async(value,text)=>{await page.waitForFunction(({value,text})=>document.querySelector(`.snow-home button[aria-label^="${value}，"]`)?.getAttribute('aria-label')===text,{value,text});};
-  await calendar.waitFor();
+  await calendar.waitFor().catch(async error=>{console.error(await panel.innerText());throw error;});
   await expectDay('2026-12-31','2026-12-31，方案 1，套餐 1，待确认 1');
   assert.equal(await calendar.locator('.snow-season-navigation,.snow-season-layers,.snow-season-selection').count(),0);
   assert.equal(await calendar.locator('.rdp-month_grid').count(),4);
@@ -159,8 +159,17 @@ try{
     await page.getByRole('dialog',{name:'删除套餐',exact:true}).getByRole('button',{name:'确认删除',exact:true}).click();await page.getByRole('dialog',{name:'删除套餐',exact:true}).waitFor({state:'hidden'});
   }
   await brand().click();await calendar.getByRole('button',{name:'开始录入第一份套餐',exact:true}).waitFor();
+  await panel.getByRole('button',{name:'出发去山野',exact:true}).click();
+  const departure=panel.locator('.snow-conversation'),draft=departure.locator('[data-composer-input]');
+  await draft.fill('技能切换保留草稿');
+  await departure.getByRole('button',{name:/录入套餐/}).click();
+  await page.waitForFunction(()=>document.querySelector('.snow-conversation [data-composer-input]')?.textContent.includes('/snow-import'));
+  assert.match(await draft.innerText(),/^\/snow-import 技能切换保留草稿$/);
+  await departure.getByRole('button',{name:/规划出行/}).click();
+  await departure.getByRole('button',{name:/规划出行/}).click();
+  assert.match(await draft.innerText(),/^\/snow-plan 技能切换保留草稿$/);
   assert.deepEqual(errors,[]);
-  console.log('通过：真实宿主认证、默认首页、四个月总览、无明细卡片、重开与草稿、固定雪季、键盘与窄屏、读取失败与重试、级联删除、迟到响应和空库。');
+  console.log('通过：真实宿主认证、默认首页、四个月总览、无明细卡片、重开与草稿、固定雪季、键盘与窄屏、读取失败与重试、级联删除、迟到响应、空库和技能切换保留草稿。');
 }finally{
   releaseRead();
   await browser?.close();

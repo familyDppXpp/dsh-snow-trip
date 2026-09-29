@@ -5,7 +5,7 @@ import {readFile,mkdir} from 'node:fs/promises';
 const {chromium}=await import(process.env.SNOW_PLAYWRIGHT||'playwright');
 const script=await build({stdin:{contents:`
 import React from 'react';import {createRoot} from ${JSON.stringify(process.env.SNOW_REACT_DOM||'react-dom/client')};
-import {SaveCard} from './src/client/save-card.jsx';import {normalizePackage} from './src/shared/packages.ts';
+import {SaveCard} from './src/client/packages/save-card.tsx';import {normalizePackage} from './src/shared/packages.ts';
 const preview=normalizePackage({name:'长白山测试套餐',description:'长套餐说明。'.repeat(400),otherBenefits:['晚餐券2张','接送1次'],nights:3,quote:129900,hotels:['测试酒店'],surchargeRules:[],skiIncluded:true,skiTickets:2,skiBasis:'night',breakfastIncluded:true,breakfastPeople:2,breakfastBasis:'day',spaIncluded:true,spaPeople:2,spaVisits:1,spaBasis:'order',splitAllowed:true,splitRule:'每次至少住2晚'});
 const previous={...preview,id:'5d7246cd-1606-4794-8087-2597c32fce58',revision:1,schemaVersion:1,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),sessionId:'test'};
 let item={callId:'check'},old=null,p=preview;const root=createRoot(document.getElementById('root'));
@@ -16,7 +16,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.SN
 const page=await browser.newPage({viewport:{width:900,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
 try{
  page.setDefaultTimeout(5000);
- await page.setContent('<meta charset="utf-8"><main id="root"></main>');await page.addStyleTag({content:await readFile('src/client/style.css','utf8')});await page.addScriptTag({content:script.outputFiles[0].text});
+ await page.setContent('<meta charset="utf-8"><main id="root"></main>');await page.addStyleTag({content:await readFile('src/client/workbench/style.css','utf8')});await page.addScriptTag({content:script.outputFiles[0].text});
  const card=page.locator('.snow-save-card');await card.waitFor();const box=await card.getByRole('button',{name:'确认保存',exact:true}).boundingBox();assert.ok(box.y>=0&&box.y+box.height<=1000,'长卡片操作按钮保持可见');assert.ok(await card.locator('.snow-save-body').evaluate(e=>e.scrollHeight>e.clientHeight),'长内容在卡片内部滚动');await page.getByRole('button',{name:'确认保存',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('[data-save-state="saving"]'));
  assert.equal(await card.count(),1);assert.equal(await card.getByRole('button',{name:'继续调整'}).isDisabled(),true);

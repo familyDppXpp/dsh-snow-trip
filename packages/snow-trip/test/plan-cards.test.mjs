@@ -5,14 +5,14 @@ import vm from 'node:vm';
 import {build} from 'esbuild';
 
 import React from 'react';
+import * as jsxRuntime from 'react/jsx-runtime';
 const server=await import(process.env.SNOW_REACT_DOM_SERVER||'react-dom/server');
-const load=async(entry='src/client/plan-question-card.jsx')=>{
+const load=async(entry='src/client/plans/question-card.tsx')=>{
   // external react：组件用宿主 React 渲染（与生产 bundle 一致）；经 vm require 注入宿主 React。
   const bundle=await build({entryPoints:[entry],bundle:true,write:false,platform:'node',format:'cjs',external:['react','react/jsx-runtime'],loader:{'.css':'text'}});
-  const jsx=(type,props,key)=>React.createElement(type,{...props},key);
   const requireShim=id=>{
     if(id==='react')return React;
-    if(id==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment:React.Fragment};
+    if(id==='react/jsx-runtime')return jsxRuntime;
     throw new Error('非预期依赖：'+id);
   };
   const module={exports:{}};
@@ -102,7 +102,7 @@ test('讨论卡三态与回顾/状态卡',async()=>{
 });
 
 test('非法负载回退为不渲染（planQuestion 返回 null）',async()=>{
-  const {planQuestion}=await import('../src/shared/plan-question.js');
+  const {planQuestion}=await import('../src/shared/plan-question.ts');
   assert.equal(planQuestion({questions:[{id:'snow-plan-confirm-x',detail:'not-json'}]}).invalid,true);
   assert.equal(planQuestion({questions:[{id:'snow-plan-a-b',detail:'{}'}]}),null);
   assert.equal(planQuestion({questions:[{id:'snow-commit-x',detail:'{}'}]}),null);
@@ -148,20 +148,24 @@ test('pending 创建前的工具校验失败也显示错误卡',()=>{
 
 
 test('套餐提交工具错误不生成独立保存失败卡片',async()=>{
-  const {SaveCard}=await load('src/client/save-card.jsx');
+  const {SaveCard}=await load('src/client/packages/save-card.tsx');
   const html=server.renderToStaticMarkup(React.createElement(SaveCard,{item:{callId:'invalid',done:true,error:'未购买与实付信息冲突，请澄清'}}));
   assert.equal(html,'');
 });
 
 test('已存方案展示共同费用与总额加总，缺失分项时提示核对',async()=>{
-  const {PlanSavedCard}=await load('src/client/package-cards.jsx');
+  const {PlanSavedCard,SavedPlan}=await load('src/client/plans/saved-plan.tsx');
   const {normalizePackage}=await import('../src/shared/packages.ts');
   const id='11111111-1111-4111-8111-111111111111';
   const pkg={...normalizePackage({name:'测试套餐'}),id,revision:1,schemaVersion:1,createdAt:'2026-09-25T00:00:00Z',updatedAt:'2026-09-25T00:00:00Z',sessionId:'test'};
   const plan={id,schemaVersion:1,createdAt:pkg.createdAt,sessionId:'test',title:'测试方案',start:'2027-02-06',nights:7,budget:null,total:1036000,paid:null,pending:null,reason:null,allocation:null,estimates:[],items:[{packageId:id,revision:1,nights:7,start:'2027-02-06'}],daily:[{date:'2027-02-06',packageId:id,amount:636000,basis:null}],sharedCosts:[{label:'雪票',amount:400000,basis:'10 张，每张 40000 分'}],unknowns:[],packages:[{id,revision:1,snapshot:pkg}]};
   const html=server.renderToStaticMarkup(React.createElement(PlanSavedCard,{block:{kind:'tool-result',meta:{version:1,status:'saved',plan}}}));
+  assert.equal(server.renderToStaticMarkup(React.createElement(SavedPlan,{plan})),html,'已验证方案直接渲染与工具消息入口一致');
+  const composed=server.renderToStaticMarkup(React.createElement(SavedPlan,{plan,heading:React.createElement('h4',null,'引用的套餐')},React.createElement('button',null,'继续规划')));
+  assert.match(composed,/<h4>引用的套餐<\/h4>/);assert.doesNotMatch(composed,/<h3>测试方案<\/h3>/);
+  assert.match(composed,/总成本组成/);assert.match(composed,/<button>继续规划<\/button>/);
   assert.match(html,/雪票/);assert.match(html,/¥6,360.00 逐晚费用 \+ ¥4,000.00 共同费用 = ¥10,360.00/);assert.match(html,/每张 ¥400.00/);
-  const {PlanInteractionCard}=await load('src/client/package-cards.jsx');
+  const {PlanInteractionCard}=await load('src/client/plans/interaction-card.tsx');
   const saved=data=>server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data}));
   assert.equal(saved({version:1,status:'saved',plan,interaction:{action:'save'}}),html,'单份保存复用已存方案卡片');
   const batch=saved({status:'save_results',items:[{status:'saved',planId:id,plan},{status:'failed',title:'失败方案',error:'版本变化'}]});
@@ -194,7 +198,7 @@ test('已存方案展示共同费用与总额加总，缺失分项时提示核�
 });
 
 test('已确认条件保留费用及套餐快照且不可编辑，调整状态不显示',async()=>{
- const {SaveCard}=await load('src/client/save-card.jsx');
+ const {SaveCard}=await load('src/client/packages/save-card.tsx');
  const meta={status:'prepared',confirmedByCard:true,conditions:{start:'2027-02-06',nights:7,rooms:1,people:2,skiDays:5,budget:2000000,packageIds:['p1'],fees:[{id:'ski',label:'雪票',quantity:10,unitPrice:57000,source:'estimate',basis:'用户核对价格'}]},packages:[{id:'p1',name:'确认时的套餐名称',revision:3}]};
  const renderItem=item=>server.renderToStaticMarkup(React.createElement(SaveCard,{item}));
  const html=renderItem({kind:'snow_prepare_plan',meta});
@@ -205,7 +209,7 @@ test('已确认条件保留费用及套餐快照且不可编辑，调整状态�
 });
 
 test('交互后保留补充、取消和逐项保存反馈；后台核算不输出卡片',async()=>{
- const {PlanInteractionCard}=await load('src/client/package-cards.jsx');
+ const {PlanInteractionCard}=await load('src/client/plans/interaction-card.tsx');
  const renderRecord=data=>server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data}));
  const c={start:'2027-02-06',nights:7,rooms:1,budget:null,packageIds:[],fees:[]};
  const supplement=renderRecord({status:'adjusting',conditions:c,custom:'加上往返交通',interaction:{action:'supplement',stage:'confirm'}});
@@ -219,19 +223,19 @@ test('交互后保留补充、取消和逐项保存反馈；后台核算不输�
  }
 
  assert.match(renderRecord({interaction:{action:'save',stage:'results',items:[{title:'甲',status:'saved'},{title:'乙',status:'failed',error:'版本变化'}]}}),/保存失败.*版本变化/s);
- const {SaveCard}=await load('src/client/save-card.jsx');
+ const {SaveCard}=await load('src/client/packages/save-card.tsx');
  assert.equal(server.renderToStaticMarkup(React.createElement(SaveCard,{item:{kind:'snow_evaluate',meta:{status:'computed',resultId:'r'}}})), '');
 });
 
 test('提问回答记录按题目 ID 展示选择、补充及跳过，不提供编辑控件',async()=>{
- const {QuestionAnswerCard}=await load('src/client/package-cards.jsx');
+ const {QuestionAnswerCard}=await load('src/client/conversation/question-answer.tsx');
  const html=server.renderToStaticMarkup(React.createElement(QuestionAnswerCard,{data:{questions:[{id:'date',header:'出行日期',question:'哪天出发？',options:[{label:'2月6日',description:'春节出发'},{label:'2月13日',description:'节后出发'}]},{id:'people',header:'人数',question:'几人？'}],answers:[{id:'people',selected:[]},{id:'date',selected:['2月6日'],custom:'住7晚'}]}}));
  assert.match(html,/哪天出发？/);assert.match(html,/2月6日/);assert.match(html,/补充：住7晚/);assert.match(html,/已跳过/);assert.doesNotMatch(html,/<input|<textarea/);assert.match(html,/2月13日/);assert.match(html,/节后出发/);assert.match(html,/2月6日，已选择/);assert.match(html,/role="tab"/);assert.match(html,/<button disabled/);
 });
 
 
 test('讨论补充按原卡片回放，不将讨论上下文伪装成已选择方案',async()=>{
- const {PlanInteractionCard}=await load('src/client/package-cards.jsx');
+ const {PlanInteractionCard}=await load('src/client/plans/interaction-card.tsx');
  for(const action of ['supplement','cancel']){
   const card={stage:'discussion',selected:[0],message:'请核对套餐补差是否已计入实付。',results:[{title:'讨论中的候选',total:389900}]};
   const html=server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data:{interaction:{stage:'discussion',action,custom:'修正套餐数据',card}}}));
@@ -246,7 +250,7 @@ test('更新候选单选，更新后候选选择与差异卡均保留只读操�
  const candidates={stage:'results',updating:true,results:[{title:'第一份',total:45000},{title:'第二份',total:55000}],selected:[]};
  const interactive=await render(pending('results','update-select',candidates));
  assert.match(interactive,/type="radio"/);assert.doesNotMatch(interactive,/type="checkbox"/);assert.match(interactive,/核对更新差异/);
- const {PlanInteractionCard}=await load('src/client/package-cards.jsx');
+ const {PlanInteractionCard}=await load('src/client/plans/interaction-card.tsx');
  const update={stage:'update',plan:{title:'第二份',total:55000},previous:{total:45000},resetTracking:false,costChange:'增加 ¥100.00',changes:[{label:'整趟总成本',before:'¥450.00',after:'¥550.00',detail:false}]};
  const html=server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data:{interaction:{stage:'update',card:update,action:'update',selected:['确认更新'],status:'saved',selection:{card:candidates,selected:[1]}}}}));
  assert.match(html,/已选择方案 · 已进入更新确认/);assert.match(html,/已选择确认更新 · 已更新/);assert.match(html,/data-plan-stage="results"/);assert.match(html,/data-plan-stage="update"/);assert.equal((html.match(/data-readonly="true"/g)||[]).length,2);assert.doesNotMatch(html,/<input|<textarea|保存所选|核对更新差异/);
@@ -257,7 +261,7 @@ test('独立改名卡仅展示标题差异，历史保留原文和用户操作',
  const detail={rename:true,previous:{title:'100分滑雪'},plan:{title:'春节100分之旅'},changes:[{label:'方案名称',before:'100分滑雪',after:'春节100分之旅',detail:false}],resetTracking:false,costChange:'仅修改标题，费用与套餐快照不变'};
  const html=await render(pending('update','rename',detail));
  assert.match(html,/100分滑雪/);assert.match(html,/春节100分之旅/);assert.doesNotMatch(html,/继续调整|另存为新方案|查看调整后的完整方案|¥1.00/);
- const {PlanInteractionCard}=await load('src/client/package-cards.jsx');
+ const {PlanInteractionCard}=await load('src/client/plans/interaction-card.tsx');
  const history=server.renderToStaticMarkup(React.createElement(PlanInteractionCard,{data:{interaction:{stage:'update',action:'update',selected:['确认更新'],status:'saved',card:{...detail,stage:'update'}}}}));
  assert.match(history,/已选择确认更新 · 已更新/);assert.match(history,/100分滑雪/);assert.doesNotMatch(history,/<button|<input|<textarea/);
 });

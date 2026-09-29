@@ -5,7 +5,7 @@ const reactDom=process.env.SNOW_REACT_DOM||'/Users/liuyunxia/Documents/ai/deepse
 const script=await build({stdin:{contents:`
 import React,{useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {PlanQuestionCard} from './src/client/plan-question-card.jsx';
+import {PlanQuestionCard} from './src/client/plans/question-card.tsx';
 import {wireStages,brokenEstimate,pendingStage} from './test/plan-wire-fixtures.mjs';
 function Check(){
  const [stage,setStage]=useState('planning'),[answer,setAnswer]=useState(null),[fail,setFail]=useState(false),[calls,setCalls]=useState(0);
@@ -18,5 +18,5 @@ function Check(){
 }
 createRoot(document.getElementById('root')).render(<Check/>);`,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'iife',jsx:'automatic',alias:{react:process.cwd()+'/node_modules/react','react-dom/client':reactDom}});
 await mkdir('.local/plan-card-check',{recursive:true});
-await writeFile('.local/plan-card-check/index.html','<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>方案卡片合成检查</title><style>body{margin:16px} main{max-width:860px;margin:auto} textarea{width:100%;box-sizing:border-box} pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><style>'+await readFile('src/client/style.css','utf8')+'</style><div id="root"></div><script>'+script.outputFiles[0].text.replaceAll('</script','<\\/script')+'</script></html>');
+await writeFile('.local/plan-card-check/index.html','<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>方案卡片合成检查</title><style>body{margin:16px} main{max-width:860px;margin:auto} textarea{width:100%;box-sizing:border-box} pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><style>'+await readFile('src/client/workbench/style.css','utf8')+'</style><div id="root"></div><script>'+script.outputFiles[0].text.replaceAll('</script','<\\/script')+'</script></html>');
 console.log('已生成 .local/plan-card-check/index.html');

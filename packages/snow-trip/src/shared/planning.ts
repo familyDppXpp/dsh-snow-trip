@@ -1,9 +1,9 @@
 import {z} from 'zod';
-import {planRecord} from './plans.js';
-import {extraPaymentUnknowns,type PackageRecord} from './packages.js';
+import {planRecord} from './plans.ts';
+import {extraPaymentUnknowns,type PackageRecord} from './packages.ts';
 const text=z.string().trim().min(1).max(4000);
-export {conditions,amount,fee} from './plans.js';
-import {conditions,amount} from './plans.js';
+export {conditions,amount,fee} from './plans.ts';
+import {conditions,amount} from './plans.ts';
 export const planningRecord=z.strictObject({id:z.uuid(),sessionId:text,createdAt:z.iso.datetime(),conditions, sourcePlan:planRecord.optional(), confirmedByCard:z.boolean().default(false), supersededBy:z.uuid().nullable().default(null),status:z.enum(['running','complete','stopped']).default('running')});
 export type Planning=z.infer<typeof planningRecord>;
 export const segment=z.strictObject({packageId:z.uuid(),revision:z.number().int().min(1),start:z.iso.date(),nights:z.number().int().min(1).max(366)});

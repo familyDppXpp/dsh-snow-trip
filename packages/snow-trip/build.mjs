@@ -8,7 +8,7 @@ import { WorkspaceTypertGenerator } from '@deepseek-ai/dsh-typert-generator';
 const workspace = fileURLToPath(new URL('../../', import.meta.url));
 const manifest = JSON.parse(await readFile('package.json', 'utf8'));
 await rm('lib', { recursive: true, force: true });
-execFileSync(process.execPath, [fileURLToPath(import.meta.resolve('typescript/bin/tsc')), '-p', 'tsconfig.json'], { stdio: 'inherit' });
+execFileSync(process.execPath, [fileURLToPath(import.meta.resolve('typescript/bin/tsc')), '-p', 'tsconfig.server.json'], { stdio: 'inherit' });
 const [artifact] = new WorkspaceTypertGenerator(workspace).generate([manifest.name], ['host']);
 if (!artifact?.remote) throw new Error(`${manifest.name} 未生成 Remote 描述`);
 for (const [path, content] of Object.entries({
@@ -16,8 +16,10 @@ for (const [path, content] of Object.entries({
   'typert.remote-client.js': artifact.remote.js, 'typert.remote-client.d.ts': artifact.remote.dts,
 })) await writeFile(join('lib', path), content);
 
+execFileSync(process.execPath, [fileURLToPath(import.meta.resolve('typescript/bin/tsc')), '--noEmit'], { stdio: 'inherit' });
+
 await build({
-  entryPoints: ['src/client/client.jsx'], outfile: 'lib/client.js', bundle: true,
+  entryPoints: ['src/client/client.tsx'], outfile: 'lib/client.js', bundle: true,
   format: 'cjs', platform: 'browser', target: ['es2022'], jsx: 'automatic',
   external: ['react', 'react/jsx-runtime'], loader: { '.css': 'text' }, minify: true,
   define: { 'process.env.NODE_ENV': '"production"' },

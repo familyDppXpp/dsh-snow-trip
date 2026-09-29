@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {calendarDay,undatedRecords,planDateRanges,filterCalendarDay,seasonCalendar,localDay,validMonthRange} from '../src/client/home-calendar.js';
+import {calendarDay,undatedRecords,planDateRanges,filterCalendarDay,seasonCalendar,localDay,validMonthRange} from '../src/client/calendar/model.ts';
 
 const a={id:'a',validFrom:'2026-12-30',validTo:'2027-01-02',unavailableDates:['2027-01-01'],nights:3,usedNights:0,voided:false};
 const b={id:'b',start:'2026-12-31',nights:2,items:[]};

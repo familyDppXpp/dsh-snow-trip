@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {planQuestion,planQuestionItem} from '../src/shared/plan-question.js';
+import {planQuestion,planQuestionItem} from '../src/shared/plan-question.ts';
 
 const detail=(stage,key,extra={})=>JSON.stringify({stage,key,...extra});
 const pendingOf=(stage,key,extra={})=>({questions:[{id:`snow-plan-${stage}-${key}`,question:'请确认',detail:detail(stage,key,extra)}]});

@@ -8,8 +8,8 @@ assert.ok(process.env.SNOW_REACT_DOM,'请提供 SNOW_REACT_DOM（react-dom/clien
 const script=await build({stdin:{contents:`
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import {App} from './src/client/workbench.jsx';
-import {storage} from './src/client/storage.js';
+import {App} from './src/client/workbench/app.tsx';
+import {storage} from './src/client/workbench/storage.ts';
 const base={sessionId:'fixture-session',updatedAt:'2026-09-25T00:00:00Z',id:'a',name:'合成套餐 A',description:null,hotels:['合成酒店'],resort:null,region:'吉林',nights:3,paid:10000,paidExtra:30000,quote:null,purchaseStatus:'purchased',completeness:'incomplete',usedNights:0,validFrom:'2026-12-01',validTo:'2026-12-31',unavailableDates:[],unknowns:[],revision:1};
 const rows=[base,{...base,id:'b',name:'合成套餐 B',nights:5,paid:0,paidExtra:0,purchaseStatus:'unpurchased',completeness:'complete'},{...base,id:'c',name:'合成套餐 C',paid:null,purchaseStatus:'unknown',region:null},{...base,id:'d',name:'合成套餐 D',nights:null,usedNights:null,validFrom:null,paid:20000,paidExtra:0}];
 const workspace={archivedSessionIds:[]};
@@ -18,7 +18,7 @@ const actions={selection:{subscribe:()=>()=>{},getSnapshot:()=>null},lastSession
 window.setLegacy=async present=>{await storage('ledger',present?{fileName:'旧台账.xlsx',packages:[{id:'old',name:'旧套餐',hotel:'旧酒店',resort:'旧雪场',region:'旧地区',nights:2,paid:9999,paidExtra:0,blocked:[],rules:[],split:true}]}:null);};
 createRoot(document.getElementById('root')).render(<App useSessionStatus={()=>new Map()} useSessions={()=>({ids:[],byId:{}})} actions={actions} renderSlot={()=>null}/>);
 `,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'iife',jsx:'automatic',alias:{react:process.cwd()+'/node_modules/react','react-dom/client':process.env.SNOW_REACT_DOM}});
-const html='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{margin:0}</style><style>'+await readFile('node_modules/react-day-picker/src/style.css','utf8')+'\n'+await readFile('src/client/style.css','utf8')+'</style><div id="root"></div><script>'+script.outputFiles[0].text.replaceAll('</script','<\\/script')+'</script></html>';
+const html='<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{margin:0}</style><style>'+await readFile('node_modules/react-day-picker/src/style.css','utf8')+'\n'+await readFile('src/client/workbench/style.css','utf8')+'</style><div id="root"></div><script>'+script.outputFiles[0].text.replaceAll('</script','<\\/script')+'</script></html>';
 const server=createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end(html);});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
@@ -139,6 +139,13 @@ try{
  await page.screenshot({path:'.local/package-date-single-mobile.png'});
  await page.keyboard.press('Enter');
  assert.match(await dateTrigger.innerText(),/2026-12-21/);
+ await page.setViewportSize({width:1440,height:1000});
+ const beforeSwitch=await ids(),dateBeforeSwitch=await dateTrigger.innerText();
+ await page.getByRole('button',{name:'首页',exact:true}).click();
+ await page.getByRole('button',{name:/^已录套餐/}).click();
+ await cards.first().waitFor();
+ assert.deepEqual(await ids(),beforeSwitch);
+ assert.equal(await dateTrigger.innerText(),dateBeforeSwitch);
  assert.deepEqual(errors,[]);
  console.log('通过：真实工作台组件筛选、标签组合、排序、重置、旧台账隔离、键盘和 390px 窄屏；未连接真实宿主。');
 }finally{try{await browser?.close();}finally{await new Promise(resolve=>server.close(resolve));}}

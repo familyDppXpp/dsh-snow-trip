@@ -3,7 +3,7 @@
   "files": [],
   "references": [
     {
-      "path": "./packages/snow-trip"
+      "path": "./packages/snow-trip/tsconfig.server.json"
     }
   ]
 }

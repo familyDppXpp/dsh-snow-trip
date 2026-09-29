@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {addRecordReference,referenceSource} from '../src/client/references.js';
+import {addRecordReference,referenceSource} from '../src/client/conversation/references.ts';
 test('引用仅发送类型与 ID，保留草稿，多标签坐标正确，重复去重，输入忙时不写入',async()=>{
  const record={id:'11111111-1111-4111-8111-111111111111',name:'套餐名称',description:'不得发送的正文',revision:9};
  const state={draft:'已有草稿\n',draftRev:1,occurrences:[]};const inserts=[];
@@ -22,7 +22,7 @@ test('引用仅发送类型与 ID，保留草稿，多标签坐标正确，重�
 });
 
 test('历史消息引用展示保持原文，支持混合套餐/方案，忽略非法和无关 JSON',async()=>{
- const {splitRecordReferences}=await import('../src/client/references.js');
+ const {splitRecordReferences}=await import('../src/client/conversation/references.ts');
  const packageRef='{"type":"package","id":"11111111-1111-4111-8111-111111111111"}';
  const planRef='{"id":"22222222-2222-4222-8222-222222222222", "type":"plan"}';
  const text=`比较 ${packageRef} 和 ${planRef}\n是什么房型`;
@@ -33,7 +33,7 @@ test('历史消息引用展示保持原文，支持混合套餐/方案，忽略�
 });
 
 test('刷新草稿还原多个引用，跳过已有标签，异步期间编辑或离开不会覆盖',async()=>{
- const {restoreDraftReferences}=await import('../src/client/references.js');
+ const {restoreDraftReferences}=await import('../src/client/conversation/references.ts');
  const a='{"type":"package","id":"11111111-1111-4111-8111-111111111111"}',b='{"type":"plan","id":"22222222-2222-4222-8222-222222222222"}';
  let state={draft:`比较 ${a} 和 ${b} 的价格`,draftRev:1,occurrences:[]},listener;
  const inserted=[];
@@ -54,7 +54,7 @@ test('刷新草稿还原多个引用，跳过已有标签，异步期间编辑�
 });
 
 test('@ 菜单列出全部套餐和方案、按名称筛选、排除已选引用，只序列化类型与 ID',async()=>{
- const {recordReferenceSource}=await import('../src/client/references.js');
+ const {recordReferenceSource}=await import('../src/client/conversation/references.ts');
  const a={id:'11111111-1111-4111-8111-111111111111',name:'禾木套餐'},b={id:'22222222-2222-4222-8222-222222222222',title:'春节方案'};
  const remote={listPackages:async()=>({ok:true,value:[a]}),listPlans:async()=>({ok:true,value:[b]})};
  const state={occurrences:[]};const source=recordReferenceSource(remote,()=>({state:{getSnapshot:()=>state}}));

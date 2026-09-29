@@ -8,9 +8,9 @@ import { z } from 'zod';
 import {isDeepStrictEqual} from 'node:util';
 import {randomUUID} from 'node:crypto';
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
-import { packageRecord, type PackageRecord } from '../shared/packages.js';
-import { planRecord, planTrackingPatch, type PlanTrackingPatch, type PlanRecord } from '../shared/plans.js';
-import {planningRecord,resultRecord,type Planning,type Calculation} from '../shared/planning.js';
+import { packageRecord, type PackageRecord } from '../shared/packages.ts';
+import { planRecord, planTrackingPatch, type PlanTrackingPatch, type PlanRecord } from '../shared/plans.ts';
+import {planningRecord,resultRecord,type Planning,type Calculation} from '../shared/planning.ts';
 
 declare module '@deepseek-ai/cordis' { interface Context { snowTrip: SnowTrip } }
 export const snowDomain=defineDomain({name:'snow_trip',version:1,tables:{packages:domainTable(packageRecord),plans:domainTable(planRecord),planning:domainTable(planningRecord),calculations:domainTable(resultRecord)}});

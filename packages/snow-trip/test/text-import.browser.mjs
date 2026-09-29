@@ -1,7 +1,7 @@
 // 在隔离 DSH profile 和确定性模型上运行；不得连接真实用户数据。
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {detect,normalize} from '../src/client/ledger.js';
+import {detect,normalize} from '../src/client/packages/ledger.ts';
 const {chromium}=await import(process.env.SNOW_PLAYWRIGHT||'playwright');
 const url=(await readFile(process.env.SNOW_HOST_LOG,'utf8')).match(/http:\/\/127\.0\.0\.1:\d+[^\s\x1b]*/)?.[0];
 const browser=await chromium.launch({headless:true,executablePath:process.env.SNOW_CHROME});

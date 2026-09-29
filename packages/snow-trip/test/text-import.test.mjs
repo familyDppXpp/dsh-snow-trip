@@ -17,7 +17,7 @@ test('不完整套餐保留未知；金额、日期、空资料和冲突必须�
 
 test('非法与错误工具 metadata 回退通用结果，合法历史快照可重放',async()=>{
   const {build}=await import('esbuild');
-  const bundle=await build({entryPoints:['src/client/package-cards.jsx'],bundle:true,write:false,platform:'node',format:'esm'});
+  const bundle=await build({entryPoints:['src/client/packages/card.tsx'],bundle:true,write:false,platform:'node',format:'esm'});
   const {savedPackage,SavedPackageCard}=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
   const record={...normalizePackage({name:'历史套餐'}),id:'c3fa6a21-1ff7-4e32-a9c2-4e318591f766',schemaVersion:1,revision:1,createdAt:'2026-09-23T00:00:00.000Z',updatedAt:'2026-09-23T00:00:00.000Z',sessionId:'test',sources:[{sessionId:'test',messageSeq:1,text:'历史套餐',nature:'fact'}]};
   record.sourceNotes=[{kind:'image',text:'旧截图'}];

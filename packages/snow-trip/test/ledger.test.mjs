@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import * as React from 'react';
 import * as jsx from 'react/jsx-runtime';
-import {date,detect,evaluate,money,normalize,readWorkbook} from '../src/client/ledger.js';
+import {date,detect,evaluate,money,normalize,readWorkbook} from '../src/client/packages/ledger.ts';
 const sheet={name:'台账',rows:[{number:4,cells:['编号','套餐名称','酒店','住宿晚数','订单金额（元）','状态','已购房型','有效期','雪场']},{number:5,cells:['001','测试连住','测试酒店',2,200,'待预约','双床','2026-11-01至2027-03-31','测试雪场']}]};
 const detail={name:'001加价',rows:[{number:2,cells:['开始日期','结束日期','加价（元／间／晚）']},{number:3,cells:['2026-12-01','2026-12-05',100]},{number:4,cells:['2026-12-06','2026-12-10',200]}]};
 test('台账映射、金额与逐晚边界保持来源；未知不变成零',()=>{

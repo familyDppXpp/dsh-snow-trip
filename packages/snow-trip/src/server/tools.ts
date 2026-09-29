@@ -1,11 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { defineTool, type ParameterSchemaSpec, type ToolRunContext } from '@deepseek-ai/dsh-tools';
-import type {} from './service.js';
+import type {} from './service.ts';
 import '@deepseek-ai/dsh-user-questions';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { extraPayment, normalizePackage, packageInput, packageRecord, fieldLabels, type PackageRecord } from '../shared/packages.js';
-import {registerPlanningTools} from './planning-tools.js';
+import { extraPayment, normalizePackage, packageInput, packageRecord, fieldLabels, type PackageRecord } from '../shared/packages.ts';
+import {registerPlanningTools} from './planning-tools.ts';
 
 export const name='snow-trip-tools';
 export const inject=['snowTrip','tools','userQuestions'];

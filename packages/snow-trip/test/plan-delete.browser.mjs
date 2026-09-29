@@ -5,7 +5,7 @@ import {readFile,mkdir} from 'node:fs/promises';
 const {chromium}=await import(process.env.SNOW_PLAYWRIGHT||'playwright');
 const script=await build({stdin:{contents:`
 import React from 'react';import {createRoot} from ${JSON.stringify(process.env.SNOW_REACT_DOM||'react-dom/client')};
-import {App} from './src/client/workbench.jsx';import {normalizePackage} from './src/shared/packages.ts';import {storage} from './src/client/storage.js';
+import {App} from './src/client/workbench/app.tsx';import {normalizePackage} from './src/shared/packages.ts';import {storage} from './src/client/workbench/storage.ts';
 const id='11111111-1111-4111-8111-111111111111',createdAt='2026-09-25T00:00:00Z';
 const pkg={...normalizePackage({name:'测试套餐'}),id,revision:1,schemaVersion:1,createdAt,updatedAt:createdAt,sessionId:'test'};
 const plan={id,schemaVersion:1,createdAt,sessionId:'test',title:'删除验收方案',start:'2027-02-06',nights:7,budget:null,total:10000,paid:null,pending:null,reason:null,allocation:null,estimates:[],items:[{packageId:id,revision:1,nights:7,start:'2027-02-06'}],daily:[{date:'2027-02-06',packageId:id,amount:10000,basis:null}],sharedCosts:[],unknowns:[],packages:[{id,revision:1,snapshot:pkg}]};
@@ -19,7 +19,7 @@ const browser=await chromium.launch({headless:true,executablePath:process.env.SN
 try{
  const page=await browser.newPage({viewport:{width:1061,height:863}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(5000);
  await page.route('http://snow.test/',route=>route.fulfill({body:'<meta charset="utf-8"><div id="root"></div>',contentType:'text/html'}));
- await page.goto('http://snow.test/');await page.addStyleTag({content:await readFile('src/client/style.css','utf8')});await page.addScriptTag({type:'module',content:script.outputFiles[0].text});
+ await page.goto('http://snow.test/');await page.addStyleTag({content:await readFile('src/client/workbench/style.css','utf8')});await page.addScriptTag({type:'module',content:script.outputFiles[0].text});
  await page.getByRole('button',{name:'查看套餐详情：最新套餐名称',exact:true}).click();
  const explorePanel=page.getByRole('complementary',{name:'关联详情'});
  await explorePanel.getByRole('heading',{name:'套餐详情',exact:true}).waitFor();

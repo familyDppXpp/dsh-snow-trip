@@ -13,7 +13,7 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json';
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
 import {SnowTrip} from '../lib/server/service.js';
 import {normalizePackage} from '../lib/shared/packages.js';
-import {planQuestion} from '../src/shared/plan-question.js';
+import {planQuestion} from '../src/shared/plan-question.ts';
 
 test('已有方案更新：自动差异、确认/取消/另存、重新核算、冲突与历史快照',async()=>{
  const root=await mkdtemp(join(tmpdir(),'snow-update-'));const ctx=new Context();let scope,answer;

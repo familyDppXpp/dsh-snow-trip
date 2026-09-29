@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createSnowSession, openSnowSession, snowSessions, sessionTitle, groupSessions, packagesForSession, renameSnowSession} from '../src/client/sessions.js';
+import {createSnowSession, openSnowSession, snowSessions, sessionTitle, groupSessions, packagesForSession, renameSnowSession} from '../src/client/conversation/sessions.ts';
 
 test('新建先选预设，草稿不发送，历史只打开雪季会话；失败停止输入', async () => {
   const calls=[];
@@ -66,7 +66,7 @@ test('编辑标题写入指定宿主会话，空标题和非雪季会话被拒�
 });
 
 test('宿主确认同步到嵌入视图，移除与卸载镜像不回答原问题',async()=>{
-  const {mirrorQuestions}=await import('../src/client/sessions.js');
+  const {mirrorQuestions}=await import('../src/client/conversation/sessions.ts');
   let snapshot=new Map(),listener,removed=0;const published=[];
   const source={getSnapshot:()=>snapshot,subscribe:fn=>{listener=fn;return()=>{listener=null;};}};
   const target={registerPendingInteraction:()=>pending=>{published.push(pending);return()=>removed++;}};
@@ -91,7 +91,7 @@ test('详情侧栏只展示当前会话套餐，最近更新优先且不修改�
 });
 
 test('方案关联优先分类，预填保留草稿并去重，归档和缺失会话不打开',async()=>{
-  const {continueSnowSession,continuationPrompt}=await import('../src/client/sessions.js');
+  const {continueSnowSession,continuationPrompt}=await import('../src/client/conversation/sessions.ts');
   const record={id:'11111111-1111-4111-8111-111111111111',title:'春节方案',name:'测试套餐',sessionId:'s'};
   const rows=[{id:'s',title:'混合会话'},{id:'t',title:'其他'}];
   const groups=groupSessions(rows,'',[{sessionId:'s',completeness:'complete'}],[record,{...record,id:'p2'}]);

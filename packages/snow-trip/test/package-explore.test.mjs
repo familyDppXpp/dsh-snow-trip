@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {packageStats,packageCandidates} from '../src/client/package-explore.js';
+import {packageStats,packageCandidates} from '../src/client/packages/filter.ts';
 const base={id:'a',name:'山湖居',description:'亲子',hotels:['山湖酒店'],resort:'雪场',region:'吉林',nights:3,paid:209700,paidExtra:null,purchaseStatus:'purchased',completeness:'incomplete',usedNights:0,validFrom:'2026-12-01',validTo:'2026-12-06',unavailableDates:[],voided:false};
 const filter={start:'2026-12-04',nights:'3',region:'全部目的地',query:'',purchaseStatuses:[],completeness:[]};
 const ids=(rows,f=filter,sort='nights',direction='desc')=>packageCandidates(rows,f,sort,[],direction).map(({record})=>record.id);

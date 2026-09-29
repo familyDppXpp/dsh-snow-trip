@@ -106,8 +106,24 @@ http://127.0.0.1:端口/?token=启动时给出的token#app=snow-trip
 
 ## 开发目录与构建
 
-本包位于仓库的 `packages/snow-trip/`。`src/client/` 包含浏览器界面，`src/server/` 包含宿主服务与工具，`src/shared/` 包含共享模型；`test/` 包含验证脚本，`presets/` 包含插件预设，`lib/` 是未提交的构建产物。
+本包位于仓库的 `packages/snow-trip/`。`src/client/` 包含浏览器界面，`src/server/` 包含宿主服务与工具，`src/shared/` 包含共享模型；源码统一使用 `.ts` / `.tsx`，构建和测试脚本保留 `.mjs`；`test/` 包含验证脚本，`presets/` 包含插件预设，`lib/` 是未提交的构建产物。
+
+客户端按业务组织，组件、状态和纯计算放在对应目录中：
+
+```text
+src/client/
+  client.tsx       插件入口
+  integration/     DSH 挂载、插槽注册和宿主操作
+  workbench/       页面组合、导航布局和共享资料读取
+  calendar/        首页日历与日期计算
+  packages/        套餐筛选、卡片、详情、比较和删除
+  plans/           方案列表、确认步骤、更新及删除
+  conversation/    会话列表、操作、消息引用和对话面板
+  ui/              无业务状态的按钮、筛选控件、弹窗等
+```
+
+`workbench/app.tsx` 组合页面并协调跨页面选中项；套餐探索状态由 `usePackageExplorer` 管理，会话状态由 `useWorkbenchSession` 管理，资料读取集中在 `useWorkbenchRecords`。页面切换保留筛选条件；弹窗输入与错误由弹窗组件管理。业务组件直接导入所需文件，不经过汇总导出；DSH 插槽注册集中在 `integration/`。工作台样式入口保留在 `workbench/style.css`，保持现有层叠顺序。
 
 从仓库根目录执行 `pnpm --filter dsh-snow-trip build`、`pnpm --filter dsh-snow-trip test` 或 `pnpm --filter dsh-snow-trip typecheck`，也可进入本包目录后执行对应命令。安装依赖统一在仓库根目录执行。
 
-`build.mjs` 在本包内执行构建：TypeScript 直接生成 `lib/server/`、`lib/shared/` 下的运行代码和 `lib/types/` 下的声明，随后生成 Remote 并打包客户端。服务端不再二次打包。生成器与 esbuild 依赖由本包声明；根目录保留公共 TypeScript 配置、Remote 项目引用与 pnpm 协议识别补丁。DSH 宿主无需修改。
+`build.mjs` 在本包内执行构建：先按 `tsconfig.server.json` 用 TypeScript 直接生成 `lib/server/`、`lib/shared/` 下的运行代码和 `lib/types/` 下的声明，随后生成 Remote，按 `tsconfig.json` 严格检查整个 `src/`，最后打包客户端。所有 JavaScript 产物只写入 `lib/`，权限入口也使用编译产物。服务端不再二次打包。生成器与 esbuild 依赖由本包声明；根目录保留公共 TypeScript 配置、Remote 项目引用与 pnpm 协议识别补丁。DSH 宿主无需修改。

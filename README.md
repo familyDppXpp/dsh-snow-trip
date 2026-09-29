@@ -37,7 +37,7 @@ dsh plugin --profile web add "$PWD/packages/snow-trip"
 - `patches/`：已锁定版本的生成器补丁，详见[补丁说明](patches/README.md)。
 - `docs/`、`experiments/`：设计与验证记录、参考资料和实验脚本。
 
-新增工作台时，在 `packages/<名称>/` 中声明唯一的包名和 DSH 插件入口，业务依赖放在自己的 `package.json` 中。需要 Remote 的工作台须加入 `tsconfig.host.json` 的 `references`。包内保留独立的 `build`、`test`、`typecheck` 命令，根目录通过 pnpm 递归执行。
+新增工作台时，在 `packages/<名称>/` 中声明唯一的包名和 DSH 插件入口，业务依赖放在自己的 `package.json` 中。需要 Remote 的工作台须将其服务端配置（如 `tsconfig.server.json`）加入 `tsconfig.host.json` 的 `references`，避免生成器依赖尚未生成的客户端 Remote。包内保留独立的 `build`、`test`、`typecheck` 命令，根目录通过 pnpm 递归执行。
 
 各包自行定义构建入口与发布文件；根目录只调度包内命令，不约定服务或客户端文件名。出现实际重复业务代码后再提取共享包。
 

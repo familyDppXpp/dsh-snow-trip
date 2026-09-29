@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {apply} from '../src/server/permission-policy.js';
+import {apply} from '../src/server/permission-policy.ts';
 test('雪季权限命令拒绝切换，并在模型组装前恢复工作区内修改',()=>{
  let command,assemble;const session={preset:'danger-full-access'};
  const ctx={commands:{register:value=>{command=value;}},permissionPresets:{set:(s,preset)=>{s.preset=preset;}},on:(name,handler)=>{assert.equal(name,'system-prompt/assemble');assemble=handler;}};

@@ -4,7 +4,6 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
-    "allowJs": true,
     "skipLibCheck": true,
     "declaration": true,
     "types": [

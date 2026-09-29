@@ -12,7 +12,7 @@ import Storage from '@deepseek-ai/dsh-storage';
 import * as StorageJson from '@deepseek-ai/dsh-storage-json';
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain';
 import {wireStages,brokenEstimate} from './plan-wire-fixtures.mjs';
-import {planQuestion} from '../src/shared/plan-question.js';
+import {planQuestion} from '../src/shared/plan-question.ts';
 import {SnowTrip} from '../lib/server/service.js';
 
 test('snow_plan_stage 展示卡片并返回用户编辑；取消保留输入不写入',async()=>{

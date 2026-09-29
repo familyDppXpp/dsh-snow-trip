@@ -1,6 +1,6 @@
 import {isDeepStrictEqual} from 'node:util';
-import {fieldLabels,extraPaymentDescription,benefitBasisLabels,purchaseLabels,type PackageRecord} from '../shared/packages.js';
-import type {PlanRecord} from '../shared/plans.js';
+import {fieldLabels,extraPaymentDescription,benefitBasisLabels,purchaseLabels,type PackageRecord} from '../shared/packages.ts';
+import type {PlanRecord} from '../shared/plans.ts';
 
 export type ChangeRow={label:string;before:string;after:string;detail:boolean};
 const money=(value:unknown)=>value==null?'未知':`¥${(Number(value)/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}`;

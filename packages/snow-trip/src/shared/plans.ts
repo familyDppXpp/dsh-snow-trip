@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { packageRecord } from './packages.js';
+import { packageRecord } from './packages.ts';
 
 const text = z.string().trim().min(1).max(4000);
 const day = z.iso.date();
